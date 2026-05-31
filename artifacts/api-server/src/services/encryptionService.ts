@@ -46,3 +46,4 @@ export const decrypt = (encryptedData: EncryptedData, masterKey: string): string
 
   return decrypted;
 };
+
