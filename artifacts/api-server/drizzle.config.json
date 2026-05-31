@@ -1,0 +1,8 @@
+{
+  "schema": "./src/db/schema.ts",
+  "out": "./src/db/migrations",
+  "driver": "pg",
+  "dbCredentials": {
+    "connectionString": "postgres://user:password@localhost:5432/ace_db"
+  }
+}

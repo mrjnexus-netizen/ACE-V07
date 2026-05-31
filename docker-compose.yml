@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./artifacts/ace-2026
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - ace-network
+
+  api:
+    build:
+      context: ./artifacts/api-server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://user:password@postgres:5432/ace_db
+      REDIS_URL: redis://redis:6379
+      # Other .env variables will be passed during actual deployment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ace-network
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ace_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-HEALHTHCHECK", "pg_isready", "-U", "user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ace-network
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ace-network
+
+networks:
+  ace-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

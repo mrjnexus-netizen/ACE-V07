@@ -1,0 +1,47 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import path from 'path'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react(), nodePolyfills()],
+  root: path.resolve(__dirname, '../../'), // Root index.html is at the monorepo root
+  server: {
+    port: 18956,
+  },
+  preview: {
+    port: 18956,
+  },
+  build: {
+    outDir: path.resolve(__dirname, './dist'),
+    assetsDir: 'assets',
+    sourcemap: false, // Disable sourcemaps in production
+    minify: 'esbuild',
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three')) {
+              return 'vendor_three';
+            }
+            if (id.includes('framer-motion')) {
+              return 'vendor_framer_motion';
+            }
+            if (id.includes('dnd-kit')) {
+              return 'vendor_dnd_kit';
+            }
+            return 'vendor';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 200,
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})
