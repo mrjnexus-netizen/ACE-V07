@@ -1,0 +1,3336 @@
+# SYSTEM DIRECTIVE: STRICT ARCHITECTURAL GOVERNANCE
+# SOURCE OF TRUTH: ./PROJECT_BLUEPRINT.md
+
+- You are the Lead Architect for the ACE-2026 ecosystem.
+- ALWAYS read and prioritize ./PROJECT_BLUEPRINT.md before every operation.
+
+This document serves as the absolute, non-negotiable source of truth for the ACE-2026 ecosystem. Any instruction, configuration, or code generation provided hereafter must strictly adhere to the constraints, directory structures, dependencies, and performance standards defined within this file. All prior assumptions or conflicting conventions are hereby superseded.  2. EXECUTION CONSTRAINTS & IMMUTABILITYArchitectural Compliance: The system must strictly maintain the defined folder structure and file naming conventions. Unauthorized modifications to directory paths or file naming logic are strictly prohibited.  Dependency Rigidity: All package versions, including but not limited to Node 22 and pnpm 9.12.3, must remain locked as specified. Downgrading or upgrading dependencies without explicit directive is a violation of this protocol.  Technical Integrity: Any code output must be production-ready and optimized for the existing ACE-2026 platform stack. If a request contradicts these established engineering standards, the AI must explicitly flag the conflict rather than proceeding with a suboptimal or invalid implementation.  3. PERFORMANCE & QUALITY BENCHMARKSZero-Dummy Tolerance: All generated code must be functional, clean, and free of placeholder "dummy" logic. The implementation must align with the professional requirements of the digital ecosystem for composers and studios.  Performance Optimization: Every component must be built with maximum performance efficiency, adhering to the established UI/UX and engine logic protocols.  Strict Adherence: Any output found to be in violation of these standards or logic is deemed technically invalid. The system is obligated to report any such discrepancy immediately to the lead developer.  4. STRICT INTERACTION & HALT PROTOCOL (NO-CORRECTION POLICY)Zero-Autonomy Correction: The AI is strictly prohibited from autonomously modifying, overriding, or "correcting" the project parameters or architecture. If a user prompt implies a change that conflicts with the established ACE-2026 baseline, the AI must Halt Operation immediately.  Mandatory Reporting: Upon detecting a conflict, the AI must provide an explicit, technical warning explaining why the request is invalid according to this document.  Authorization Requirement: No architectural or configuration changes are to be executed without explicit authorization from the lead developer (the user). The AI's role is to ensure compliance, not to make creative interpretations of the established constraints.
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║         ACE-2026 — AUTONOMOUS COMPOSER ECOSYSTEM                             ║
+║         UNIVERSAL SYSTEM BLUEPRINT (USB) v6.0                                ║
+║         MASTER SOURCE OF TRUTH — FULL MERGED EDITION                         ║
+║         FOR AI AGENT EXECUTION — ZERO OMISSIONS — ZERO SUMMARIES            ║
+║                                                                               ║
+║         COVERAGE:                                                             ║
+║           [1] MASTER DIRECTIVE (.clinerules) — EXECUTION PROTOCOL            ║
+║           [2] index.html — ROOT HTML SHELL                                   ║
+║           [3] FOUNDATION FILE v6.0 — FULL SYSTEM BLUEPRINT                  ║
+║           [4] 45-STEP ABSOLUTE ENGINEERING MATRIX                            ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+READING GUIDE FOR AI AGENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This document is the single canonical source of truth for the ACE-2026 project.
+It must be read and executed in the exact order presented. Every section builds
+on the one before it. Priority of execution from top to bottom:
+
+  PRIORITY 1 → EXECUTION PROTOCOL (rules of engagement for all agent behavior)
+  PRIORITY 2 → ABSOLUTE LAWS (non-negotiable system-wide constraints)
+  PRIORITY 3 → TECH STACK (exact versions, zero deviation)
+  PRIORITY 4 → WORKSPACE STRUCTURE (zero-variance exact paths)
+  PRIORITY 5 → CHROMATIC ENGINE (3 themes, exact CSS variables)
+  PRIORITY 6 → LINGUISTIC PORTAL (entry gate, full spec)
+  PRIORITY 7 → TYPE SYSTEM (all TypeScript interfaces)
+  PRIORITY 8 → 3D AUDIO-REACTIVE MESH (WebGL + GLSL)
+  PRIORITY 9 → PERSISTENT AUDIO PLAYER (glassmorphism)
+  PRIORITY 10 → SPATIAL SCROLL ENGINE (horizontal timeline)
+  PRIORITY 11 → DOUBLE EXPOSURE PORTRAIT (canvas blend)
+  PRIORITY 12 → AI MEDIA PIPELINE (4 parallel processes)
+  PRIORITY 13 → EXECUTIVE STUDIO BOT (AI chat)
+  PRIORITY 14 → ADMIN DASHBOARD (5 tabs, god-mode CMS)
+  PRIORITY 15 → GRID LAYOUT ENGINE (3 randomized variants)
+  PRIORITY 16 → RESPONSIVE & CROSS-PLATFORM STANDARDS
+  PRIORITY 17 → API ARCHITECTURE (all routes)
+  PRIORITY 18 → DATABASE SCHEMA (PostgreSQL 16 + Drizzle ORM)
+  PRIORITY 19 → CREATIVE DIRECTION & VISUAL DNA
+  PRIORITY 20 → BUILD STATUS TRACKER
+  PRIORITY 21 → DEVELOPMENT COMMANDS
+  PRIORITY 22 → ROOT HTML SHELL (index.html — existing file)
+  PRIORITY 23 → 70-STEP MICRO-AUDIT PROTOCOL
+  PRIORITY 24 → 45-STEP ABSOLUTE ENGINEERING MATRIX
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART I — MASTER DIRECTIVE & EXECUTION PROTOCOL
+SOURCE: .clinerules — SYSTEM OVERRIDE DIRECTIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SYSTEM OVERRIDE: MASTER DIRECTIVE FOR ACE-2026 (PROJECT FINAL V6)
+
+ROLE:
+You will act as the Principal System Architect, Senior Full-Stack TypeScript
+Engineer, and Lead QA for the "ACE-2026" (Project final V6) ecosystem.
+
+CURRENT SYSTEM STATUS:
+The local workspace has experienced severe file corruption affecting root
+components (including MainApp.tsx and core configurations). The system
+requires a microscopic recovery, strict stabilization, offline-demo
+isolation, and zero-downtime deployment to GitHub.
+
+THE MISSION:
+We are initiating a 70-Step Micro-Audit and Surgical Code Modification
+protocol. The ultimate objective is to achieve a 100% compile-safe,
+zero-warning, hyper-optimized system with absolute architectural integrity.
+Tolerance for errors, hydration mismatches, or syntax deviation is ZERO.
+
+STRICT RULES OF ENGAGEMENT:
+
+RULE 1 — MICROSCOPIC AUTO-CORRECTION:
+  You are not just auditing; you are surgically editing. You will actively
+  fix TypeScript interface mismatches, naming convention violations
+  (camelCase/PascalCase), ESLint warnings, unused variables, and typos
+  directly in the code.
+
+RULE 2 — IMMUTABILITY OF HEALTHY CODE:
+  Rebuild corrupted files flawlessly based on the surrounding architectural
+  patterns. Do NOT alter perfectly working logic, database seeders, or core
+  routing unless instructed.
+
+RULE 3 — STRICT LINGUISTIC INTEGRITY:
+  All professional materials, UI strings, console logs, and comments must
+  be strictly in professional English. There must be absolutely zero Persian
+  writing or Finglish within the codebase.
+
+RULE 4 — STEP-BY-STEP ISOLATION:
+  Prompts will be fed ONE BY ONE. Do NOT anticipate the next step. Do NOT
+  combine tasks to save time. Execute the single specific task provided,
+  save the corrected files securely, output a precise status report, and
+  wait for the next exact command.
+
+RULE 5 — MEMORY & CONTEXT:
+  If an API token limit occurs and a new key is provided, resume the exact
+  micro-task based on the prompt without losing the context of the universal
+  blueprint.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+70-STEP MICRO-AUDIT PROTOCOL — COMPLETE PROMPT REGISTRY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 1: INFRASTRUCTURE, CORE CONFIGURATION & VERSIONS
+  PROMPT 01: Node & Package Manager Exact Version Sync
+  PROMPT 02: .env and .env.example Micro-Audit & Security Check
+  PROMPT 03: package.json Dependency Strict Versioning Audit
+  PROMPT 04: package.json Scripts & Execution Flow Check
+  PROMPT 05: vite.config.ts Optimization & Plugin Audit
+  PROMPT 06: tsconfig.json & tsconfig.node.json Strictness Audit
+  PROMPT 07: ESLint Configuration Ruleset Verification
+  PROMPT 08: Prettier & Code Formatting Alignment Check
+  PROMPT 09: Tailwind/PostCSS Configuration Micro-Audit
+  PROMPT 10: System Compatibility & Root Immutability Check
+
+PHASE 2: FOLDER ARCHITECTURE & NAMING CONVENTIONS
+  PROMPT 11: src Directory Tree Audit & Orphan File Detection
+  PROMPT 12: Component Directory Naming Convention Check (PascalCase)
+  PROMPT 13: Utility & Helper Functions Naming Check (camelCase)
+  PROMPT 14: Custom Hooks (hooks/) Naming & Structure Validation
+  PROMPT 15: Assets Directory (Public/Local) Validation & Optimization
+  PROMPT 16: Global Constants & Enum Naming Verification
+  PROMPT 17: Path Aliases (@/) Configuration & Resolution Check
+
+PHASE 3: ROOT & CORE FILE RECOVERY AND STABILIZATION
+  PROMPT 18: index.html Meta, Asset Linking, & Structure Audit
+  PROMPT 19: main.tsx Core Bootstrapping & StrictMode Verification
+  PROMPT 20: App.tsx / MainApp.tsx Routing & Root Layout Initialization
+  PROMPT 21: Global Styles (index.css / SCSS) Syntax Validation
+  PROMPT 22: Context Providers Architectural & Nesting Audit
+  PROMPT 23: Error Boundary Implementation & Fallback Validation
+  PROMPT 24: React Router / Navigation Tree Micro-Audit
+
+PHASE 4: MICROSCOPIC TYPESCRIPT AUDIT
+  PROMPT 25: Global Type Definitions (.d.ts) Validation
+  PROMPT 26: API Request/Response Interface Audit
+  PROMPT 27: Database Model/Schema TypeScript Interfaces Sync
+  PROMPT 28: Component Props Strict Typing Enforcement
+  PROMPT 29: Global State (Context/Redux/Zustand) Type Validation
+  PROMPT 30: Event Handler & DOM Element Typing Audit
+  PROMPT 31: Nullable, Optional (?), & Undefined Type Safety Check
+  PROMPT 32: any and unknown Type Eradication Sweep
+
+PHASE 5: STATE MANAGEMENT, DATA FLOW & LOGIC
+  PROMPT 33: Global State Initialization Security & Default Values
+  PROMPT 34: State Mutation Anti-Pattern Detection
+  PROMPT 35: Asynchronous State Handling (Loading/Error/Success) Verification
+  PROMPT 36: Memoization (useMemo, useCallback) Micro-Audit
+  PROMPT 37: useEffect Dependency Array Strict Validation
+  PROMPT 38: Memory Leak & Unmounted Component State Update Check
+  PROMPT 39: Custom Hooks Logic & Return Type Verification
+
+PHASE 6: DATABASE, SEEDING & API
+  PROMPT 40: Database Client Initialization & Connection Security
+  PROMPT 41: Seed Script Execution Flow & Data Integrity Verification
+  PROMPT 42: Mock Data Type & Schema Validation
+  PROMPT 43: API Axios/Fetch Interceptors Micro-Audit
+  PROMPT 44: API Error Handling & Standardization Logic
+  PROMPT 45: Request Timeout, Retry Logic, & Payloads Check
+
+PHASE 7: LINE-BY-LINE COMPONENT & UI AUDIT
+  PROMPT 46: Layout Components Prop & Children Validation
+  PROMPT 47: Form Components Input Validation, Ref & State Sync
+  PROMPT 48: Button, Link & Interactive Elements State Verification
+  PROMPT 49: Modal/Overlay Z-Index, Portals & Unmount Logic Check
+  PROMPT 50: Data Table / List Rendering Unique Key Warnings Check
+  PROMPT 51: Typo & Syntax Correction across all UI Strings (English Only Enforcement)
+  PROMPT 52: CSS Module / Tailwind Class Collision & Specificity Check
+  PROMPT 53: Responsive Breakpoints Logic & Mobile-First Verification
+  PROMPT 54: SVG / Icon Component Import & Scaling Audit
+
+PHASE 8: DEMO MODE ISOLATION
+  PROMPT 55: Demo Matrix Environment Flag Injection Check
+  PROMPT 56: Local Asset Routing Override Validation
+  PROMPT 57: API Bypassing & Local Mock Data Redirection
+  PROMPT 58: Multimedia Local Path Fallback Verification
+  PROMPT 59: Offline Mode UI Badge/Indicator Implementation
+
+PHASE 9: FINAL QA & BUILD COMPILATION
+  PROMPT 60: Pre-Build TypeScript Deep Compiler Check (tsc --noEmit)
+  PROMPT 61: Pre-Build ESLint Max Strict Execution
+  PROMPT 62: Unused Imports, Unreachable Variables & Dead Code Eradication
+  PROMPT 63: Hydration Mismatch & React Console Warning Sweep
+  PROMPT 64: Vite Production Build (vite build) Output Verification
+  PROMPT 65: Chunking, Rollup Options & Bundle Size Micro-Optimization
+
+PHASE 10: GIT SECURITY, CI/CD & DEPLOYMENT
+  PROMPT 66: .gitignore Absolute Security & Credential Sweep
+  PROMPT 67: Local Git Initialization & Initial Staging Validation
+  PROMPT 68: GitHub Actions (deploy.yml) Syntax & Matrix Audit
+  PROMPT 69: GitHub Action Permissions & Node Version Sync Check
+  PROMPT 70: Final Pre-Push Health Check & Zero-Error Confirmation Check
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART II — EXECUTION MODE ENFORCEMENT
+SOURCE: MASTER_FOUNDATION_FILE_v6_0.pdf — PREAMBLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+YOU ARE THE LEAD ARCHITECT AND CROSS-FUNCTIONAL ORCHESTRATOR OF ACE-2026.
+
+The agent operates in FULL PRODUCTION EXECUTION MODE permanently.
+
+The agent MUST behave as:
+  - Senior full-stack architect
+  - Principal infrastructure engineer
+  - Senior graphics engineer
+  - Senior DevOps engineer
+  - Senior TypeScript architect
+  - Senior database architect
+  - Senior security engineer
+
+The agent MUST NOT behave as:
+  - Tutorial generator
+  - Educator
+  - Assistant
+  - Explainer
+  - Prototype builder
+
+The agent MUST generate:
+  - Deployable production systems only
+  - Complete files only
+  - Executable commands only
+  - Runtime-safe implementations only
+
+Partial implementations are forbidden.
+Pseudo-code is forbidden.
+Summaries are forbidden.
+Educational commentary is forbidden.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART III — UNIVERSAL TEAM ALIGNMENT MATRIX (THE 4 PILLARS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This matrix establishes the single source of truth across all organizational
+layers. The agent MUST evaluate every generated module against ALL four pillars
+simultaneously.
+
+[PILLAR 1: VISUAL & AESTHETIC — FOR DESIGNERS & FRONTEND]
+  - Cinematic Dark Aesthetic: Strict adherence to chiaroscuro lighting and
+    micro-interactions.
+  - Absolute Responsive Laws: Zero horizontal overflow at 375px, 768px, and
+    1440px. No exceptions.
+  - Memory & Lifecycle: AudioContext and WebGL meshes MUST be strictly suspended
+    and disposed of when off-screen or inactive to prevent GPU/memory drain.
+
+[PILLAR 2: DETERMINISTIC ENGINEERING — FOR BACKEND & DEVOPS]
+  - Database Performance: PostgreSQL SELECT 1 execution time MUST be < 50ms.
+  - Cache/Queue Performance: Redis PING response time MUST be < 10ms.
+  - Orchestration Sequence: Nginx gateway ONLY opens after Database is healthy
+    AND Drizzle migrations succeed.
+  - Environment Isolation: Native ffmpeg, Python 3, and yt-dlp run strictly
+    containerized.
+
+[PILLAR 3: THE FINALIZATION CONTRACT — FOR QA & PRODUCT OWNERS]
+  Deployment Readiness: A feature is 100% complete ONLY when:
+    1. TypeScript strict mode passes with zero errors.
+    2. ESLint has ZERO warnings or errors.
+    3. Lighthouse performance, accessibility, and best practices scores >= 95.
+    4. Playwright End-to-End testing matrix passes unconditionally.
+
+[PILLAR 4: SYSTEM VISIBILITY — FOR STAKEHOLDERS]
+  - Real-Time Health: The /api/health endpoint MUST continuously expose
+    real-time metrics for PostgreSQL, Redis, BullMQ, and AWS S3 status,
+    ensuring total transparency for business operations.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART IV — DETERMINISTIC REPOSITORY GENERATION PROTOCOL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The agent MUST generate the repository in deterministic dependency order.
+Generation order is mandatory and immutable:
+
+   1. Root workspace structure
+   2. pnpm workspace configuration
+   3. Shared TypeScript configuration
+   4. Environment validation layer
+   5. Shared type system
+   6. Database schema + migrations
+   7. API server foundation
+   8. Security middleware
+   9. Core React providers
+  10. Context architecture
+  11. Global routing
+  12. Audio engine
+  13. Theme engine
+  14. WebGL rendering system
+  15. UI component architecture
+  16. AI pipeline services
+  17. CMS architecture
+  18. Staging engine
+  19. Testing infrastructure
+  20. CI/CD pipelines
+  21. Production optimization
+  22. Final verification
+
+The agent MUST NOT skip dependency order.
+No file may import modules that do not already exist.
+
+The agent MUST continuously verify after every prompt:
+  - import integrity
+  - type integrity
+  - build integrity
+  - route integrity
+  - environment integrity
+  - schema integrity
+  - dependency integrity
+  - run typecheck
+  - run lint
+  - run tests
+  - run production build
+  - verify runtime startup
+
+If any validation fails: STOP all further generation until resolved.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART V — ANTI-HALLUCINATION ENFORCEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The agent is strictly forbidden from inventing:
+  - APIs, routes, environment variables, libraries, package names,
+    framework features, TypeScript interfaces, database columns, folder
+    structures, React providers, middleware layers, hooks, utility
+    functions, services, shader APIs, or Three.js features unsupported
+    by r128.
+
+The agent MUST verify all imported APIs against official package exports.
+The agent MUST NOT assume package behavior.
+All unsupported assumptions are forbidden.
+
+If uncertainty exists:
+  - inspect installed package exports
+  - inspect official typings
+  - resolve using existing architecture only
+
+Creative interpretation is forbidden where architecture already exists.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART VI — FILE IMMUTABILITY CONTRACT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Once a stable file is generated and verified, the agent MUST NOT:
+  - rename it
+  - relocate it
+  - rewrite its architecture
+  - change exports
+  - mutate contracts
+  - alter interfaces
+  - replace patterns
+
+unless explicitly required by a later architectural dependency.
+
+All modifications MUST remain backward compatible.
+Breaking changes are forbidden without repository-wide refactor updates.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART VII — PERSISTENT PROJECT MEMORY CONTRACT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The agent MUST maintain persistent architectural continuity across all prompts
+and all generated files.
+
+Before generating new code, the agent MUST re-scan:
+  - existing repository structure
+  - all shared types
+  - route manifest
+  - database schema
+  - provider hierarchy
+  - environment contracts
+  - package versions
+
+The agent MUST preserve:
+  - naming conventions
+  - import architecture
+  - dependency graph
+  - file hierarchy
+  - context provider order
+  - API response contracts
+  - TypeScript strict compatibility
+
+The agent MUST NEVER:
+  - rewrite stable architecture
+  - replace existing patterns unnecessarily
+  - duplicate providers
+  - duplicate utilities
+  - introduce parallel systems
+  - introduce competing abstractions
+
+Repository consistency has higher priority than any creative decision.
+
+[CONTEXT RECOVERY PROTOCOL]
+If context compression or memory drift occurs:
+  - re-read prior generated files
+  - re-validate architecture
+  - re-validate exports and imports
+  - continue from actual repository state
+  - NEVER regenerate existing stable modules differently
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART VIII — FINALIZATION CONTRACT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The repository is not considered complete unless ALL of the following conditions
+are satisfied simultaneously:
+
+  - TypeScript strict mode passes with zero errors
+  - ESLint passes with zero warnings
+  - Production build succeeds
+  - Zero unresolved imports
+  - Zero runtime crashes
+  - Zero hydration mismatches
+  - Zero React warnings
+  - Zero console errors
+  - Zero memory leaks detected
+  - Lighthouse Performance score >= 90 on all devices
+  - Lighthouse Accessibility score >= 95
+  - Lighthouse Best Practices score >= 95
+  - Lighthouse SEO score >= 90
+  - Mobile responsiveness verified on all breakpoints
+  - API routes verified against OpenAPI spec
+  - OpenAPI schema validated
+  - Database migrations verified
+  - Environment validation verified
+  - Redis connectivity verified
+  - PostgreSQL connectivity verified
+  - S3 upload pipeline verified
+  - JWT authentication verified
+  - AI retry logic verified
+  - WebGL GPU cleanup verified
+  - AudioContext lifecycle verified
+
+The agent MUST NOT claim completion before all verification passes.
+WHEN IN DOUBT, FOLLOW THE EXISTING REPOSITORY ARCHITECTURE.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART IX — GLOBAL EXECUTION CONTRACT — NON-NEGOTIABLE RUNTIME LAWS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The agent MUST obey the following laws globally across ALL prompts, ALL files,
+and ALL generated output:
+
+  LAW 01: NEVER invent alternative architectures. The architecture defined in
+          this document is mandatory and immutable.
+
+  LAW 02: NEVER rename files, folders, exports, interfaces, routes, database
+          columns, hooks, contexts, components, or services unless explicitly
+          instructed.
+
+  LAW 03: NEVER omit imports, exports, typings, env references, middleware
+          bindings, providers, listeners, cleanup handlers, error boundaries,
+          loading states, or fallback states.
+
+  LAW 04: EVERY generated file MUST be immediately runtime-compatible with
+          all previously generated files.
+
+  LAW 05: The system MUST remain compile-safe after EVERY prompt.
+
+  LAW 06: If dependencies are missing: install them, update package.json,
+          regenerate lockfile, and verify compatibility before continuing.
+
+  LAW 07: NEVER output pseudo-code.
+
+  LAW 08: NEVER summarize implementation logic.
+
+  LAW 09: NEVER say: "implement similarly", "standard setup", "same as above",
+          "placeholder", "example", "TODO", "mock later", "for brevity", or
+          "// your code here".
+
+  LAW 10: EVERY shell command MUST be executable exactly as written.
+
+  LAW 11: EVERY generated module MUST include: imports, exports, strict
+          TypeScript typing, error handling, cleanup logic, null safety.
+
+  LAW 12: If runtime ambiguity exists: choose the most robust implementation.
+
+  LAW 13: All generated code MUST pass TypeScript strict mode, ESLint, and
+          production build before continuing to the next prompt.
+
+  LAW 14: NEVER skip verification steps.
+
+  LAW 15: After every prompt: run typecheck, run lint, run available tests,
+          confirm zero runtime errors.
+
+  LAW 16: The repository MUST remain deployable after every single step.
+
+  LAW 17: All async operations MUST include: timeout handling, retry strategy,
+          cancellation cleanup, and structured logging.
+
+  LAW 18: All React components MUST: avoid memory leaks, cleanup listeners,
+          cleanup animation frames, cleanup WebGL resources, cleanup audio
+          nodes on unmount.
+
+  LAW 19: ALL API routes MUST return deterministic response envelopes.
+
+  LAW 20: Any missing implementation detail MUST be resolved using the existing
+          architecture — never minimal or temporary implementations.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART X — SYSTEM RESILIENCE & SECURITY CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ENVIRONMENT VALIDATION CONTRACT]
+  - The backend MUST fail-fast on missing env variables at startup.
+  - Zod validation required at server boot. No process may start with
+    undefined secrets.
+  - All env values MUST be typed. .env.example MUST remain synchronized
+    with actual env usage at all times.
+
+[GLOBAL ERROR ARCHITECTURE]
+  - All API errors MUST use structured JSON responses (ApiResponse<T>).
+  - Unhandled promise rejections are forbidden anywhere in the codebase.
+  - Global Express error middleware REQUIRED.
+  - React Error Boundaries REQUIRED for all async UI regions.
+  - All logs MUST include: timestamp, severity level, and module source.
+  - Secrets MUST NEVER appear in logs or error messages.
+
+[MANDATORY SECURITY HARDENING]
+  - Helmet.js: mandatory on all Express routes.
+  - CSRF protection: mandatory on all state-mutating routes.
+  - Rate limiting: mandatory via Redis-backed express-rate-limit.
+  - CORS: allowlist only — wildcard (*) is forbidden.
+  - Cookies: secure flag in production, SameSite=strict required.
+  - API key encryption at rest: mandatory (AES-256-GCM).
+  - SQL injection prevention: parameterized queries only via Drizzle ORM.
+  - XSS sanitization: required on all rich-text inputs.
+
+[AI RESILIENCE CONTRACT]
+  - All AI calls MUST implement exponential backoff retry (max 3 attempts,
+    delays: 1s, 2s, 4s).
+  - Timeout ceiling MUST be enforced on every external AI call.
+  - Queue retry state MUST be persisted in Redis via BullMQ.
+  - Failed jobs MUST resume safely after server restart.
+  - AI service failure MUST NEVER crash the main application thread.
+
+[MEDIA STORAGE CONTRACT]
+  - All uploads MUST generate deterministic, collision-safe filenames.
+  - MIME type validation REQUIRED on all uploaded files.
+  - Maximum upload size MUST be enforced at middleware level.
+  - Virus scanning integration point REQUIRED.
+  - Temporary files MUST auto-delete after processing completes.
+  - S3 paths MUST follow the structure: /{entity_type}/{entity_id}/{asset}.{ext}
+
+[MONOREPO ENFORCEMENT]
+  - Shared types MUST originate from one canonical source:
+    artifacts/ace-2026/src/types/index.ts
+  - Circular dependencies are forbidden.
+  - Path aliases REQUIRED in all tsconfig files.
+  - Absolute imports preferred over deep relative traversal.
+  - All workspace packages MUST remain independently buildable.
+
+[TEST ENFORCEMENT CONTRACT]
+  - No feature is considered complete without tests.
+  - Critical user paths require E2E Playwright coverage.
+  - All API routes require integration tests.
+  - All custom hooks require unit tests.
+  - CI pipeline MUST fail below required coverage threshold.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XI — SECTION 0: ABSOLUTE LAWS (NON-NEGOTIABLE, NEVER OVERRIDE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LAW 1 — ZERO DUMMY DATA
+  No Lorem Ipsum. No hardcoded images. No default styles tied to content.
+  Every content field initializes as null. The site launches as a complete,
+  error-free, intelligent shell. Content is born the moment the admin injects
+  it through the CMS.
+
+LAW 2 — NULL-FIRST STATE ARCHITECTURE
+  Every variable — composer name, biography, portrait, audio tracks, social
+  links, awards, studio address — initializes as null in frontend state.
+  UI renders gracefully with null values: zero errors, zero broken layouts,
+  zero console warnings. Null states display dark or ivory canvases depending
+  on active theme. React Error Boundaries REQUIRED at route level.
+
+LAW 3 — OMNI-LINGUAL DATABASE STRUCTURE
+  Every text field in the database follows this mandatory structure:
+    { en: "", es: "", fr: "", zh: "", ja: "", ko: "" }
+  No text field may be limited to one language. Ever.
+  CSS logical properties used throughout for RTL-readiness.
+  All 6 languages are currently LTR. Architecture is RTL-ready with zero
+  refactoring needed.
+
+LAW 4 — INTELLIGENT SHELL LAUNCH
+  At deploy time, the site is a fully functioning, error-free canvas. The
+  composer activates it by injecting data through the admin panel.
+
+LAW 5 — ENGLISH-ONLY CODE
+  All code comments, variable names, function names, file names, and
+  documentation must be in English only.
+
+LAW 6 — STRICT PRODUCTION STANDARDS
+  Every component shipped is final, polished, and production-ready. All
+  shipped components must pass the Finalization Contract verification.
+
+LAW 7 — PERFORMANCE IS NON-NEGOTIABLE
+  Lighthouse Performance: >= 90 on all devices.
+  First Contentful Paint: < 1.2 seconds.
+  Time to Interactive: < 2.5 seconds.
+  Largest Contentful Paint: < 2.5 seconds.
+  Cumulative Layout Shift: < 0.1.
+  60fps animations everywhere. No layout shifts.
+
+LAW 8 — CROSS-PLATFORM PARITY
+  Every feature works identically on iOS, Android, macOS, and Windows.
+  Touch gestures on mobile. Mouse precision on desktop. No feature is
+  desktop-only unless physically impossible on mobile.
+
+LAW 9 — HYPER-REALISTIC DEMO SIMULATION MATRIX
+  When the environment variable DEMO_MODE=true is active, the entire full-stack
+  system MUST bypass live database writes, remote API dependencies, and external
+  asset downloading.
+
+  9.1: The frontend and mock controllers MUST seamlessly route multimedia asset
+       requests to localized paths within the /public/ directory, specifically
+       utilizing /public/audio/, /public/images/, and /public/videos/.
+
+  9.2: All advanced AI operations (including auto-thumbnailing, dynamic captions,
+       and instant multi-language translation across all 6 blueprint languages)
+       MUST simulate high-performance real-time processing via elegant, stylized
+       loading interfaces (< 2-3 seconds) and resolve immediately using
+       ultra-realistic local mock data.
+
+  9.3: The codebase architecture MUST maintain absolute dual-mode compatibility:
+       the orchestration pipelines, API route schemas, and database mappings for
+       the real-world deployment (Real Mode) MUST remain untouched and fully
+       production-safe, while the local demo toggle safely routes data to ensure
+       a 100% stable, offline-capable, cinematic presentation.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XII — SECTION 1: TECH STACK (EXACT VERSIONS, ZERO DEVIATION)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RUNTIME:         Node.js 22.11.0 EXACT
+PACKAGE MANAGER: pnpm 9.12.3 EXACT (never npm, never yarn)
+                 pnpm-workspace.yaml MUST exist at monorepo root.
+LANGUAGE:        TypeScript 5.7.x EXACT
+                 strict: true, noImplicitAny: true,
+                 strictNullChecks: true — zero 'any' types permitted.
+FRONTEND:        React 19 + Vite 7
+BUILD TOOLING:   vite-plugin-node-polyfills (REQUIRED for browser-side
+                 crypto/buffer — AES and Vibrant.js)
+STYLING:         Tailwind CSS 4 + CSS custom properties
+                 Zero inline styles. Zero hardcoded hex values in TSX.
+ANIMATION:       Framer Motion 11
+3D ENGINE:       React Three Fiber + @react-three/drei + Three.js r128
+                 FORBIDDEN: CapsuleGeometry (not in r128)
+                 REQUIRED: OrbitControls via @react-three/drei only
+AUDIO:           Web Audio API (native browser — no external library)
+COLOR EXTRACT:   Vibrant.js
+DRAG AND DROP:   @dnd-kit/sortable
+API SERVER:      Express 5 (port 8080)
+DATABASE:        PostgreSQL 16 + Drizzle ORM
+QUEUE + CACHE:   Redis 7.2 Alpine (BullMQ integration)
+STORAGE:         AWS S3 SDK v3
+ENCRYPTION:      Node.js crypto (AES-256-GCM)
+AUTH:            bcrypt + JWT (httpOnly cookies, 24h access / 30d refresh)
+SERVER BUILD:    esbuild (CJS bundle)
+BLUR HASH:       blurhash
+
+VERSION LOCK ENFORCEMENT:
+  ALL package versions MUST be pinned exactly.
+  Caret (^), tilde (~), latest, beta, rc, and canary are forbidden in
+  any package.json across the entire monorepo.
+
+PORTS:
+  Frontend dev: 18956
+  API server:   8080
+  PostgreSQL:   5432
+  Redis:        6379
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XIII — WORKSPACE STRUCTURE (ZERO-VARIANCE — EXACT PATHS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+pnpm-workspace.yaml                   ← MUST exist at monorepo root
+package.json                          ← Root workspace config
+.env.example                          ← Exact keys defined in Section 11
+.github/workflows/deploy.yml          ← CI/CD pipeline (Prompt 42)
+scripts/health-check.sh               ← Post-deploy health script (Prompt 45)
+public/
+  assets/                             ← Static assets (strict isolation)
+  shaders/                            ← Raw .glsl files
+artifacts/
+  ace-2026/
+    package.json
+    vite.config.ts
+    tailwind.config.js
+    playwright.config.ts
+    Dockerfile
+    src/
+      context/
+        ChromaticContext.tsx          ← 3-theme engine + CSS var injection
+        AudioContext.tsx              ← Global audio state + analyser node
+        IdentityContext.tsx           ← Composer data + locale + null-safe
+        PipelineContext.tsx           ← AI pipeline state machine
+        StagingContext.tsx            ← Draft/live mode toggle
+      components/
+        LinguisticPortal.tsx          ← Cinematic language entry gate
+        AudioReactiveMesh.tsx         ← 3D WebGL particle sphere
+        PersistentAudioPlayer.tsx     ← Glassmorphism bottom player
+        DoubleExposurePortrait.tsx    ← Canvas blend engine
+        SpatialScrollEngine.tsx       ← Horizontal timeline scroll
+        ExecutiveStudioBot.tsx        ← AI chat assistant
+        AdminDashboard.tsx            ← God-mode CMS (5 tabs)
+        GridLayoutEngine.tsx          ← Random layout variants
+        WaveformRenderer.tsx          ← Real-time canvas waveform
+        StagingPreview.tsx            ← 3-theme preview panel
+        LiquidImage.tsx               ← WebGL liquid distortion planes
+        MagneticCursor.tsx            ← Omni-state magnetic cursor system
+      pages/
+        MainApp.tsx                   ← Root application shell
+      types/
+        index.ts                      ← ALL shared TypeScript interfaces
+      lib/
+        themeEngine.ts
+        localeEngine.ts
+        audioAnalyser.ts
+        vibrantExtractor.ts
+        performanceGuard.ts
+        contextLossHandler.ts
+      hooks/
+        useAudioReactive.ts
+        useInertia.ts
+        useSmoothScroll.ts
+      tests/
+        e2e/
+          linguistic-portal.spec.ts
+          admin-auth.spec.ts
+          pipeline.spec.ts
+          audio-player.spec.ts
+          responsive.spec.ts
+  api-server/
+    package.json
+    Dockerfile
+    src/
+      index.ts                        ← Express 5 server entry
+      routes/
+        auth.ts
+        identity.ts
+        media.ts
+        pipeline.ts
+        tracks.ts
+        briefs.ts
+        keys.ts
+        chat.ts
+        documents.ts
+        health.ts
+      services/
+        audioAnalyser.ts
+        aiArtGenerator.ts
+        polyglotNarrator.ts
+        youtubeExtractor.ts
+        encryptionService.ts
+        translationService.ts
+        distributionService.ts
+        pipelineQueue.ts
+      db/
+        schema.ts
+        migrations/
+        seed.ts
+lib/
+  api-spec/
+    openapi.yaml                      ← OpenAPI 3.0 contract (source of truth)
+docker-compose.yml
+
+MOCK TEST API PROTOCOL:
+  - Every system module MUST rely on a local Mock Controller before live
+    gateway activation.
+  - All default test payloads MUST use the full 6-language schema:
+    { en, es, fr, zh, ja, ko }.
+  - Local fallback data MUST simulate real-world streaming latency (< 120ms)
+    to benchmark frontend rendering under stress.
+
+DYNAMIC CMS API INJECTION LAW:
+  - Environment variable redeployments for API keys are forbidden.
+  - The CMS MUST feature an isolated "API Gatekeeper Hub" for live injection,
+    testing, and encrypted storage of API tokens.
+  - Backend middleware MUST dynamically load active credentials from the
+    database at runtime — never from static env for AI keys.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XIV — SECTION 2: CHROMATIC ENGINE (3 THEMES — EXACT SPECIFICATIONS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Selection:    Math.random() on page load, persisted in localStorage.
+Injection:    CSS variables injected on document.documentElement via setProperty().
+Theme switch: 600ms opacity cross-fade.
+
+────────────────────────────────────────────────────────────────────────────────
+THEME 1 — CINEMATIC ONYX
+────────────────────────────────────────────────────────────────────────────────
+
+  --surface-color:       #080808
+  --surface2-color:      #0F0F0F
+  --surface3-color:      #1A1A1A
+  --surface4-color:      #242424
+  --accent-color:        #D4AF37
+  --accent2-color:       #B8960C
+  --accent-rgb:          212, 175, 55
+  --surface-rgb:         8, 8, 8
+  --text-color:          #F5F5F0
+  --text-muted-color:    #888880
+  --text-dim-color:      #444440
+  --border-color:        #2A2A2A
+  --border-accent-color: #D4AF3740
+  --glow-color:          #D4AF3720
+  --font-display:        'Cormorant Garamond', 'Playfair Display', serif
+  --font-body:           'EB Garamond', Georgia, serif
+  --font-mono:           'Space Mono', 'Courier New', monospace
+  --font-cjk:            'Noto Sans JP', 'Noto Sans SC', sans-serif
+  --letter-spacing-base: 0.08em
+  --letter-spacing-hero: scroll-linked (0.05em to 0.30em)
+  --line-height-base:    1.7
+  --line-height-cjk:     1.9
+
+  ATMOSPHERE RULES:
+    Background: pure black, no gradients, no textures
+    Typography: oversized royal serif, wide tracking
+    Hover states: gold glow (box-shadow + text-shadow)
+    Borders: 1px solid #2A2A2A
+    Animations: slow, cinematic (800ms-1200ms)
+    Cursor: custom crosshair in gold on key interactive elements
+    Double Exposure blend mode: 'multiply'
+    Portrait treatment: high contrast dark
+
+────────────────────────────────────────────────────────────────────────────────
+THEME 2 — INDUSTRIAL CYBER
+────────────────────────────────────────────────────────────────────────────────
+
+  --surface-color:       #0A0A0F
+  --surface2-color:      #12131A
+  --surface3-color:      #1E1F26
+  --surface4-color:      #2C2E35
+  --accent-color:        #00F5D4
+  --accent2-color:       #00C4AA
+  --accent-rgb:          0, 245, 212
+  --surface-rgb:         10, 10, 15
+  --text-color:          #E8E9F0
+  --text-muted-color:    #6B6C75
+  --text-dim-color:      #3A3B44
+  --border-color:        #2A2B33
+  --border-accent-color: #00F5D440
+  --glow-color:          #00F5D415
+  --font-display:        'Space Mono', 'IBM Plex Mono', monospace
+  --font-body:           'IBM Plex Mono', 'Courier New', monospace
+  --font-mono:           'Space Mono', monospace
+  --font-cjk:            'Noto Sans JP', 'Noto Sans SC', sans-serif
+  --letter-spacing-base: 0.12em
+  --letter-spacing-hero: 0.20em
+  --line-height-base:    1.6
+  --line-height-cjk:     1.85
+
+  ATMOSPHERE RULES:
+    Background: near-black with subtle blue undertone
+    Typography: monospaced industrial, wide tracking, uppercase labels
+    Hover: 2px RGB-split glitch effect
+      text-shadow: -2px 0 #FF0040, 2px 0 #00F5D4
+      Duration: 150ms enter / 300ms exit
+    Borders: cyan glow on focus (box-shadow: 0 0 12px #00F5D440)
+    Scan lines: CSS repeating-linear-gradient overlay at 3% opacity
+    Animations: fast, mechanical (200ms-400ms) with slight overshoot spring
+    Double Exposure blend mode: 'screen'
+    Portrait treatment: slight cyan tint overlay
+
+────────────────────────────────────────────────────────────────────────────────
+THEME 3 — NEOCLASSICAL MINIMAL
+────────────────────────────────────────────────────────────────────────────────
+
+  --surface-color:       #F9F9F7
+  --surface2-color:      #F2F2F0
+  --surface3-color:      #EAEAE8
+  --surface4-color:      #E0E0DE
+  --accent-color:        #0A0A08
+  --accent2-color:       #3D3D3A
+  --accent-rgb:          10, 10, 8
+  --surface-rgb:         249, 249, 247
+  --text-color:          #0A0A08
+  --text-muted-color:    #7A7A75
+  --text-dim-color:      #C0C0BC
+  --border-color:        #D8D8D5
+  --border-accent-color: #0A0A0830
+  --glow-color:          #0A0A0808
+  --font-display:        'Playfair Display', 'Cormorant Garamond', serif
+  --font-body:           'Lora', Georgia, serif
+  --font-mono:           'Space Mono', monospace
+  --font-cjk:            'Noto Sans JP', 'Noto Sans SC', sans-serif
+  --letter-spacing-base: 0.04em
+  --letter-spacing-hero: 0.15em
+  --line-height-base:    1.8
+  --line-height-cjk:     2.0
+
+  ATMOSPHERE RULES:
+    Background: warm ivory
+    Typography: deconstructed display at massive scales (15vw-25vw)
+    Negative space: generous, intentional, architectural
+    Portraits: black and white with sepia undertone
+    Animations: deliberate, measured (600ms-1000ms linear or ease-in-out)
+    Hover: subtle underline sweep, no glow
+    Double Exposure blend mode: 'overlay'
+    Portrait treatment: black and white, sepia
+
+────────────────────────────────────────────────────────────────────────────────
+LANGUAGE-SPECIFIC FONT ARCHITECTURE
+────────────────────────────────────────────────────────────────────────────────
+
+Applied on locale change in < 100ms:
+
+  en: --font-display applied, letter-spacing: var(--letter-spacing-base)
+  es: same as en, line-height +5% for accent character clearance
+  fr: same as en, line-height +5% for accent character clearance
+  zh: 'Noto Sans SC', letter-spacing: 0.05em, line-height: var(--line-height-cjk)
+  ja: 'Noto Sans JP', letter-spacing: 0.03em, line-height: var(--line-height-cjk)
+  ko: 'Noto Sans KR', letter-spacing: 0.04em, line-height: var(--line-height-cjk)
+
+All fonts loaded via Google Fonts with font-display: swap.
+Preloaded in <head> for zero flash of unstyled text.
+
+RTL SUPPORT:
+  All 6 languages are LTR. CSS logical properties used throughout.
+  RTL expansion requires zero refactoring.
+
+CSS VARIABLE INJECTION PATTERN (exact implementation):
+
+  const applyTheme = (theme: ThemeConfig, locale: Locale) => {
+    const root = document.documentElement;
+    Object.entries(theme.variables).forEach(([key, value]) => {
+      root.style.setProperty(key, value);
+    });
+    root.setAttribute('data-theme', theme.id);
+    root.setAttribute('data-locale', locale);
+    root.setAttribute('lang', locale);
+    root.setAttribute('dir', 'ltr');
+    applyLocaleTypography(locale, theme);
+  };
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XV — SECTION 3: LINGUISTIC PORTAL (THE GRAND ENTRY GATE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SUPPORTED LANGUAGES:
+  en — English  — "ENGLISH"
+  es — Spanish  — "ESPANOL"
+  fr — French   — "FRANCAIS"
+  zh — Chinese  — "中文"
+  ja — Japanese — "日本語"
+  ko — Korean   — "한국어"
+
+────────────────────────────────────────────────────────────────────────────────
+VISUAL ARCHITECTURE
+────────────────────────────────────────────────────────────────────────────────
+
+Canvas: 100vw x 100vh, no scroll, no overflow.
+
+Background Three.js scene:
+  - 15,000 star particles (BufferGeometry points)
+  - Slow Y-axis rotation: 0.00008 radians/frame
+  - Depth fog: THREE.FogExp2 color #000000 density 0.0008
+  - Directional light: intensity 0.3, position [5, 3, 5]
+  - Ambient light: intensity 0.1
+
+Language columns: 6 vertical floating typographic pillars in 3D space:
+  - Slight arc arrangement, staggered Z-axis depth
+  - Font size: 3.5vw desktop / 6vw tablet / 9vw mobile
+  - Default state: opacity 0.4, letter-spacing 0.15em
+
+Center element:
+  - Thin horizontal rule, 1px, 60% width
+  - Pulsing opacity animation (0.2 to 0.6, 3s ease-in-out infinite)
+  - ACE monogram above (32px, wide tracking)
+
+────────────────────────────────────────────────────────────────────────────────
+HOVER INTERACTION (desktop)
+────────────────────────────────────────────────────────────────────────────────
+
+On mouse enter:
+  1. Opacity: 0.4 to 1.0 (200ms ease-out)
+  2. Letter-spacing: 0.15em to 0.45em (300ms ease-out)
+  3. Point light repositions toward hovered element (400ms)
+  4. All other columns: opacity to 0.15 (200ms)
+  5. Nearby particles drift toward cursor (physics)
+  6. Micro-tone (50ms fade-in, max volume 0.08):
+       en: 440Hz (A4)
+       es: 528Hz (C5)
+       fr: 396Hz (G4)
+       zh: 639Hz (Eb5)
+       ja: 741Hz (F#5)
+       ko: 852Hz (Ab5)
+
+On mouse leave:
+  All elements return to default state (300ms ease-in)
+
+────────────────────────────────────────────────────────────────────────────────
+TOUCH INTERACTION (mobile/tablet)
+────────────────────────────────────────────────────────────────────────────────
+
+Tap activates hover state for 400ms then triggers selection.
+Language columns in 2x3 grid on mobile.
+Minimum touch target: 52x52px (Apple HIG compliance).
+
+────────────────────────────────────────────────────────────────────────────────
+THE SHATTER TRANSITION
+────────────────────────────────────────────────────────────────────────────────
+
+Duration: 900ms total.
+
+Phase 1 (0–200ms):
+  - Selected language scales to 200%, letter-spacing explodes
+  - All other languages: opacity to 0, translateY(-20px)
+
+Phase 2 (200–600ms):
+  - Canvas fractures: 48 triangular fragments (desktop) / 24 (mobile)
+  - Each fragment: random rotation, translateX/Y, scale 1->0, opacity 1->0
+  - Implementation: Canvas 2D API + CSS transforms
+  - Fragment explosion from click/tap origin point
+
+Phase 3 (600–900ms):
+  - Black void fills screen
+  - MainApp fades in from opacity 0
+
+After transition:
+  - locale stored in IdentityContext and localStorage
+  - Font architecture rewrites for selected language
+  - document.documentElement lang attribute updates
+  - Portal unmounts cleanly (GPU memory freed)
+
+MOBILE PERFORMANCE FALLBACK:
+  navigator.hardwareConcurrency < 4:
+    Use CSS clip-path dissolve instead of fragment shatter.
+    Canvas fades to black over 600ms with scale(1.05) push.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XVI — SECTION 4: IDENTITY MATRIX CMS — TYPESCRIPT INTERFACES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All content null at launch. Admin injects via Admin Dashboard.
+Every field renders gracefully when null.
+
+Canonical source: artifacts/ace-2026/src/types/index.ts
+
+────────────────────────────────────────────────────────────────────────────────
+COMPLETE TYPESCRIPT INTERFACE DEFINITIONS
+────────────────────────────────────────────────────────────────────────────────
+
+interface MultiLingual {
+  en: string;
+  es: string;
+  fr: string;
+  zh: string;
+  ja: string;
+  ko: string;
+}
+
+interface MediaAsset {
+  url: string;
+  blurHash: string;
+  width: number;
+  height: number;
+  format: 'webp' | 'jpg' | 'png';
+  dominantColors: string[];
+  vibrantPalette: VibrantPalette | null;
+}
+
+interface VibrantPalette {
+  vibrant: string;
+  muted: string;
+  darkVibrant: string;
+  darkMuted: string;
+  lightVibrant: string;
+  lightMuted: string;
+}
+
+interface ComposerIdentity {
+  id: string | null;
+  name: MultiLingual | null;
+  tagline: MultiLingual | null;
+  biography: MultiLingual | null;
+  awards: MultiLingual[] | null;
+  studioAddress: MultiLingual | null;
+  portrait: MediaAsset | null;
+  logo: MediaAsset | null;
+  heroVideo: string | null;
+  socialLinks: SocialLinks | null;
+  projects: Project[] | null;
+}
+
+interface SocialLinks {
+  spotify: string | null;
+  imdb: string | null;
+  instagram: string | null;
+  youtube: string | null;
+}
+
+interface Project {
+  id: string;
+  title: MultiLingual;
+  type: 'film' | 'game' | 'animation' | 'documentary';
+  year: number;
+  description: MultiLingual;
+  coverImage: MediaAsset | null;
+}
+
+interface AudioTrack {
+  id: string;
+  title: MultiLingual;
+  narrative: MultiLingual;
+  audioUrl: string;
+  coverArt: MediaAsset | null;
+  genre: 'cinematic' | 'gaming' | 'animation' | 'ambient';
+  bpm: number | null;
+  mood: string | null;
+  duration: number;
+  sortOrder: number;
+  isLive: boolean;
+  createdAt: string;
+}
+
+interface AudioState {
+  isPlaying: boolean;
+  currentTrack: AudioTrack | null;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  isMuted: boolean;
+  analyserNode: AnalyserNode | null;
+  audioContext: AudioContext | null;
+  dominantColors: VibrantPalette | null;
+  playlist: AudioTrack[];
+  currentIndex: number;
+}
+
+type PipelineStatus =
+  | 'idle'
+  | 'uploading'
+  | 'analyzing_audio'
+  | 'generating_art'
+  | 'generating_narrative'
+  | 'applying_filters'
+  | 'awaiting_approval'
+  | 'publishing'
+  | 'complete'
+  | 'error';
+
+interface PipelineJob {
+  id: string;
+  status: PipelineStatus;
+  progress: number;
+  audioMetadata: AudioMetadata | null;
+  generatedArtUrl: string | null;
+  generatedNarrative: MultiLingual | null;
+  errorMessage: string | null;
+}
+
+interface AudioMetadata {
+  dominantInstrument: string;
+  bpm: number;
+  mood: string;
+  keySignature: string;
+  duration: number;
+  title: string | null;
+}
+
+type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
+
+type ThemeId = 'onyx' | 'cyber' | 'minimal';
+
+interface ThemeConfig {
+  id: ThemeId;
+  variables: Record<string, string>;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T | null;
+  error: string | null;
+  code: string | null;
+  timestamp: string;
+}
+
+────────────────────────────────────────────────────────────────────────────────
+AI TRANSLATE FEATURE
+────────────────────────────────────────────────────────────────────────────────
+
+Admin enters content in one language then clicks "AI Translate".
+API call: POST /api/identity/translate
+Body: { text: string, sourceLang: Locale, fieldType: string }
+
+LLM system prompt (exact text, verbatim):
+  "You are translating content for an elite international composer's
+   platform. Preserve the dramatic, cinematic, and professional music
+   industry tone. Use native-level grammar for each language. Use music
+   industry terminology appropriate to each market.
+   Output strict JSON only: { en, es, fr, zh, ja, ko }
+   No preamble. No markdown. Pure JSON."
+
+All 5 remaining language fields auto-populate.
+Admin reviews each translation before confirming.
+OpenAI response_format: { type: "json_object" } REQUIRED.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XVII — SECTION 5: 3D AUDIO-REACTIVE MESH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TECHNOLOGY: React Three Fiber + custom GLSL vertex shader + Web Audio API.
+
+GEOMETRY: BufferGeometry sphere:
+  Desktop: 8000 particles, radius 2.5
+  Tablet:  4000 particles, radius 2.5
+  Mobile:  2000 particles, radius 2.5
+  Detection: window.innerWidth breakpoints
+
+RENDERING: THREE.Points with ShaderMaterial.
+
+────────────────────────────────────────────────────────────────────────────────
+IDLE STATE (no audio)
+────────────────────────────────────────────────────────────────────────────────
+
+  - Perfect sphere with slight random displacement
+  - Breathing: uniform scale 0.95 to 1.05, 4s ease-in-out loop
+  - Slow Y-axis rotation: 0.0005 rad/frame
+  - Particle color: accent-color at 35% opacity
+  - Particle size: 0.015 uniform
+  - Fog: exponential, density 0.15
+
+────────────────────────────────────────────────────────────────────────────────
+ACTIVE STATE (audio playing)
+────────────────────────────────────────────────────────────────────────────────
+
+  AudioContext.createAnalyser():
+    fftSize: 2048 desktop/tablet, 512 mobile
+    smoothingTimeConstant: 0.85
+    getByteFrequencyData() -> Uint8Array(1024)
+
+  Frequency band mapping:
+    Bass  (0–10):    bassLevel — vertex displacement magnitude
+    Mid   (10–100):  midLevel  — particle spread radius
+    High  (100–512): highLevel — shimmer/sparkle speed
+    Sub-bass peak:   triggers mesh deformation wave pulse
+
+────────────────────────────────────────────────────────────────────────────────
+GLSL VERTEX SHADER (exact code — verbatim)
+────────────────────────────────────────────────────────────────────────────────
+
+  uniform float uTime;
+  uniform float uBassLevel;
+  uniform float uMidLevel;
+  uniform float uHighLevel;
+  uniform float uAudioData[128];
+  attribute float aScale;
+
+  void main() {
+    vec3 pos = position;
+    float noise = sin(pos.x * 8.0 + uTime * 0.5) *
+                  cos(pos.y * 8.0 + uTime * 0.3) *
+                  sin(pos.z * 8.0 + uTime * 0.4);
+    float displacement = uBassLevel * 0.4 * noise;
+    float spread = 1.0 + uMidLevel * 0.3;
+    pos = pos * spread + normalize(pos) * displacement;
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+    gl_PointSize = aScale * (uHighLevel * 3.0 + 1.5) *
+                   (1.0 / -mvPosition.z);
+  }
+
+────────────────────────────────────────────────────────────────────────────────
+GLSL FRAGMENT SHADER (exact code — verbatim)
+────────────────────────────────────────────────────────────────────────────────
+
+  uniform vec3 uColor;
+  uniform float uOpacity;
+
+  void main() {
+    float dist = distance(gl_PointCoord, vec2(0.5));
+    if (dist > 0.5) discard;
+    float alpha = 1.0 - (dist * 2.0);
+    gl_FragColor = vec4(uColor, alpha * uOpacity);
+  }
+
+────────────────────────────────────────────────────────────────────────────────
+COLOR DYNAMICS
+────────────────────────────────────────────────────────────────────────────────
+
+  bassLevel < 0.3:     accent-color at 35% opacity
+  bassLevel 0.3–0.7:   interpolate accent to white
+  bassLevel > 0.7:     pure white flash (20ms) then decay
+
+────────────────────────────────────────────────────────────────────────────────
+GPU MEMORY GUARD (mandatory on unmount — exact pattern)
+────────────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      material.dispose();
+      renderer.dispose();
+    };
+  }, []);
+
+SUSPENSE WRAPPER: <Suspense fallback={<MeshSkeletonLoader />}>
+
+INTERSECTION OBSERVER:
+  Canvas animates only when in viewport.
+  Off-screen: pause requestAnimationFrame loop.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XVIII — SECTION 6: PERSISTENT GLASSMORPHISM AUDIO PLAYER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ARCHITECTURE LAW:
+  AudioContext singleton lives in the root-level React context provider.
+  The player component is purely presentational — reads state only, never
+  owns state. This is the only architecture that guarantees zero audio
+  dropout across all navigation.
+
+────────────────────────────────────────────────────────────────────────────────
+VISUAL SPECIFICATIONS
+────────────────────────────────────────────────────────────────────────────────
+
+  Position:   fixed, bottom: 0, left: 0, right: 0
+  z-index:    9999
+  Height:     72px desktop / 56px mobile
+
+  Background:
+    backdrop-filter: blur(40px) saturate(200%) brightness(0.8)
+    -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(0.8)
+    background: rgba(var(--surface-rgb), 0.55)
+    border-top: 1px solid var(--border-color)
+
+  Vibrant integration on track change:
+    box-shadow: 0 -4px 40px rgba([dominantColor], 0.15)
+    Transition: 800ms ease
+
+  Desktop layout: [Cover Art 52px] [Track Info] [Waveform flex-1] [Controls] [Volume]
+
+  Mobile layout:
+    Row 1: [Cover Art 36px] [Track Info] [Play/Pause]
+    Row 2: [Waveform full-width]
+    Collapsed: 56px — tap to expand to 120px
+
+────────────────────────────────────────────────────────────────────────────────
+WAVEFORM RENDERER
+────────────────────────────────────────────────────────────────────────────────
+
+  Canvas: 100% width, 40px height
+  Rendering: requestAnimationFrame at 60fps
+  Data: analyser.getFloatTimeDomainData(dataArray)
+
+  Drawing algorithm (exact):
+    ctx.clearRect(0, 0, width, height)
+    ctx.beginPath()
+    for each sample:
+      x = (i / bufferLength) * width
+      y = (sample * 0.8 + 0.5) * height
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+    ctx.strokeStyle = dominantVibrantColor || accentColor
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+
+  Playhead: 1px vertical line at currentTime/duration ratio.
+    Color: accent-color. Height: 100%. Width: 1px.
+  Null-safe: renders flat centerline when no audio.
+
+────────────────────────────────────────────────────────────────────────────────
+BROWSER AUTOPLAY COMPLIANCE
+────────────────────────────────────────────────────────────────────────────────
+
+  AudioContext initialized ONLY after first user gesture.
+  All play attempts before gesture: queued and executed on first gesture.
+  Suspended AudioContext: resume() on user interaction.
+  iOS Safari: handled via touchstart/click gesture detector.
+  All play attempts: audioContext.resume().then(() => audioEl.play())
+
+────────────────────────────────────────────────────────────────────────────────
+VIBRANT.JS COLOR EXTRACTION — on every track change
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Load cover art image
+  2. Vibrant.from(imageUrl).getPalette()
+  3. Extract: Vibrant, Muted, DarkVibrant, DarkMuted
+  4. Update CSS --dynamic-accent live
+  5. Waveform color -> Vibrant swatch
+  6. Player glow -> DarkMuted swatch
+  7. Transition: 800ms ease on all color changes
+  NOTE: If extracted hue is within 30 degrees of theme accent: desaturate.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XIX — SECTION 7: SPATIAL SCROLL ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+────────────────────────────────────────────────────────────────────────────────
+HORIZONTAL TIMELINE (desktop + tablet)
+────────────────────────────────────────────────────────────────────────────────
+
+  Trigger: vertical scroll reaches 40% of viewport height.
+
+  Mechanism:
+    - Framer Motion useScroll({ target: containerRef })
+    - useTransform(scrollYProgress, [0.4, 1.0], ['0%', '-80%'])
+    - Applied to: transform: translateX() — hardware accelerated
+    - FORBIDDEN: scrollLeft (causes layout repaints)
+    - REQUIRED: will-change: transform on the scrolling container
+
+  Snap behavior:
+    scroll-snap-type: x mandatory
+    scroll-snap-align: start per item
+    scroll-snap-stop: always
+
+  Timeline items (from IdentityContext.projects):
+    Null safe: if projects is null, section renders as elegant empty strip.
+    Item fields: title, year, type, description, cover image.
+    Item width: 60vw desktop / 80vw tablet.
+
+  Text mask reveal (scroll-linked):
+    Achievement keyword at 120% scroll progress:
+      font-size: 4rem to 24vw
+      mix-blend-mode: difference
+    Background video plays through text (heroVideo)
+    Null-safe: gradient fallback if no video injected.
+
+────────────────────────────────────────────────────────────────────────────────
+MOBILE ADAPTATION
+────────────────────────────────────────────────────────────────────────────────
+
+  Horizontal scroll converts to standard vertical scroll.
+  Timeline items stack vertically.
+  Text mask: simplified to scale + opacity reveal.
+  Touch swipe: Framer Motion drag constraints.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XX — SECTION 8: LIVE DOUBLE EXPOSURE PORTRAIT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Canvas blend engine — zero external libraries.
+
+NULL STATE:
+  portrait is null:
+    ONYX/CYBER: pure black canvas.
+    MINIMAL:    pure ivory canvas.
+
+LAYER ARCHITECTURE:
+  Layer 1 (base): composer portrait from IdentityContext
+    - Drawn at full resolution
+    - ONYX:    dark contrast boost
+    - CYBER:   cyan tint overlay pre-applied
+    - MINIMAL: desaturated (grayscale 100%)
+
+  Layer 2 (overlay): procedurally generated music motifs
+    All elements generated programmatically (no image files):
+      - Staff lines (5-line musical staves)
+      - Treble clef outlines
+      - Piano keyboard silhouettes
+      - Sinusoidal waveform curves
+      - Eighth and quarter note shapes
+      - Frequency bar visualizations
+      - Vinyl groove spiral paths
+    - Animation: elements pulse at track BPM
+    - BPM null fallback: 80 BPM default
+    - Motif scale oscillates ±8% at tempo
+    - Motif opacity increases with bassLevel
+
+BLEND MODES:
+  ONYX:    ctx.globalCompositeOperation = 'multiply'
+             Motif: gold (#D4AF37) stroke lines
+  CYBER:   ctx.globalCompositeOperation = 'screen'
+             Motif: cyan (#00F5D4) neon lines with glow
+  MINIMAL: ctx.globalCompositeOperation = 'overlay'
+             Motif: dark (#1A1A18) precise lines
+
+ANIMATION LOOP:
+  requestAnimationFrame drives all motif animations.
+  BPM-synced pulse: scale oscillates ±8% at tempo.
+  Audio-reactive: motif opacity increases with bassLevel from AudioContext.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXI — SECTION 9: AI MEDIA PIPELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRIGGER: Admin drops WAV/MP3 or pastes YouTube URL into the drop zone.
+All processes run in PARALLEL via Promise.allSettled() for maximum resilience.
+Raw Promise.all() is forbidden.
+
+ERROR HANDLING LAW:
+  Exponential backoff retry (max 3 attempts, delays: 1s, 2s, 4s) on all
+  external API calls. On permanent failure after 3 retries: log to error state,
+  preserve all successful outputs, gracefully degrade UI.
+  The main thread MUST NEVER crash.
+
+────────────────────────────────────────────────────────────────────────────────
+PROCESS 1 — AUDIO ANALYSIS
+────────────────────────────────────────────────────────────────────────────────
+
+  Library: music-metadata (npm)
+  YouTube: youtube-dl-exec for metadata + thumbnail extraction
+  Extract: bpm (music-tempo), mood, dominant instrument, key signature,
+           duration, ID3 title tag
+  Output: AudioMetadata stored in PipelineContext
+
+────────────────────────────────────────────────────────────────────────────────
+PROCESS 2 — AI VISUAL ART GENERATION
+────────────────────────────────────────────────────────────────────────────────
+
+  API: AI_IMAGE_GENERATION_KEY -> OpenAI DALL-E 3
+
+  Cinematic prompt construction from AudioMetadata (exact text):
+    "Photorealistic cinematic artwork.
+     ${mood} atmosphere.
+     ${dominantInstrument} as central visual metaphor.
+     Shot on Phase One IQ4 medium format sensor.
+     85mm f/1.4 lens, razor-thin depth of field.
+     2200K warm-white key light with cold rim lighting.
+     Aspect ratio 16:9. Dramatic shadow gradients.
+     Color grade: ${themeColorGrade}.
+     No text, no watermarks, no people's faces.
+     Ultra-high detail, award-winning composition."
+
+  Apply site theme color filter via Canvas API.
+  Extract Vibrant palette from result. Generate BlurHash.
+  Store in AWS S3: /tracks/{trackId}/cover.webp
+  Returns: MediaAsset with all fields populated.
+
+────────────────────────────────────────────────────────────────────────────────
+PROCESS 3 — POLYGLOT SONIC NARRATOR
+────────────────────────────────────────────────────────────────────────────────
+
+  API: LLM_NARRATIVE_API_KEY -> OpenAI GPT-4o
+
+  LLM prompt (exact text):
+    "You are the world's most celebrated music journalist writing liner
+     notes for an Academy Award-winning composer's portfolio.
+     Audio metadata: ${JSON.stringify(audioMetadata)}
+     Write a captivating dramatic narrative for this piece.
+     Tone: cinematic, sophisticated, emotionally resonant.
+     Length: 2-3 sentences per language.
+     Output ONLY this JSON, no markdown, no preamble:
+     { en: '', es: '', fr: '', zh: '', ja: '', ko: '' }"
+
+  REQUIRED: response_format: { type: "json_object" } in OpenAI SDK call.
+  Response parsed and validated as MultiLingual interface.
+  Store in tracks table.
+
+────────────────────────────────────────────────────────────────────────────────
+PROCESS 4 — PLAYLIST MANAGEMENT
+────────────────────────────────────────────────────────────────────────────────
+
+  YouTube URL:
+    youtube-dl-exec extracts: title, duration, thumbnail, channel.
+    Site visual style rendered over thumbnail via Canvas API.
+    Added to playlist at bottom (default sort_order).
+
+  Drag-and-drop reordering:
+    @dnd-kit/sortable with DndContext.
+    onDragEnd: PUT /api/tracks/reorder with new sort_order array.
+    Optimistic UI update + API confirmation.
+    Smooth reorder transition: 300ms ease.
+
+  APPROVAL GATE:
+    Generated art and narrative shown to admin before publishing.
+    Admin can edit any narrative field in any language.
+    Admin can regenerate art or narrative independently.
+    Track goes live (is_live = true) ONLY after "Approve & Publish".
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXII — SECTION 10: EXECUTIVE STUDIO BOT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POSITION: fixed, bottom: 88px (above audio player), right: 24px
+z-index: 9998
+Trigger: circular floating button, 56px diameter, accent-color
+
+OPEN STATE: panel slides up (Framer Motion spring)
+  Desktop: 380px wide, 520px tall, glassmorphism, border-radius: 16px
+  Mobile: 100vw, 70vh, full-screen bottom sheet
+
+────────────────────────────────────────────────────────────────────────────────
+CAPABILITIES
+────────────────────────────────────────────────────────────────────────────────
+
+  1. Responds in visitor's selected locale exclusively
+  2. Portfolio semantic search: mood, genre, tempo, instrument queries
+  3. Inline audio player inside chat messages (global AudioContext)
+  4. Structured project brief intake collector
+  5. Brief submission: POST /api/briefs
+
+MULTILINGUAL SYSTEM PROMPT (exact text):
+  "You are the Executive Studio Manager for a world-class international
+   composer. You speak ${locale} fluently and exclusively. Your tone is
+   professional, cinematic, warm.
+   Composer portfolio: ${JSON.stringify(tracks)}
+   When recommending tracks, include the track ID for inline player.
+   When asked for a project brief, collect in this order:
+     1. Media type (film / game / animation / documentary / commercial)
+     2. Emotional direction (3 keywords)
+     3. Budget range (below $5k / $5k-$25k / $25k-$100k / above $100k)
+     4. Deadline
+   Then confirm and submit via POST /api/briefs."
+
+INLINE PLAYER IN CHAT:
+  Bot message includes: { type: 'track_recommendation', trackId: string }
+  Frontend renders PersistentAudioPlayer mini-variant inside chat bubble.
+  Connects to global AudioContext — zero new audio instances.
+
+BRIEF SUBMISSION:
+  POST /api/briefs with structured data.
+  Admin dashboard shows unread brief indicator.
+  Optional SMTP email notification via configured SMTP.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXIII — SECTION 11: GOD-MODE ADMIN DASHBOARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACCESS METHOD 1: Ctrl+Shift+A (desktop keyboard shortcut)
+ACCESS METHOD 2: /admin route (requires Gatekeeper auth)
+ACCESS METHOD 3: Triple-tap ACE logo in footer (mobile)
+
+GATEKEEPER AUTHENTICATION:
+  Username + password -> bcrypt hash comparison (cost factor: 12)
+  Access JWT: 24h expiry, httpOnly cookie, SameSite=strict
+  Refresh JWT: 30-day rolling, httpOnly cookie
+  Failed attempts: 5 max -> 15-minute lockout
+  Lockout state: stored in admin_users.failed_attempts + locked_until
+  Zero third-party auth services.
+
+────────────────────────────────────────────────────────────────────────────────
+TAB 1 — IDENTITY MATRIX
+────────────────────────────────────────────────────────────────────────────────
+
+  Multilingual fields (6-language sub-tabs EN|ES|FR|ZH|JA|KO):
+    - Full Name
+    - Artistic Tagline
+    - Biography (rich text, markdown support)
+    - Awards & Recognition (repeatable array with +/- controls)
+    - Studio Address
+
+  Single-language fields:
+    - Portrait upload -> staging preview on upload
+    - Logo upload -> staging preview on upload
+    - Hero video URL
+    - Spotify URL
+    - IMDB URL
+    - Instagram URL
+    - YouTube URL
+
+  AI Translate: per-section button -> POST /api/identity/translate
+  Auto-save: debounced 2 seconds -> PUT /api/identity
+
+────────────────────────────────────────────────────────────────────────────────
+TAB 2 — MEDIA PIPELINE
+────────────────────────────────────────────────────────────────────────────────
+
+  Drop zone: 100% width, 200px height, animated dashed border.
+    Accept: .mp3, .wav, YouTube URLs.
+    Drag-over: border -> accent-color, scale 1.02.
+
+  Pipeline progress: animated stage indicators + estimated time.
+    Stages map to PipelineStatus type.
+
+  Generated art preview:
+    Before/after: original vs AI-generated art.
+    Theme filter preview: 3 panels (ONYX / CYBER / MINIMAL).
+    Regenerate art button (re-triggers PROCESS 2 independently).
+
+  Generated narrative preview:
+    6 language tabs, each editable textarea with word count.
+    Regenerate per-language button.
+
+  Approval gate:
+    "Approve & Publish" with confirmation modal -> POST /api/pipeline/approve/:jobId
+
+  Playlist manager:
+    @dnd-kit drag handles. Cover thumbnail, title, genre badge, duration.
+    is_live toggle per track. Delete with confirmation.
+
+  Real-time telemetry console:
+    SSE from /api/pipeline/status/:jobId.
+    Auto-scrolling log: INFO (white), WARN (amber), ERROR (red), SUCCESS (green).
+    Each log entry: timestamp + stage + message.
+
+────────────────────────────────────────────────────────────────────────────────
+TAB 3 — UNIVERSAL INJECTION PANEL (API GATEKEEPER HUB)
+────────────────────────────────────────────────────────────────────────────────
+
+  Security: all inputs type="password", never stored in localStorage.
+  Encryption: AES-256-GCM before database storage.
+  Storage: api_keys table (encrypted_value + iv + auth_tag).
+
+  Panel-managed keys (live injection via UI):
+    AI_IMAGE_GENERATION_KEY — OpenAI DALL-E 3
+    LLM_NARRATIVE_API_KEY   — OpenAI GPT-4o
+    YOUTUBE_API_DATA_V3     — YouTube Data API v3
+
+  Environment-only keys (MUST be in .env — not injectable via UI):
+    ENCRYPTION_MASTER_KEY   — 32-byte hex string, .env ONLY
+    SMTP_SERVER             — .env ONLY
+    SMTP_PORT               — .env ONLY (default: 587)
+    SMTP_USER               — .env ONLY
+    SMTP_PASSWORD           — .env ONLY
+    DATABASE_URL            — .env ONLY
+    REDIS_URL               — .env ONLY
+    JWT_SECRET              — .env ONLY
+    AWS_ACCESS_KEY_ID       — .env ONLY
+    AWS_SECRET_ACCESS_KEY   — .env ONLY
+    AWS_REGION              — .env ONLY
+    AWS_S3_BUCKET_NAME      — .env ONLY
+
+  Each panel-managed field:
+    - Input with show/hide toggle
+    - "Test Connection" -> POST /api/keys/test
+    - Status: Connected / Not configured / Error + timestamp
+
+  Without AI keys: AI features show "Configure API Keys in Admin Panel".
+  With AI keys: full autonomous pipeline activates instantly.
+
+MANDATORY .env.example at monorepo root (exact keys, no additions):
+
+  DATABASE_URL=
+  REDIS_URL=
+  AWS_ACCESS_KEY_ID=
+  AWS_SECRET_ACCESS_KEY=
+  AWS_REGION=
+  AWS_S3_BUCKET_NAME=
+  ENCRYPTION_MASTER_KEY=
+  AI_IMAGE_GENERATION_KEY=
+  LLM_NARRATIVE_API_KEY=
+  YOUTUBE_API_DATA_V3=
+  SMTP_SERVER=
+  SMTP_PORT=587
+  SMTP_USER=
+  SMTP_PASSWORD=
+  JWT_SECRET=
+
+────────────────────────────────────────────────────────────────────────────────
+TAB 4 — STAGING ENGINE
+────────────────────────────────────────────────────────────────────────────────
+
+  Edit Mode / Live Mode toggle at top of panel.
+
+  Edit Mode:
+    - Blue dashed borders on all injectable components
+    - Click text -> inline edit activates
+    - Click image -> file picker opens
+    - Changes accumulate in StagingContext (draft only, not live)
+    - Unsaved indicator: orange dot on tab label
+
+  Preview panels (simultaneous):
+    - Three panels: ONYX | CYBER | MINIMAL
+    - Viewport selector: Mobile (375px) | Tablet (768px) | Desktop (1440px)
+
+  Approve & Publish:
+    - Diff view: staged changes vs live state
+    - Atomic commit: all changes go live simultaneously
+    - Rollback: revert to previous live state (stored in staging_drafts)
+
+────────────────────────────────────────────────────────────────────────────────
+TAB 5 — CMS DOCUMENT ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+  Upload zone: PDF, .txt, .eml files.
+
+  AI processing via LLM_NARRATIVE_API_KEY:
+    Extract: timecodes, revision notes, delivery requirements, deadlines.
+    Output: structured checklist grouped by:
+      Timecodes | Revisions | Deliverables | Deadlines
+    Each item: checkbox, priority indicator, due date if found.
+
+  Export as PDF: POST /api/documents/export
+  Send to email: POST /api/documents/email (via configured SMTP)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXIV — SECTION 12: GRID LAYOUT RANDOMIZATION ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Selected on page load via seeded random, persisted for session.
+Framer Motion stagger entrance on all variants.
+All variants are null-safe.
+
+────────────────────────────────────────────────────────────────────────────────
+VARIANT A — BILLBOARD FULL BLEED
+────────────────────────────────────────────────────────────────────────────────
+
+  Hero: 100vw x 100vh full-bleed portrait or pure black canvas (null-safe)
+  Text overlay: bottom-left, large serif
+    Name:    clamp(3rem, 8vw, 9rem), var(--font-display)
+    Tagline: clamp(1rem, 2vw, 1.5rem), var(--font-body), opacity 0.7
+  Scroll indicator: thin pulsing vertical line, right side
+  Audio player: slides from bottom on first scroll
+  CTA: "Enter Studio" button, centered at 70% vh
+  Mobile: center-aligned text, portrait fills 60vh top
+
+────────────────────────────────────────────────────────────────────────────────
+VARIANT B — ASYMMETRIC EDITORIAL GRID
+────────────────────────────────────────────────────────────────────────────────
+
+  CSS Grid: repeat(12, 1fr), gap: 0, 100vh height
+  Portrait: columns 1-7, rows 1-4 (bleed left edge)
+  Name + tagline: columns 8-12, rows 1-2
+    Name: clamp(2.5rem, 5vw, 6rem)
+  Bio excerpt: columns 8-12, row 3 (max 3 lines with ellipsis)
+  Track count + genre badges: columns 8-12, row 4
+  Audio player card: columns 8-12, rows 5-6 (glassmorphism)
+  All grid areas null-safe: empty -> pure surface-color
+  Mobile: single column, portrait top (50vh), content below
+
+────────────────────────────────────────────────────────────────────────────────
+VARIANT C — DECONSTRUCTED TYPOGRAPHIC
+────────────────────────────────────────────────────────────────────────────────
+
+  Composer name: 18vw-25vw, deliberately overflows viewport
+  Letterforms: positioned as CSS Grid structural elements
+  Content flows in negative space between letterforms
+  Portrait: inside letterform void (clip-path mask)
+  Scroll: letters separate (translateX) revealing content behind
+    Framer Motion useTransform on scrollYProgress
+    Separation: 0% to ±15vw over full scroll range
+  Mobile: name at 45vw, single-column stacked below
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXV — SECTION 13: RESPONSIVE & CROSS-PLATFORM STANDARDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ZERO HORIZONTAL OVERFLOW LAW (CRITICAL):
+  The agent MUST guarantee that at exactly 375px, 768px, and 1440px viewport
+  widths, there is strictly 0px of horizontal scrolling. All containers MUST
+  use CSS overflow-x: hidden at the root wrapper, and internal CSS grids and
+  flexboxes must be strictly mathematically bounded to a maximum of 100vw.
+
+BREAKPOINTS:
+  xs: 320px - 479px    (small phones)
+  sm: 480px - 767px    (large phones)
+  md: 768px - 1023px   (tablets)
+  lg: 1024px - 1439px  (laptops)
+  xl: 1440px - 1919px  (desktops)
+  2xl: 1920px+         (4K displays)
+
+PLATFORM TARGETS:
+  iOS Safari (iPhone 12+)
+  Android Chrome (Android 10+)
+  macOS Safari + Chrome + Firefox
+  Windows Chrome + Edge + Firefox
+  iPadOS (landscape and portrait)
+  4K displays (1920px+)
+
+MOBILE-SPECIFIC ADAPTATIONS:
+  Linguistic Portal: 2x3 grid, touch targets min 52px
+  3D Mesh: 2000 particles, fftSize 512
+  Audio Player: collapsed bottom sheet, swipe up to expand to 120px
+  Spatial Scroll: vertical layout, Framer Motion swipe gestures
+  Admin Dashboard: bottom tab bar, full-screen panels
+  Studio Bot: full-screen bottom sheet
+  Grid layouts: all 3 variants -> single-column stacked
+
+iOS SAFARI REQUIREMENTS:
+  AudioContext: deferred until touchstart/click
+  Viewport: dvh units everywhere (not vh)
+  Prefix: -webkit-backdrop-filter always included
+  Scroll momentum: -webkit-overflow-scrolling: touch
+  Safe areas: env(safe-area-inset-*) on all fixed elements
+  Input zoom prevention: font-size minimum 16px on all inputs
+
+ANDROID CHROME REQUIREMENTS:
+  Hardware back button: close modals/panels before navigation
+  Touch feedback: ripple on all interactive elements
+  Overscroll: overscroll-behavior: contain on all scroll containers
+  Viewport: 100dvh not 100vh
+
+PERFORMANCE TARGETS:
+  Lighthouse Performance: >= 90 (all devices)
+  Lighthouse Accessibility: >= 95
+  Lighthouse Best Practices: >= 95
+  Lighthouse SEO: >= 90
+  First Contentful Paint: < 1.2s
+  Largest Contentful Paint: < 2.5s
+  Cumulative Layout Shift: < 0.1
+  Time to Interactive: < 3.0s
+
+PERFORMANCE TECHNIQUES:
+  Images: WebP format, BlurHash placeholders, lazy loading
+  3D Canvas: IntersectionObserver pause when off-screen
+  Code splitting: React.lazy() for all major components
+  Bundle warning threshold: 200KB per chunk
+  Fonts: preloaded in <head>, font-display: swap
+  Animations: CSS transforms only (no layout-triggering properties)
+  React.memo: all expensive pure components
+
+ACCESSIBILITY:
+  prefers-reduced-motion: all non-essential animations disabled
+  Focus indicators: 2px solid accent-color, 2px offset
+  ARIA labels: all icon-only buttons
+  ARIA live regions: dynamic content announcements
+  Color contrast: WCAG AA minimum (4.5:1 body text)
+  Semantic HTML: nav, main, section, article, header, footer
+  Keyboard navigation: all interactive elements fully accessible
+  Skip navigation link: visible on focus
+  CJK typography: font-feature-settings for correct character rendering
+
+CJK TYPOGRAPHY RULES:
+  Korean: word-break: keep-all
+  Chinese: word-break: break-all disabled
+  Japanese: line-break: strict, font-feature-settings: "palt" 1
+  All CJK: text-align: justify disabled, overflow-wrap: break-word
+  All text: clamp() for responsive scaling — no pixel-locked font sizes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXVI — SECTION 14: API ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BASE URL:
+  Development: http://localhost:8080
+  Production:  https://api.ace-2026.com
+
+SPEC: OpenAPI 3.0 at lib/api-spec/openapi.yaml (source of truth)
+All routes MUST match the OpenAPI spec exactly.
+CORS: frontend origin only — wildcard (*) forbidden.
+RATE LIMITING: 100 req/min per IP (express-rate-limit + Redis store).
+HELMET: full security headers (CSP, HSTS, X-Frame-Options).
+COMPRESSION: gzip on all text responses.
+
+S3 CORS LAW:
+  All S3 media tag references MUST include crossorigin="anonymous".
+  S3 bucket CORS policy MUST explicitly allow GET from frontend origin.
+  This prevents tainted canvas errors in WebGL and Canvas API operations.
+
+STAGING PREVIEW PAYLOAD:
+  POST /api/media/staging-preview:
+    Accepts multipart/form-data.
+    Processes file in temporary memory buffer.
+    Returns: temporary Signed URL + Vibrant palette + audio duration.
+    MUST NOT permanently store the file.
+
+STANDARD RESPONSE ENVELOPE:
+  interface ApiResponse<T> {
+    success: boolean;
+    data: T | null;
+    error: string | null;
+    code: string | null;
+    timestamp: string;
+  }
+
+COMPLETE ROUTE MANIFEST:
+  POST /api/auth/login
+  POST /api/auth/logout
+  POST /api/auth/refresh
+  GET  /api/identity
+  PUT  /api/identity
+  POST /api/identity/translate
+  POST /api/media/upload
+  POST /api/media/staging-preview
+  POST /api/pipeline/process
+  GET  /api/pipeline/status/:jobId
+  POST /api/pipeline/approve/:jobId
+  POST /api/pipeline/regenerate/:jobId
+  GET  /api/tracks
+  POST /api/tracks
+  PUT  /api/tracks/:id
+  DELETE /api/tracks/:id
+  PUT  /api/tracks/reorder
+  GET  /api/tracks/:id/stream
+  GET  /api/briefs
+  POST /api/briefs
+  POST /api/keys
+  GET  /api/keys/status
+  POST /api/keys/test
+  POST /api/chat
+  POST /api/documents/analyze
+  POST /api/documents/export
+  POST /api/documents/email
+  GET  /api/health
+  GET  /api/admin/queue-dashboard    (JWT protected)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXVII — SECTION 15: DATABASE SCHEMA (PostgreSQL 16 + Drizzle ORM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DRIZZLE ORM LAWS:
+  - Explicit relations() defined for every table association.
+  - ON DELETE CASCADE on all foreign keys.
+  - B-Tree indexes on all searchable fields and foreign keys.
+  - All tables: gen_random_uuid() primary keys.
+  - All JSONB fields: default '{}' not null.
+  - All timestamps: TIMESTAMPTZ (timezone-aware).
+
+DATABASE MIGRATION LAWS:
+  - Migrations are immutable once generated.
+  - Every schema change requires a new migration file.
+  - Historical migrations MUST NEVER be edited.
+  - Migration ordering MUST remain deterministic.
+  - Rollback scripts MUST exist for every migration.
+  - Seed scripts MUST NEVER contain demo or fake content.
+
+────────────────────────────────────────────────────────────────────────────────
+TABLE DEFINITIONS (COMPLETE)
+────────────────────────────────────────────────────────────────────────────────
+
+TABLE: composer_identity
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  name            JSONB NOT NULL DEFAULT '{}'
+  tagline         JSONB NOT NULL DEFAULT '{}'
+  biography       JSONB NOT NULL DEFAULT '{}'
+  awards          JSONB[] NOT NULL DEFAULT '{}'
+  studio_address  JSONB NOT NULL DEFAULT '{}'
+  portrait_url    TEXT
+  portrait_blur   TEXT
+  logo_url        TEXT
+  hero_video_url  TEXT
+  social_links    JSONB NOT NULL DEFAULT '{}'
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+
+TABLE: projects
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  composer_id     UUID REFERENCES composer_identity(id) ON DELETE CASCADE
+  title           JSONB NOT NULL DEFAULT '{}'
+  type            TEXT NOT NULL
+  year            INTEGER
+  description     JSONB NOT NULL DEFAULT '{}'
+  cover_url       TEXT
+  cover_blur      TEXT
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+
+TABLE: tracks
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  title           JSONB NOT NULL DEFAULT '{}'
+  narrative       JSONB NOT NULL DEFAULT '{}'
+  audio_url       TEXT
+  cover_url       TEXT
+  cover_blur      TEXT
+  dominant_colors TEXT[] DEFAULT '{}'
+  vibrant_palette JSONB
+  genre           TEXT
+  bpm             INTEGER
+  mood            TEXT
+  key_signature   TEXT
+  duration        INTEGER
+  sort_order      INTEGER NOT NULL DEFAULT 0
+  is_live         BOOLEAN DEFAULT FALSE
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+
+TABLE: pipeline_jobs
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  track_id             UUID REFERENCES tracks(id) ON DELETE CASCADE
+  status               TEXT NOT NULL DEFAULT 'idle'
+  progress             INTEGER DEFAULT 0
+  audio_metadata       JSONB
+  generated_art_url    TEXT
+  generated_narrative  JSONB
+  error_message        TEXT
+  created_at           TIMESTAMPTZ DEFAULT NOW()
+  updated_at           TIMESTAMPTZ DEFAULT NOW()
+
+TABLE: api_keys
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  key_name         TEXT UNIQUE NOT NULL
+  encrypted_value  TEXT NOT NULL
+  iv               TEXT NOT NULL
+  auth_tag         TEXT NOT NULL
+  is_active        BOOLEAN DEFAULT FALSE
+  tested_at        TIMESTAMPTZ
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+
+TABLE: admin_users
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  username         TEXT UNIQUE NOT NULL
+  password_hash    TEXT NOT NULL
+  failed_attempts  INTEGER DEFAULT 0
+  locked_until     TIMESTAMPTZ
+  last_login       TIMESTAMPTZ
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+
+TABLE: briefs
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  locale              TEXT NOT NULL
+  budget_range        TEXT
+  media_type          TEXT
+  deadline            TEXT
+  emotional_direction TEXT
+  raw_conversation    JSONB NOT NULL DEFAULT '{}'
+  is_read             BOOLEAN DEFAULT FALSE
+  created_at          TIMESTAMPTZ DEFAULT NOW()
+
+TABLE: staging_drafts
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  entity_type  TEXT NOT NULL
+  entity_id    UUID
+  draft_data   JSONB NOT NULL DEFAULT '{}'
+  created_by   UUID REFERENCES admin_users(id) ON DELETE SET NULL
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+
+────────────────────────────────────────────────────────────────────────────────
+B-TREE INDEXES (MANDATORY — ALL MUST BE CREATED)
+────────────────────────────────────────────────────────────────────────────────
+
+  CREATE INDEX idx_projects_composer_id      ON projects(composer_id);
+  CREATE INDEX idx_pipeline_jobs_track_id    ON pipeline_jobs(track_id);
+  CREATE INDEX idx_tracks_sort_order         ON tracks(sort_order);
+  CREATE INDEX idx_tracks_is_live            ON tracks(is_live);
+  CREATE INDEX idx_briefs_is_read            ON briefs(is_read);
+  CREATE INDEX idx_api_keys_key_name         ON api_keys(key_name);
+  CREATE INDEX idx_staging_drafts_entity_id  ON staging_drafts(entity_id);
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXVIII — SECTION 16: CREATIVE DIRECTION & VISUAL DNA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VISUAL REFERENCES:
+  Apple.com product pages         — spatial depth, typography precision
+  Porsche.com                     — performance aesthetics, black space, metallic restraint
+  Teenage Engineering             — industrial minimalism
+  NASA mission control            — data density + visual clarity
+  Kubrick film frame compositions — mathematical precision in framing
+
+MOTION DESIGN PRINCIPLES:
+  Every entrance animation has purpose — not decoration.
+  Physics-based springs for interactive elements.
+  Cinematic easing: cubic-bezier(0.25, 0.46, 0.45, 0.94)
+  No linear animations.
+  Stagger delays on lists: 0.05s between items.
+  Exit animations always present — nothing disappears instantly.
+  Loading states are always resolved states, never bare spinners.
+  Error states are visually precise, never raw console messages.
+
+TYPOGRAPHY PRINCIPLES:
+  Scale creates hierarchy, not weight alone.
+  Whitespace is content.
+  Text never competes with imagery.
+  CJK: respect character spacing, never force-track.
+  Responsive type: clamp() everywhere — no pixel-locked sizes.
+
+COLOR PRINCIPLES:
+  One accent color maximum per theme.
+  Accent used sparingly (maximum 10% of visible surface).
+  Vibrant.js colors MUST NOT clash with theme accent.
+  If extracted hue is within 30 degrees of accent: desaturate.
+  WCAG AA minimum on all text/background combinations.
+
+INTERACTION PRINCIPLES:
+  Every interactive element: feedback within 50ms.
+  Hover states begin animating on cursor approach.
+  Touch targets minimum 44x44px (Apple HIG), 52x52px critical elements.
+
+[OMNI-STATE MAGNETIC CURSOR SYSTEM]
+  - Custom global cursor bypassing OS pointer (cursor: none).
+  - Default: 12px solid dot, mix-blend-mode: exclusion.
+  - Hover states: expands/morphs based on target:
+      Text  -> line
+      Media -> circle with 'VIEW'
+      Audio -> circle with 'PLAY'
+  - Magnetic Physics: cursor snaps to center of interactive buttons via
+    Framer Motion spring (stiffness 150).
+  - MUST gracefully hide on touch devices:
+    window.matchMedia('(pointer: coarse)')
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXIX — SECTION 17: BUILD STATUS TRACKER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COMPLETED MILESTONES:
+  [x] pnpm workspace scaffold
+  [x] TypeScript 5.x strict configuration
+  [x] Node.js 22 LTS confirmed
+  [x] artifacts/ace-2026 frontend package
+  [x] artifacts/api-server backend package
+  [x] React contexts scaffolded (all 5)
+  [x] ChromaticContext — 3 themes with CSS variable injection
+  [x] localStorage theme persistence
+  [x] MainApp.tsx entry point
+  [x] Vite 7 dev server on port 18956
+  [x] TypeScript compiling clean
+  [x] pnpm execution policy fixed (Windows)
+  [x] Node modules installed
+
+IN PROGRESS:
+  [ ] LinguisticPortal
+  [ ] PersistentAudioPlayer
+  [ ] AudioReactiveMesh
+
+NOT STARTED:
+  [ ] DoubleExposurePortrait
+  [ ] SpatialScrollEngine
+  [ ] ExecutiveStudioBot
+  [ ] AdminDashboard (all 5 tabs)
+  [ ] GridLayoutEngine
+  [ ] LiquidImage.tsx
+  [ ] MagneticCursor.tsx
+  [ ] AI Pipeline services
+  [ ] Database schema + migrations
+  [ ] All API routes
+  [ ] JWT authentication
+  [ ] Universal Injection Panel
+  [ ] Staging Engine
+  [ ] Responsive + Accessibility audit
+  [ ] Docker + Nginx
+  [ ] GitHub Actions CI/CD
+  [ ] Playwright E2E tests
+  [ ] Deployment
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXX — SECTION 18: DEVELOPMENT COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+START FRONTEND:    pnpm --filter @workspace/ace-2026 run dev
+START API SERVER:  pnpm --filter @workspace/api-server run dev
+TYPECHECK ALL:     pnpm run typecheck
+LINT ALL:          pnpm run lint
+BUILD ALL:         pnpm run build
+INSTALL PACKAGES:  pnpm install --no-frozen-lockfile
+DB MIGRATE:        pnpm --filter @workspace/api-server run db:migrate
+DB STUDIO:         pnpm --filter @workspace/api-server run db:studio
+DB SEED:           pnpm --filter @workspace/api-server run db:seed
+RUN E2E TESTS:     pnpm --filter @workspace/ace-2026 run test:e2e
+HEALTH CHECK:      bash scripts/health-check.sh
+DOCKER UP:         docker-compose up -d
+DOCKER BUILD:      docker-compose build --no-cache
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXI — ROOT HTML SHELL (index.html — EXISTING FILE)
+SOURCE: index.html upload
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NOTE FOR AI AGENT:
+  The index.html file is the root HTML shell of the frontend application.
+  It was uploaded as part of this project. Per PROMPT 18 of the 70-Step
+  Micro-Audit, this file requires a Meta, Asset Linking, & Structure Audit.
+  The following requirements MUST be satisfied in index.html:
+
+INDEX.HTML REQUIREMENTS (from blueprint + 70-Step audit):
+
+  1. DOCTYPE declaration: <!DOCTYPE html>
+  2. <html lang="en"> with dir="ltr" (dynamically updated by locale)
+  3. <meta charset="UTF-8">
+  4. <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  5. <title>ACE-2026 — Autonomous Composer Ecosystem</title>
+  6. All Google Fonts preloaded in <head> with rel="preload" and
+     as="font" and crossorigin="anonymous":
+       - Cormorant Garamond (300, 400, 500, 600, 700)
+       - Playfair Display (400, 500, 700)
+       - EB Garamond (400, 500)
+       - Lora (400, 500)
+       - Space Mono (400, 700)
+       - IBM Plex Mono (400, 500)
+       - Noto Sans JP (400, 500)
+       - Noto Sans SC (400, 500)
+       - Noto Sans KR (400, 500)
+  7. Google Fonts stylesheet link with font-display=swap
+  8. favicon reference: /assets/favicon.ico
+  9. OG meta tags for social sharing
+  10. <meta name="theme-color" content="#080808">
+  11. <div id="root"></div> — root React mount point
+  12. <script type="module" src="/src/main.tsx"></script>
+  13. ZERO inline styles in index.html
+  14. ZERO hardcoded colors in index.html
+  15. preconnect links to fonts.googleapis.com and fonts.gstatic.com
+  16. dns-prefetch for CDN origins
+  17. Safe area meta for iOS:
+      <meta name="viewport" content="width=device-width, initial-scale=1.0,
+      viewport-fit=cover">
+  18. Apple touch icon reference
+  19. Zero layout-shift-inducing resources loaded synchronously
+  20. All script tags deferred or module type
+
+COMPLETE CANONICAL index.html (production-ready):
+
+  <!DOCTYPE html>
+  <html lang="en" dir="ltr">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+      <meta name="theme-color" content="#080808" />
+      <meta name="description" content="ACE-2026 — The Autonomous Composer Ecosystem. A cinematic digital portfolio for world-class composers." />
+      <meta property="og:title" content="ACE-2026 — Autonomous Composer Ecosystem" />
+      <meta property="og:description" content="Cinematic digital portfolio for world-class composers." />
+      <meta property="og:type" content="website" />
+      <meta property="og:image" content="/assets/og-image.webp" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <title>ACE-2026 — Autonomous Composer Ecosystem</title>
+      <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
+      <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;700&family=EB+Garamond:wght@400;500&family=Lora:wght@400;500&family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Noto+Sans+KR:wght@400;500&display=swap"
+        rel="stylesheet"
+      />
+    </head>
+    <body>
+      <div id="root"></div>
+      <script type="module" src="/src/main.tsx"></script>
+    </body>
+  </html>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXII — THE 45-STEP ABSOLUTE ENGINEERING MATRIX
+SOURCE: MASTER_FOUNDATION_FILE_v6_0.pdf — SECTIONS A through H
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CRITICAL AGENT DIRECTIVE — THE ZERO-ABSTRACTION RULE:
+  You are an autonomous coding agent executing these 45 steps sequentially.
+  You are FORBIDDEN from treating any step as a high-level summary.
+
+  For EVERY single prompt:
+    1. Output the EXACT, complete, production-ready code files.
+    2. DO NOT use placeholders. "// your code here" is a build failure.
+    3. Write exhaustive, compile-ready code for every module before
+       proceeding to the next step.
+    4. If a step requires shell commands, execute them fully and verify
+       output before continuing.
+    5. If a step involves connecting components, write the full integration
+       logic including imports, exports, and wiring.
+    6. ALWAYS declare the absolute file path before writing code.
+       Example: artifacts/ace-2026/src/components/ExecutiveStudioBot.tsx
+    7. Partial code is a total failure. Build 100% complete or do not proceed.
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION A: ENVIRONMENT, DIRECTORY SCHEMA & DATABASE (PROMPTS 1-5)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 01 [CLI Initialization Blueprint]:
+  Generate a deterministic shell script provisioning the full monorepo
+  directory tree. MUST:
+  - Create all directories in Section 1 workspace structure
+  - Initialize pnpm-workspace.yaml at monorepo root
+  - Generate root package.json with workspace configuration
+  - Generate artifacts/ace-2026/package.json with all frontend dependencies
+    at exact pinned versions:
+      React 19, Vite 7, Three.js r128, Framer Motion 11,
+      Tailwind CSS 4, @react-three/fiber, @react-three/drei,
+      @dnd-kit/sortable, vibrant-js, blurhash, @studio-freight/lenis,
+      vite-plugin-node-polyfills
+  - Generate artifacts/api-server/package.json with all backend dependencies
+    at exact pinned versions:
+      Express 5, Drizzle ORM, PostgreSQL driver, BullMQ, ioredis,
+      AWS SDK v3, bcrypt, jsonwebtoken, music-metadata,
+      youtube-dl-exec, multer, helmet, express-rate-limit, zod
+  - Generate tsconfig.json at root and per workspace:
+      strict: true, noImplicitAny: true, strictNullChecks: true
+  - Generate tailwind.config.js referencing CSS custom properties
+  - Generate .env.example with exact keys from Section 11
+  - Establish absolute package-dependency synchronization
+
+PROMPT 02 [Relational Schema Engine]:
+  Complete Drizzle ORM schema at artifacts/api-server/src/db/schema.ts
+  MUST include:
+  - All 8 tables from Section 15 with exact column definitions
+  - All JSONB fields defaulting to '{}'
+  - All TIMESTAMPTZ timestamps
+  - All foreign keys with ON DELETE CASCADE
+  - All B-Tree indexes from Section 15
+  - Explicit Drizzle relations() for every table association
+  - TypeScript types exported per table (InferModel pattern)
+
+PROMPT 03 [Cryptographic Storage Layer]:
+  Complete encryption service at:
+    artifacts/api-server/src/services/encryptionService.ts
+  MUST include:
+  - AES-256-GCM using Node.js crypto (no external libraries)
+  - Functions: encrypt(plaintext, masterKey) and
+    decrypt(ciphertext, iv, authTag, masterKey)
+  - ENCRYPTION_MASTER_KEY from process.env exclusively
+  - No key material in error messages or logs
+  - Complete api_keys route at artifacts/api-server/src/routes/keys.ts
+    using this service for all CRUD on the api_keys table
+
+PROMPT 04 [Deterministic Seeding Controller]:
+  Complete seed script at artifacts/api-server/src/db/seed.ts
+  MUST:
+  - Insert exactly ONE composer_identity row (all JSONB fields as {})
+  - Insert exactly ONE admin_users row (bcrypt-hashed password from env)
+  - Verify existing data before inserting (idempotent, safe to re-run)
+  - Log each step clearly
+  - Zero Lorem Ipsum, placeholder text, or test URLs
+
+PROMPT 05 [Edge-Level Protection Middleware]:
+  Complete server entry at artifacts/api-server/src/index.ts
+  MUST include:
+  - Helmet with full CSP headers
+  - CORS restricted to frontend origin from .env
+  - Redis-backed express-rate-limit (100 req/min per IP)
+  - Zod body validation on all protected routes
+  - Morgan request logging in development
+  - Global error handler (no stack trace leaks in production)
+  - All routes from Section 14 mounted and wired
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION B: TYPE SYSTEM & GLOBAL STATE ENGINES (PROMPTS 6-10)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 06 [Strict Structural Definitions]:
+  Complete type declaration file at:
+    artifacts/ace-2026/src/types/index.ts
+  MUST include ALL interfaces from Section 4 exactly as specified:
+    MultiLingual, MediaAsset, VibrantPalette, ComposerIdentity,
+    SocialLinks, Project, AudioTrack, AudioState, PipelineStatus,
+    PipelineJob, AudioMetadata, Locale, ThemeId, ThemeConfig,
+    ApiResponse<T>. Zero 'any' types.
+
+PROMPT 07 [Autonomous Identity State Core]:
+  Complete context at:
+    artifacts/ace-2026/src/context/IdentityContext.tsx
+  MUST include:
+  - ComposerIdentity initialized entirely as null
+  - Locale initialized from localStorage or navigator.language
+  - fetchIdentity(): GET /api/identity -> populate state
+  - fetchTracks(): GET /api/tracks -> populate playlist
+  - All consumers receive null-safe typed data
+  - React.createContext with exported useContext hook
+  - Error boundary integration for API failures
+
+PROMPT 08 [Zero-Layout-Shift Linguistic Interface]:
+  Complete component at:
+    artifacts/ace-2026/src/components/LinguisticPortal.tsx
+  Full implementation of Section 3:
+  - Three.js starfield background
+  - 6 language columns with hover interactions
+  - Per-language micro-tones (440Hz/528Hz/396Hz/639Hz/741Hz/852Hz)
+  - Shatter transition (48 fragments desktop / 24 mobile)
+  - hardwareConcurrency < 4 dissolve fallback
+  - 2x3 mobile grid
+  - 52px minimum touch targets
+  - Zero layout shifts
+
+PROMPT 09 [Global Audio Pipeline Analyser Context]:
+  Complete context at:
+    artifacts/ace-2026/src/context/AudioContext.tsx
+  MUST include:
+  - AudioContext singleton (Web Audio API, no external library)
+  - Lazy initialization on first user gesture only
+  - AnalyserNode: fftSize 2048 desktop, 512 mobile
+  - getByteFrequencyData -> bassLevel, midLevel, highLevel (0.0-1.0)
+  - Vibrant.js extraction on track change + --dynamic-accent update
+  - Full AudioState interface implementation (Section 4)
+  - play(), pause(), seek(), setVolume(), nextTrack(), prevTrack()
+  - iOS Safari resume() compliance
+  - Color clash prevention (hue within 30 degrees -> desaturate)
+  [ENVIRONMENTAL UI AUDIO ENGINE — MANDATORY]:
+  - Pre-load Base64 encoded micro-tones (Hover Ping, Click Thud,
+    Route Swoosh) inside AudioContext.
+  - Execute environmental sounds synchronously with Magnetic Cursor states.
+  - Volume MUST be locally clamped to a maximum of 0.15 gain to never
+    overpower portfolio tracks.
+
+PROMPT 10 [Dynamic Chromatic Theme Orchestrator]:
+  Complete context at:
+    artifacts/ace-2026/src/context/ChromaticContext.tsx
+  MUST include:
+  - Math.random() theme selection, localStorage persistence
+  - All 3 theme configurations with exact CSS variable values from Section 2
+  - applyTheme() injecting all variables on document.documentElement
+  - applyLocaleTypography() for all 6 locales per Section 2 rules
+  - 600ms opacity cross-fade on theme switch
+  - ThemeId and switchTheme() exported
+  - Google Fonts preloading for all 3 themes
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION C: ADMIN GATEWAY & API INJECTION (PROMPTS 11-17)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 11 [Dynamic CMS API Gatekeeper Hub]:
+  Complete Tab 3 of AdminDashboard at:
+    artifacts/ace-2026/src/components/AdminDashboard.tsx (Tab 3)
+  MUST include:
+  - Inputs for AI_IMAGE_GENERATION_KEY, LLM_NARRATIVE_API_KEY,
+    YOUTUBE_API_DATA_V3 with show/hide toggle per field
+  - "Test Connection" button -> POST /api/keys/test per key
+  - Status: Connected / Not configured / Error + timestamp
+  - Secure submit: POST /api/keys -> backend encrypts before storage
+
+PROMPT 12 [Simultaneous Hexa-Lingual Input Suite]:
+  Complete Tab 1 of AdminDashboard at:
+    artifacts/ace-2026/src/components/AdminDashboard.tsx (Tab 1)
+  MUST include:
+  - All fields from Section 11 Tab 1
+  - 6-language tab switcher per multilingual field
+  - AI Translate button per section
+  - Auto-save debounced 2s
+  - File upload with staging preview
+  - Repeatable awards array with add/remove controls
+
+PROMPT 13 [Decoupled Asset Media Manager]:
+  Complete Tab 2 of AdminDashboard at:
+    artifacts/ace-2026/src/components/AdminDashboard.tsx (Tab 2)
+  MUST include:
+  - Drop zone
+  - Pipeline progress visualization
+  - Before/after art preview with 3-theme panels
+  - 6-language narrative textareas with word counts per language
+  - Regenerate buttons
+  - Approval gate modal
+  - Playlist manager with @dnd-kit drag handles and is_live toggle per track
+
+PROMPT 14 [Kinematic Validation Interface]:
+  Real-time Zod-based input validation for all admin form fields.
+  MUST include:
+  - URL validation for all social links
+  - Inline error display with 300ms shake animation (translateX keyframes)
+  - Error state: accent-colored left border, subtle glow
+  - Success state: checkmark icon, theme-aware green glow
+  - Focus: box-shadow 0 0 0 2px var(--border-accent-color)
+
+PROMPT 15 [Live Generative Telemetry Log View]:
+  Real-time telemetry console embedded in Tab 2. MUST include:
+  - SSE from /api/pipeline/status/:jobId
+  - Auto-scrolling log: INFO (white), WARN (amber), ERROR (red), SUCCESS (green)
+  - Timestamp + stage per log entry
+  - Estimated time remaining per stage
+  - Clear log and expand/collapse controls
+
+PROMPT 16 [Express High-Fidelity API Routes]:
+  Complete Express route handler files:
+  - artifacts/api-server/src/routes/auth.ts
+    (login, logout, refresh — bcrypt + JWT httpOnly cookies)
+  - artifacts/api-server/src/routes/identity.ts
+    (GET/PUT composer identity, POST translate)
+  - artifacts/api-server/src/routes/tracks.ts
+    (full CRUD + PUT /reorder + GET /:id/stream with Range support)
+  - artifacts/api-server/src/routes/pipeline.ts
+    (process, SSE status, approve, regenerate)
+  - artifacts/api-server/src/routes/media.ts
+    (multipart upload -> S3 -> return MediaAsset)
+  - artifacts/api-server/src/routes/briefs.ts
+    (GET all, POST new brief)
+  - artifacts/api-server/src/routes/chat.ts
+    (LLM proxy with full system prompt from Section 10)
+  - artifacts/api-server/src/routes/documents.ts
+    (analyze, export PDF, send email via SMTP)
+  All routes: ApiResponse<T> envelope, JWT middleware on protected routes,
+  Zod input validation on all request bodies.
+
+PROMPT 17 [JWT Cryptographic Auth Gatekeeper]:
+  Complete stateless authorization. MUST include:
+  - JWT middleware verifying httpOnly cookie
+  - Login: bcrypt.compare -> access JWT (24h) + refresh JWT (30d)
+  - Logout: clear both cookies
+  - Refresh: validate refresh JWT -> issue new access JWT
+  - Failed attempts counter with 5-attempt lockout (15 minutes)
+  - All admin routes (except GET /api/identity and GET /api/tracks)
+    MUST require valid JWT middleware
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION D: WEBGL, SPATIAL CANVAS & SHADERS (PROMPTS 18-25)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 18 [Spatial Three.js Root Infrastructure]:
+  Complete GPU-accelerated root canvas at:
+    artifacts/ace-2026/src/components/AudioReactiveMesh.tsx
+  MUST include:
+  - React Three Fiber Canvas, camera position [0, 0, 5]
+  - OrbitControls via @react-three/drei (touch enabled, damping 0.05)
+  - Window resize handler updating camera.aspect + renderer.setSize
+  - Mouse tracking with smooth lerp interpolation
+  - IntersectionObserver pause when off-screen
+  - React Error Boundary wrapping entire canvas
+
+PROMPT 19 [GLSL Shader Files]:
+  Complete GLSL shader files:
+  - public/shaders/starfield.vert (Linguistic Portal background)
+  - public/shaders/starfield.frag (Linguistic Portal background)
+  - Full vertex shader from Section 5 (exact code as specified)
+  - Full fragment shader from Section 5 (exact code as specified)
+  - ShaderMaterial configuration with correct uniform types
+  - public/shaders/liquidDistortion.vert (Hero/Project image transitions)
+  - public/shaders/liquidDistortion.frag (Liquid surface tension logic)
+  - Shader hot-reload in development via Vite
+
+PROMPT 19.5 [Liquid Distortion WebGL Image Planes]:
+  Complete component at:
+    artifacts/ace-2026/src/components/LiquidImage.tsx
+  MUST include:
+  - Replacement of static <img> tags with Canvas-based WebGL planes
+    for Hero/Cover art.
+  - Custom GLSL Fragment Shader implementing liquid distortion on hover.
+  - Uniforms: uTexture (base image), uHoverState (0.0 to 1.0 via Framer
+    Motion useSpring), uTime.
+  - Performance Guard: Only render via requestAnimationFrame when
+    IntersectionObserver detects element is in viewport.
+  - Strict Memory Law: texture.dispose() and material.dispose() on unmount.
+
+PROMPT 20 [Cursor-Reactive Volumetric Particle Mesh]:
+  Complete AudioReactiveMesh component. MUST include:
+  - BufferGeometry particle sphere (8000/4000/2000 per device)
+  - aScale attribute: Float32Array of per-particle scales
+  - All uniforms: uTime, uBassLevel, uMidLevel, uHighLevel, uColor, uOpacity
+  - useFrame hook updating uniforms from AudioContext every frame
+  - Idle breathing animation (scale 0.95 to 1.05, 4s loop)
+  - Full GLSL shader displacement in active audio state
+  - Color dynamics from bassLevel thresholds (Section 5)
+
+PROMPT 21 [Dynamic Spatial Atmospheric Illumination]:
+  Complete dynamic lighting. MUST include:
+  - Linguistic Portal: directional + ambient as specified in Section 3
+  - Point light following mouse position (400ms lerp)
+  - Audio-reactive mesh: PointLight intensity scaled by midLevel (0.2 to 1.2)
+  - All lights dispose cleanly on unmount
+
+PROMPT 22 [Scroll-Driven Kinematic Camera Controller]:
+  Complete SpatialScrollEngine at:
+    artifacts/ace-2026/src/components/SpatialScrollEngine.tsx
+  Full Section 7 implementation:
+  - Framer Motion useScroll + useTransform for horizontal timeline
+  - Trigger at 40% scroll
+  - scroll-snap-type: x mandatory with scroll-snap-align: start
+  - Text mask reveal with mix-blend-mode: difference (4rem to 24vw)
+  - Null-safe video/gradient fallback
+  - Mobile vertical conversion
+
+PROMPT 23 [Low-Performance Throttle Fallback]:
+  Complete module at:
+    artifacts/ace-2026/src/lib/performanceGuard.ts
+  MUST include:
+  - navigator.hardwareConcurrency check (< 4 -> low-end mode)
+  - FPS monitor: < 30fps for 3 consecutive seconds -> reduce quality
+  - Low-end mode: 2000 -> 500 particles, disable blur/scan lines,
+    CSS dissolve instead of shatter
+  - Hook: usePerformanceGuard() -> { isLowEnd, particleCount, enableEffects }
+
+PROMPT 24 [High-Inertia Mathematical Motion Hook]:
+  Complete hook at:
+    artifacts/ace-2026/src/hooks/useInertia.ts
+  MUST include:
+  - Accepts: target value, inertia factor (0.0-1.0), precision threshold
+  - Returns: interpolated value via requestAnimationFrame
+  - lerp formula: current += (target - current) * factor
+  - Cleanup: cancel animation frame on unmount
+  - TypeScript generic: useInertia<T extends number | [number, number]>
+
+PROMPT 25 [Context-Loss Memory Recovery Handler]:
+  Complete module at:
+    artifacts/ace-2026/src/lib/contextLossHandler.ts
+  MUST include:
+  - canvas.addEventListener('webglcontextlost', handler)
+  - On loss: preventDefault(), dispose all geometry/material/textures,
+    clear all texture buffers, log warning
+  - canvas.addEventListener('webglcontextrestored', handler)
+  - On restore: re-initialize all geometries, re-upload textures,
+    resume requestAnimationFrame
+  - Hook: useWebGLContextGuard(rendererRef) attaches/detaches on mount/unmount
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION E: AUDIO ANALYSIS & CHROMATIC ADAPTATION (PROMPTS 26-30)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 26 [Web Audio API Spectrum Analyser]:
+  Complete module at:
+    artifacts/ace-2026/src/lib/audioAnalyser.ts
+  MUST include:
+  - createAnalyserNode(audioContext, fftSize): configured AnalyserNode
+  - getFrequencyBands(analyserNode): { bassLevel, midLevel, highLevel }
+    normalized 0.0-1.0
+  - getTimeDomainData(analyserNode): Float32Array for waveform
+  - smoothingTimeConstant: 0.85
+  - Mobile fftSize: 512; Desktop fftSize: 2048
+
+PROMPT 27 [Chromatic Audio-Reactive Bridge Hook]:
+  Complete hook at:
+    artifacts/ace-2026/src/hooks/useAudioReactive.ts
+  MUST include:
+  - Reads from AudioContext (analyserNode)
+  - Returns: { bassLevel, midLevel, highLevel, timeDomainData }
+  - Updates at 60fps via requestAnimationFrame
+  - Consumers: AudioReactiveMesh, WaveformRenderer, DoubleExposurePortrait
+  - Returns zeroed values gracefully when no audio plays
+
+PROMPT 28 [Liquid Premium Media Control Suite]:
+  Complete audio player at:
+    artifacts/ace-2026/src/components/PersistentAudioPlayer.tsx
+  Full Section 6 implementation:
+  - Fixed bottom bar, glassmorphism background
+  - Desktop + mobile layouts
+  - All controls (play/pause, prev/next, seek, volume, mute)
+  - Vibrant.js dynamic box-shadow (800ms ease)
+  - BlurHash placeholder on cover art
+  - Zero audio ownership (reads AudioContext only)
+
+PROMPT 29 [Dynamic Procedural Waveform Synthesizer]:
+  Complete waveform renderer at:
+    artifacts/ace-2026/src/components/WaveformRenderer.tsx
+  Full Section 6 waveform spec:
+  - 100% width canvas, 40px height
+  - 60fps requestAnimationFrame loop
+  - getFloatTimeDomainData with exact drawing algorithm from Section 6
+  - Playhead line at currentTime/duration
+  - Dynamic color
+  - Null-safe flat centerline
+
+PROMPT 30 [Zero-Latency Binary Streaming Route]:
+  Complete streaming handler in:
+    artifacts/api-server/src/routes/tracks.ts (streaming endpoint)
+  MUST include:
+  - GET /api/tracks/:id/stream with Range request support (HTTP 206)
+  - Content-Type based on file type (audio/mpeg or audio/wav)
+  - Accept-Ranges: bytes header
+  - S3 SDK: GetObjectCommand piped to response
+  - Scrubbing from any byte position without re-downloading
+  - Correct CORS headers for cross-origin audio requests
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION F: AUTONOMOUS AI PIPELINES (PROMPTS 31-36)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 31 [Autonomous Multi-Lingual LLM Matrix]:
+  Complete service at:
+    artifacts/api-server/src/services/polyglotNarrator.ts
+  MUST include:
+  - OpenAI client with LLM_NARRATIVE_API_KEY loaded from DB at runtime
+  - Full LLM prompt from Section 9 Process 3 (exact text)
+  - response_format: { type: "json_object" } REQUIRED in SDK call
+  - Response parsed and validated as MultiLingual interface
+  - Exponential backoff: 3 attempts, delays 1s/2s/4s
+  - Returns: MultiLingual | null on permanent failure (logged)
+
+PROMPT 32 [Cinematic Artwork Synthesis Controller]:
+  Complete service at:
+    artifacts/api-server/src/services/aiArtGenerator.ts
+  MUST include:
+  - OpenAI DALL-E 3 client with AI_IMAGE_GENERATION_KEY from DB
+  - Full cinematic prompt construction from AudioMetadata (Section 9)
+  - Theme color grade parameter injected per active theme
+  - Canvas API theme filter applied to returned image bytes
+  - Vibrant.js palette extraction from filtered image
+  - BlurHash generation from final image
+  - S3 upload: /tracks/{trackId}/cover.webp
+  - Returns: MediaAsset with all fields populated
+  - Exponential backoff: 3 attempts
+
+PROMPT 33 [Smart Media Drag-and-Drop Ingestion Pipeline]:
+  Complete drop zone in AdminDashboard Tab 2 AND:
+    artifacts/api-server/src/routes/pipeline.ts
+  MUST include:
+  - Frontend: drag-over visual, file type validation, size limit display
+  - Client-side: ID3 metadata preview before upload
+  - Backend: multer middleware, S3 upload, music-metadata extraction
+  - youtube-dl-exec: URL detection, thumbnail + metadata extraction
+  - POST /api/pipeline/process -> creates pipeline_job -> BullMQ job
+  - PipelineContext state machine updates via SSE in real-time
+
+PROMPT 34 [Asynchronous Background Job Processing Queue]:
+  Complete BullMQ infrastructure at:
+    artifacts/api-server/src/services/pipelineQueue.ts
+  MUST include:
+  - Queue setup with Redis 7.2 connection (REDIS_URL from .env)
+  - Worker: PROCESS 1 + PROCESS 2 + PROCESS 3 via Promise.allSettled()
+  - Progress events emitted at each stage -> SSE to frontend
+  - Failed job: error stored in pipeline_jobs.error_message
+  - Bull Board at /api/admin/queue-dashboard (JWT protected)
+  - Graceful shutdown: queue.close() on SIGTERM/SIGINT
+
+PROMPT 35 [Global Distribution Sync Engine]:
+  Complete service at:
+    artifacts/api-server/src/services/distributionService.ts
+  MUST include:
+  - YouTube Data API v3: update video description on publish
+    (only if YouTube URL is linked to the track)
+  - Extensible structure for additional platforms
+  - All external calls wrapped in try/catch — platform push failure
+    MUST NOT prevent track from going live
+  - Full logging of all successful and failed distribution attempts
+
+PROMPT 36 [CMS Editorial Moderation Workflow]:
+  Complete approval interface in AdminDashboard Tab 2. MUST include:
+  - Side-by-side view: original thumbnail vs AI-generated art
+  - 3-panel theme preview: ONYX | CYBER | MINIMAL
+  - 6 language narrative tabs, each fully editable textarea
+  - Individual regenerate buttons per component (art + narrative per language)
+  - "Approve & Publish" button with confirmation modal showing:
+      track title + art thumbnail + narrative preview (active locale)
+  - POST /api/pipeline/approve/:jobId -> sets is_live = true
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION G: KINEMATICS & INTERFACE REFINEMENT (PROMPTS 37-41.5)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 37 [Architectural Lenis Smooth Scroll Engine]:
+  Complete setup at:
+    artifacts/ace-2026/src/hooks/useSmoothScroll.ts
+  MUST include:
+  - Integration of @studio-freight/lenis for global scroll hijacking.
+  - Configuration Matrix:
+      duration: 1.2
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t))
+      direction: 'vertical'
+      smooth: true
+      smoothTouch: false
+  - requestAnimationFrame MUST be synchronized explicitly with Framer
+    Motion and Three.js useFrame.
+  - Native browser scroll behavior MUST be explicitly disabled via CSS
+    (overflow: hidden on body).
+  - WebGL camera Y-axis translation MUST sync seamlessly with Lenis
+    scroll output.
+  - Cleanup: lenis.destroy() on unmount to prevent memory leaks.
+
+PROMPT 38 [Elastic Framer-Motion Layout System]:
+  Complete transition system. MUST include:
+  - Global page variants: opacity 0 to 1, translateY(20px) to 0
+  - Stagger container: staggerChildren 0.05s
+  - Spring: type "spring", stiffness 100, damping 20
+  - All major components use these variants
+  - Exit animations on all modals, panels, overlays
+  - Cinematic easing: cubic-bezier(0.25, 0.46, 0.45, 0.94)
+  - prefers-reduced-motion: all animations disabled when set
+
+PROMPT 39 [Omni-Lingual Typographic Layout Polish]:
+  Implement all CJK and responsive typography rules from Section 13:
+  - word-break: keep-all for Korean
+  - line-break: strict + font-feature-settings: "palt" 1 for Japanese
+  - text-align: justify disabled for all CJK
+  - overflow-wrap: break-word on all CJK containers
+  - Noto series loaded with correct Google Fonts subsets
+  - clamp() for all display font sizes — no pixel-locked values
+
+PROMPT 40 [Fluid Spatial Floating Navigation Matrix]:
+  Complete floating navigation. MUST include:
+  - Fixed position adapting to each grid layout variant
+  - Cursor distance: Math.sqrt(dx squared + dy squared)
+  - Items within 150px: translateX/Y ±8px toward cursor (lerp)
+  - Active section indicator: accent-color line animated between items
+  - Mobile: bottom tab bar, 4 items, full width
+  - Keyboard navigable with visible focus indicators
+  - role="navigation", aria-label="Main navigation"
+
+PROMPT 41 [Apple HIG Multi-Platform Display Audit]:
+  Full implementation of all Section 13 platform requirements.
+  MUST produce:
+  - iOS Safari: all dvh fixes, -webkit- prefixes, safe-area-inset,
+    16px min font on inputs, AudioContext gesture guard
+  - Android: overscroll-behavior: contain, back button handling
+  - Touch targets: min 44x44px (52x52px critical)
+  - Focus indicators: 2px solid var(--accent-color), 2px offset
+  - ARIA labels on all icon-only buttons
+  - ARIA live regions: track changes, pipeline status, brief submission
+  - Skip navigation link visible on focus
+  - prefers-reduced-motion implemented globally
+  - WCAG AA contrast verified on all theme/text combinations
+
+PROMPT 41.5 [Omni-State Magnetic Cursor Component]:
+  Complete component at:
+    artifacts/ace-2026/src/components/MagneticCursor.tsx
+  MUST include:
+  - Global event listeners for mousemove tracking coordinates.
+  - Framer Motion useSpring for cursor positioning
+    (damping: 25, stiffness: 200).
+  - Hover detection via data-attributes (e.g., data-cursor="play")
+    to trigger state morphing.
+  - Magnetic snapping math: calculate distance to button center, apply
+    transform translate to button, snap cursor to dead center.
+  - MUST gracefully hide on touch devices:
+    window.matchMedia('(pointer: coarse)')
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION H: CI/CD, INFRASTRUCTURE & DEPLOYMENT (PROMPTS 42-45)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT 42 [Zero-Downtime GitHub Actions CI/CD Manifest]:
+  Complete workflow at .github/workflows/deploy.yml. MUST include:
+  - Trigger: push to main
+  - Step 1: pnpm install --frozen-lockfile
+  - Step 2: pnpm run typecheck (fail on any TypeScript error)
+  - Step 3: pnpm run lint (fail on any ESLint error)
+  - Step 4: pnpm run test (fail on any test failure)
+  - Step 5: pnpm run build (Vite frontend + esbuild API)
+  - Step 6: Wait for PostgreSQL healthy (pg_isready loop, max 30s)
+  - Step 7: pnpm run db:migrate (ONLY after PostgreSQL verified)
+  - Step 8: Deploy frontend to CDN, API to server
+  - Step 9: Nginx reload (ONLY after migrations complete)
+  - Step 10: GET /api/health -> 200 required
+  - On failure: rollback deployment, alert via configured channel
+  - Zero downtime: new container starts before old container stops
+
+PROMPT 43 [High-Performance Docker & Nginx Orchestration]:
+  Complete runtime environment. MUST produce:
+
+  artifacts/ace-2026/Dockerfile (multi-stage: builder -> nginx)
+
+  artifacts/api-server/Dockerfile:
+    Base: node:22-alpine
+    RUN corepack enable pnpm (BEFORE dependency installation)
+    RUN apt-get install python3 ffmpeg
+    RUN pip3 install yt-dlp
+    Multi-stage: builder -> runner
+
+  docker-compose.yml:
+    Service: frontend (nginx)
+    Service: api (node, port 8080)
+    Service: postgres (postgres:16-alpine, port 5432)
+    Service: redis (redis:7.2-alpine, port 6379) — MANDATORY
+    Health checks on postgres + redis before api starts
+    Named volumes for postgres data persistence
+
+  nginx.conf:
+    Frontend: /dist on port 80
+    /api/* -> proxy_pass to api:8080
+    gzip enabled for all text types
+    Cache-Control: 1 year for static assets
+    Security headers mirroring Helmet configuration
+    Rate limiting at nginx level (backup layer)
+
+PROMPT 44 [End-to-End Automated Testing Matrix]:
+  Complete Playwright E2E suite at artifacts/ace-2026/tests/e2e/
+  MUST include:
+
+  linguistic-portal.spec.ts:
+    All 6 language columns render, click each -> shatter ->
+    MainApp renders, localStorage locale stored correctly
+
+  admin-auth.spec.ts:
+    Correct credentials -> JWT cookie set,
+    wrong credentials -> error + attempt counter,
+    5 failures -> lockout message displayed
+
+  pipeline.spec.ts:
+    Upload .mp3 -> pipeline starts -> status updates via SSE,
+    mocked AI APIs -> approval gate shown ->
+    approve -> track appears in playlist
+
+  audio-player.spec.ts:
+    Player renders when tracks exist,
+    play button triggers playback,
+    volume control functional
+
+  responsive.spec.ts:
+    All 3 breakpoints (375px, 768px, 1440px) tested,
+    zero horizontal overflow on any breakpoint
+
+  playwright.config.ts with all browser targets
+
+PROMPT 45 [Absolute Runtime Health Validation]:
+  Complete health system. MUST produce:
+
+  artifacts/api-server/src/routes/health.ts:
+    GET /api/health verifies simultaneously:
+      PostgreSQL: SELECT 1 responds in < 50ms
+      Redis: PING responds in < 10ms
+      AWS S3: HeadBucket accessible
+      BullMQ: queue.getJobCounts() returns without error
+      api_keys: > 0 active keys configured
+    Response:
+      {
+        status: 'healthy' | 'degraded' | 'critical',
+        checks: { postgres, redis, s3, queue, apiKeys },
+        system_uptime: number,
+        component_latencies: { postgres_ms: number, redis_ms: number }
+      }
+    Business Visibility Addition: Output JSON MUST include
+    'system_uptime' and 'component_latencies' to fulfill Pillar 4
+    (System Visibility) requirements.
+
+  scripts/health-check.sh:
+    curl all health endpoints
+    Verify frontend returns 200
+    Verify /api/identity returns 200
+    Verify WebGL shaders exist at /public/shaders/
+    Exit 0 if all healthy, exit 1 on any critical failure
+    Used by CI/CD pipeline in post-deploy verification step
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXIII — SUPPLEMENTARY COMPONENT SPECIFICATIONS
+(Additional components referenced throughout the blueprint)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+────────────────────────────────────────────────────────────────────────────────
+PIPELINE CONTEXT — artifacts/ace-2026/src/context/PipelineContext.tsx
+────────────────────────────────────────────────────────────────────────────────
+
+  Manages the full state machine for AI pipeline jobs.
+  States: idle | uploading | analyzing_audio | generating_art |
+          generating_narrative | applying_filters | awaiting_approval |
+          publishing | complete | error
+  All transitions driven by SSE events from /api/pipeline/status/:jobId.
+  Must expose: currentJob, jobHistory, startJob(), cancelJob(), resetJob().
+  All consumers receive strongly typed PipelineJob data.
+
+────────────────────────────────────────────────────────────────────────────────
+STAGING CONTEXT — artifacts/ace-2026/src/context/StagingContext.tsx
+────────────────────────────────────────────────────────────────────────────────
+
+  Manages draft vs live mode toggle.
+  draftState: all staged changes (not yet committed).
+  liveState: currently published data.
+  isEditMode: boolean.
+  hasPendingChanges: boolean (drives orange dot indicator on tab).
+  commitDraft(): atomic commit of all staged changes.
+  rollbackDraft(): revert to previous live state.
+  All draft data accumulates locally before commit — zero API calls during editing.
+
+────────────────────────────────────────────────────────────────────────────────
+GRID LAYOUT ENGINE — artifacts/ace-2026/src/components/GridLayoutEngine.tsx
+────────────────────────────────────────────────────────────────────────────────
+
+  Selects layout variant on page load: Math.random() seeded for session.
+  Persists selected variant in sessionStorage (NOT localStorage — per-session).
+  Renders Variant A, B, or C based on selection.
+  All three variants must be present in the same file as conditional renders.
+  Framer Motion AnimatePresence wraps each variant's content blocks.
+  staggerChildren: 0.05s on all list-like content within variants.
+
+────────────────────────────────────────────────────────────────────────────────
+DOUBLE EXPOSURE PORTRAIT — artifacts/ace-2026/src/components/DoubleExposurePortrait.tsx
+────────────────────────────────────────────────────────────────────────────────
+
+  Full spec in Section 8 above.
+  Canvas size: matches container dimensions via ResizeObserver.
+  AudioContext integration: reads bassLevel from useAudioReactive hook.
+  BPM sync: if currentTrack.bpm is null, default to 80 BPM.
+  All music motifs drawn with ctx.beginPath() / ctx.stroke() — zero image assets.
+  On unmount: cancelAnimationFrame(), canvas context cleared.
+
+────────────────────────────────────────────────────────────────────────────────
+STAGING PREVIEW — artifacts/ace-2026/src/components/StagingPreview.tsx
+────────────────────────────────────────────────────────────────────────────────
+
+  Renders three simultaneous iframes or scaled-down panels:
+    ONYX (dark) | CYBER (cyber) | MINIMAL (light)
+  Each panel has its own isolated theme variable scope.
+  Viewport selector buttons above: Mobile (375px) | Tablet (768px) | Desktop (1440px)
+  Each panel scales to fit within the admin panel viewport.
+  Shows draft state data, not live state.
+
+────────────────────────────────────────────────────────────────────────────────
+VIBRANT EXTRACTOR — artifacts/ace-2026/src/lib/vibrantExtractor.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  extractPalette(imageUrl: string): Promise<VibrantPalette | null>
+  Uses Vibrant.from(imageUrl).getPalette()
+  Maps Vibrant swatches to VibrantPalette interface
+  Hue clash detection: if Math.abs(extractedHue - themeAccentHue) < 30 degrees:
+    desaturate extracted color by 60%
+  Returns null on failure (logged, non-crashing)
+  Used by: AudioContext (on track change), aiArtGenerator, PersistentAudioPlayer
+
+────────────────────────────────────────────────────────────────────────────────
+THEME ENGINE — artifacts/ace-2026/src/lib/themeEngine.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  Exports: THEMES: ThemeConfig[] (all 3 theme objects with exact CSS variables)
+  selectRandomTheme(): ThemeId — uses Math.random(), persists to localStorage
+  getStoredTheme(): ThemeId | null
+  applyTheme(themeId: ThemeId, locale: Locale): void — direct DOM injection
+  All theme variable maps must be 100% complete — no partial theme objects
+
+────────────────────────────────────────────────────────────────────────────────
+LOCALE ENGINE — artifacts/ace-2026/src/lib/localeEngine.ts
+────────────────────────────────────────────────────────────────────────────────
+
+  getInitialLocale(): Locale — checks localStorage, then navigator.language
+  setLocale(locale: Locale): void — stores in localStorage
+  getLocalizedText(content: MultiLingual | null, locale: Locale): string
+    Returns empty string '' when content is null (never throws)
+  applyLocaleTypography(locale: Locale, theme: ThemeConfig): void
+    Injects all typography CSS variables for the given locale/theme combo
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXIV — CONTEXT PROVIDER HIERARCHY & NESTING ORDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The provider nesting order in main.tsx is MANDATORY and IMMUTABLE.
+No provider may be reordered without explicit instruction.
+Order (outermost to innermost):
+
+  1. ChromaticProvider        — must be outermost (theme before everything)
+  2. IdentityProvider         — composer data + locale (depends on theme)
+  3. AudioProvider            — audio singleton (depends on identity for tracks)
+  4. PipelineProvider         — AI pipeline state (depends on audio context)
+  5. StagingProvider          — staging/draft system (depends on identity)
+  [Children / Router / Pages]
+
+Exact structure in main.tsx:
+  <ChromaticProvider>
+    <IdentityProvider>
+      <AudioProvider>
+        <PipelineProvider>
+          <StagingProvider>
+            <App />
+          </StagingProvider>
+        </PipelineProvider>
+      </AudioProvider>
+    </IdentityProvider>
+  </ChromaticProvider>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXV — ERROR BOUNDARY ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+React Error Boundaries REQUIRED at the following levels:
+  1. Root level (wraps entire app) — shows full-screen dark error panel
+  2. Route level (per page/section) — shows section-scoped fallback
+  3. AudioReactiveMesh (WebGL canvas) — shows static particle image fallback
+  4. LiquidImage (WebGL planes) — falls back to standard <img> tag
+  5. LinguisticPortal (Three.js scene) — falls back to static 2D version
+  6. All async data regions (identity, tracks, pipeline) — shows loading/empty states
+
+Error boundary fallback components:
+  - NEVER show raw error messages to users
+  - ONYX/CYBER: dark canvas with minimal accent-colored text
+  - MINIMAL: ivory canvas with muted text
+  - Log errors to console with timestamp + module source
+  - In production: send to error tracking service endpoint
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXVI — DEMO MODE ISOLATION ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When DEMO_MODE=true (environment variable):
+
+FRONTEND DEMO ROUTING:
+  - All audio requests → /public/audio/[filename]
+  - All image requests → /public/images/[filename]
+  - All video requests → /public/videos/[filename]
+  - API calls → local mock controllers (no real HTTP requests)
+
+BACKEND DEMO ROUTING:
+  - Database writes: intercepted, logged, not committed
+  - AI API calls: intercepted, simulated with local mock data
+  - File uploads: stored in temp memory, not persisted to S3
+
+DEMO OFFLINE UI BADGE:
+  Fixed position indicator: "DEMO MODE" in top-right corner
+  Styling: accent-color border, surface background, 12px monospace font
+  Not visible in production (DEMO_MODE=false removes it from DOM)
+
+MOCK DATA REQUIREMENTS:
+  - All mock data uses the full 6-language schema: { en, es, fr, zh, ja, ko }
+  - Mock tracks include: id, title (multilingual), audioUrl (/public/audio/),
+    coverArt with blurHash, genre, bpm, mood, duration, isLive: true
+  - Simulated AI processing delay: 1500ms-2500ms (randomized)
+  - Mock responses match exact ApiResponse<T> envelope structure
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXVII — OPENAPI SPECIFICATION REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File location: lib/api-spec/openapi.yaml
+Format: OpenAPI 3.0
+This file is the source of truth for all API contracts.
+
+Required sections:
+  openapi: "3.0.0"
+  info:
+    title: ACE-2026 API
+    version: "1.0.0"
+  servers:
+    - url: http://localhost:8080 (development)
+    - url: https://api.ace-2026.com (production)
+  components/schemas:
+    - ApiResponse (generic wrapper)
+    - MultiLingual
+    - MediaAsset
+    - VibrantPalette
+    - ComposerIdentity
+    - AudioTrack
+    - PipelineJob
+    - AudioMetadata
+    - Brief
+  paths: (all 27 routes from Section 14 fully documented)
+  security schemes: bearerAuth (JWT via httpOnly cookie)
+
+All route definitions must include:
+  - requestBody schema
+  - response schema (200, 400, 401, 403, 500)
+  - security requirements
+  - example payloads
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXVIII — PERFORMANCE BUDGET & BUNDLE CONSTRAINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BUNDLE SIZE LIMITS:
+  - Per chunk warning threshold: 200KB
+  - Initial JS bundle (main): < 150KB gzipped
+  - Three.js chunk (lazy): < 300KB gzipped
+  - Framer Motion chunk (lazy): < 80KB gzipped
+  - Admin dashboard chunk (lazy, code-split): < 200KB gzipped
+
+LAZY LOADING STRATEGY (React.lazy() required for):
+  - LinguisticPortal (Three.js dependency)
+  - AudioReactiveMesh (Three.js dependency)
+  - AdminDashboard (all 5 tabs, heavy UI)
+  - ExecutiveStudioBot (AI-dependent)
+  - DoubleExposurePortrait (canvas-heavy)
+
+CRITICAL RENDER PATH:
+  - Only ChromaticContext and root shell rendered synchronously
+  - All heavy components behind Suspense with BlurHash/skeleton fallbacks
+  - No blocking resources in index.html (all fonts preloaded, not blocking)
+
+VITE BUILD CONFIGURATION:
+  - rollupOptions.output.manualChunks for Three.js, Framer Motion, admin
+  - build.chunkSizeWarningLimit: 200
+  - build.sourcemap: false in production
+  - build.minify: 'esbuild'
+  - build.target: 'es2020'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XXXIX — SECURITY IMPLEMENTATION CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Backend Security (all must be present in artifacts/api-server/src/index.ts):
+  [ ] helmet() with full CSP header configuration
+  [ ] cors({ origin: process.env.FRONTEND_URL }) — no wildcard
+  [ ] express-rate-limit with RedisStore (100 req/min)
+  [ ] compression() middleware for gzip
+  [ ] express.json({ limit: '10mb' }) body size limit
+  [ ] morgan('combined') for access logging (dev only)
+  [ ] Global error handler middleware (last in chain)
+  [ ] process.on('unhandledRejection') and process.on('uncaughtException')
+  [ ] Zod validation middleware factory for all routes
+  [ ] JWT verification middleware protecting all admin routes
+  [ ] CSRF token generation and validation
+  [ ] Secure cookie configuration (httpOnly, sameSite: 'strict', secure: prod)
+  [ ] SQL injection prevention via Drizzle parameterized queries only
+  [ ] XSS sanitization on all user-submitted text fields
+  [ ] AES-256-GCM encryption for all stored API keys
+  [ ] bcrypt with cost factor 12 for password hashing
+  [ ] Failed login attempt tracking with 15-minute lockout at 5 failures
+  [ ] No stack traces in production error responses
+  [ ] No secrets in logs, error messages, or API responses
+  [ ] S3 presigned URLs with expiry for all media delivery
+
+Frontend Security:
+  [ ] No API keys in frontend code or localStorage
+  [ ] All admin inputs type="password" for sensitive fields
+  [ ] CSP meta tag matching server Helmet CSP
+  [ ] Subresource integrity (sri) for all CDN resources
+  [ ] No eval() usage anywhere in the codebase
+  [ ] All external links: rel="noopener noreferrer"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART XL — FINAL MASTER VERIFICATION CHECKLIST
+(Agent must verify ALL items before declaring any phase complete)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+INFRASTRUCTURE:
+  [ ] Node.js 22.11.0 exact version confirmed
+  [ ] pnpm 9.12.3 exact version confirmed
+  [ ] pnpm-workspace.yaml exists at monorepo root
+  [ ] All package versions pinned exactly (no ^ or ~)
+  [ ] .env.example synchronized with all env usages
+  [ ] tsconfig.json strict: true across all workspaces
+  [ ] Path aliases @/ configured and resolving
+
+BUILD:
+  [ ] pnpm run typecheck exits with 0 errors
+  [ ] pnpm run lint exits with 0 warnings and 0 errors
+  [ ] pnpm run build succeeds (Vite + esbuild)
+  [ ] No chunks exceed 200KB warning threshold
+  [ ] Zero unresolved imports at build time
+
+RUNTIME:
+  [ ] Frontend serves on port 18956 (dev)
+  [ ] API server serves on port 8080
+  [ ] PostgreSQL connects and SELECT 1 < 50ms
+  [ ] Redis connects and PING < 10ms
+  [ ] GET /api/health returns { status: 'healthy' }
+  [ ] GET /api/identity returns ApiResponse<ComposerIdentity>
+  [ ] GET /api/tracks returns ApiResponse<AudioTrack[]>
+
+FRONTEND:
+  [ ] LinguisticPortal renders all 6 language columns
+  [ ] Shatter transition works (all 3 phases)
+  [ ] Math.random() theme selection + localStorage persistence
+  [ ] All 3 theme CSS variables inject correctly
+  [ ] AudioContext singleton initialized on first gesture
+  [ ] Particle mesh renders (idle breathing state)
+  [ ] PersistentAudioPlayer renders (fixed bottom)
+  [ ] WaveformRenderer renders (flat line when no audio)
+  [ ] Admin dashboard accessible via Ctrl+Shift+A
+  [ ] All 5 admin tabs render and are navigable
+
+RESPONSIVE:
+  [ ] Zero horizontal overflow at 375px
+  [ ] Zero horizontal overflow at 768px
+  [ ] Zero horizontal overflow at 1440px
+  [ ] iOS Safari: all dvh units, webkit prefixes present
+  [ ] Touch targets: minimum 44px all interactive elements
+
+SECURITY:
+  [ ] JWT auth flow: login, refresh, logout all working
+  [ ] bcrypt cost factor 12 confirmed
+  [ ] AES-256-GCM encryption for api_keys confirmed
+  [ ] Rate limiting active (Redis-backed)
+  [ ] CORS: only frontend origin allowed
+  [ ] No secrets in any log output
+
+TESTING:
+  [ ] All 5 Playwright spec files exist and run
+  [ ] linguistic-portal.spec.ts: all 6 languages clickable
+  [ ] admin-auth.spec.ts: lockout after 5 failures
+  [ ] responsive.spec.ts: zero overflow at all breakpoints
+  [ ] CI/CD pipeline: all 10 steps pass on push to main
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║         END OF MASTER SOURCE OF TRUTH — ACE-2026 v6.0                       ║
+║         ABSOLUTE DETERMINISTIC ENGINEERING EDITION                           ║
+║         FULL MERGED DOCUMENT — ZERO OMISSIONS                                ║
+║                                                                               ║
+║         DOCUMENT COVERAGE SUMMARY:                                           ║
+║           Part I–II:    Execution protocol & mode enforcement               ║
+║           Part III:     4-pillar alignment matrix                            ║
+║           Part IV–IX:   Generation protocol, anti-hallucination,            ║
+║                         immutability, memory, finalization,                  ║
+║                         global runtime laws                                  ║
+║           Part X:       Security & resilience contracts                      ║
+║           Part XI:      9 absolute laws (zero dummy data through demo)      ║
+║           Part XII:     Tech stack exact versions                            ║
+║           Part XIII:    Workspace structure (exact paths)                   ║
+║           Part XIV:     3 chromatic themes (exact CSS variables)            ║
+║           Part XV:      Linguistic portal full spec                          ║
+║           Part XVI:     All TypeScript interfaces                            ║
+║           Part XVII:    3D audio-reactive mesh + GLSL shaders               ║
+║           Part XVIII:   Persistent glassmorphism audio player               ║
+║           Part XIX:     Spatial scroll engine                                ║
+║           Part XX:      Double exposure portrait                             ║
+║           Part XXI:     AI media pipeline (4 processes)                     ║
+║           Part XXII:    Executive studio bot                                 ║
+║           Part XXIII:   Admin dashboard (5 tabs)                            ║
+║           Part XXIV:    Grid layout engine (3 variants)                     ║
+║           Part XXV:     Responsive & cross-platform standards               ║
+║           Part XXVI:    API architecture (all 27 routes)                    ║
+║           Part XXVII:   Database schema (8 tables + indexes)                ║
+║           Part XXVIII:  Creative direction & visual DNA                     ║
+║           Part XXIX:    Build status tracker                                 ║
+║           Part XXX:     Development commands                                 ║
+║           Part XXXI:    index.html canonical shell                          ║
+║           Part XXXII:   45-step engineering matrix (all 45 prompts)        ║
+║           Part XXXIII:  Supplementary component specifications              ║
+║           Part XXXIV:   Context provider hierarchy                          ║
+║           Part XXXV:    Error boundary architecture                          ║
+║           Part XXXVI:   Demo mode isolation                                  ║
+║           Part XXXVII:  OpenAPI specification requirements                  ║
+║           Part XXXVIII: Performance budget & bundle constraints             ║
+║           Part XXXIX:   Security implementation checklist                   ║
+║           Part XL:      Final master verification checklist                 ║
+╚═══════════════════════════════════════════════════════════════════════════════╝  
