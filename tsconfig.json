@@ -1,29 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "moduleResolution": "Bundler",
-    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./artifacts/ace-2026/src/*"],
-      "@api/*": ["./artifacts/api-server/src/*"]
-    }
-  },
-  "references": [
-    { "path": "./artifacts/ace-2026" },
-    { "path": "./artifacts/api-server" }
-  ],
-  "files": []
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  }
 }

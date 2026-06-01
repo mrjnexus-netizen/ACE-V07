@@ -1,8 +1,8 @@
 packages:
   - 'artifacts/*'
 allowBuilds:
-  bcrypt: false
-  es5-ext: false
-  esbuild: false
-  msgpackr-extract: false
-  youtube-dl-exec: false
+  bcrypt: true
+  es5-ext: true
+  esbuild: true
+  msgpackr-extract: true
+  youtube-dl-exec: true

@@ -1,12 +1,17 @@
 {
   "extends": "../../tsconfig.json",
-  "compilerOptions": { "ignoreDeprecations": "6.0",
+  "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.pnpm-stores/tsbuildinfo-api-server.json"
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "build"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build"
+  ]
 }
-

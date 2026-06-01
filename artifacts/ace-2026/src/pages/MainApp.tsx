@@ -3,13 +3,19 @@ import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
 import LinguisticPortal from '../components/LinguisticPortal';
+import GridLayoutEngine from '../components/GridLayoutEngine';
+import SpatialScrollEngine from '../components/SpatialScrollEngine';
+import PersistentAudioPlayer from '../components/PersistentAudioPlayer';
+import ExecutiveStudioBot from '../components/ExecutiveStudioBot';
+import AdminDashboard from '../components/AdminDashboard';
+import MagneticCursor from '../components/MagneticCursor';
 import { Locale } from '../types';
 
 const MainApp = () => {
-  const { identity, fetchIdentity, fetchTracks, locale, setLocale } = useIdentity();
-  const { audioState, playTrack, pauseTrack, setVolume, nextTrack, prevTrack } = useAudio();
+  const { identity, locale, setLocale } = useIdentity();
   const { theme, switchTheme, applyLocaleTypography } = useChromatic();
   const [showPortal, setShowPortal] = useState(true);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     if (!showPortal) {
@@ -17,6 +23,19 @@ const MainApp = () => {
       applyLocaleTypography(locale, theme);
     }
   }, [showPortal, locale, theme, applyLocaleTypography]);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+A toggles admin dashboard
+      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        setShowAdmin((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleLanguageSelect = (selectedLocale: Locale) => {
     setLocale(selectedLocale);
@@ -28,47 +47,55 @@ const MainApp = () => {
   }
 
   return (
-    <div className="min-h-screen bg-surface text-text font-body transition-colors duration-600">
-      <header className="p-4 border-b border-border flex justify-between items-center">
-        <h1 className="text-4xl font-display text-accent">ACE-2026</h1>
-        <nav>
-          <button onClick={() => switchTheme('onyx')} className="mr-2 p-2">Onyx</button>
-          <button onClick={() => switchTheme('cyber')} className="mr-2 p-2">Cyber</button>
-          <button onClick={() => switchTheme('minimal')} className="p-2">Minimal</button>
+    <div className="min-h-screen bg-surface text-text font-body transition-colors duration-600 relative overflow-x-hidden select-none">
+      {/* Global Magnetic Cursor System */}
+      <MagneticCursor />
+
+      {/* Secret Admin Panel Access Trigger in Header (ACE monogram logo) */}
+      <header className="fixed top-0 left-0 right-0 z-40 p-6 flex justify-between items-center backdrop-blur-md border-b border-border/10 bg-surface/30">
+        <h1
+          onClick={() => setShowAdmin(true)}
+          className="text-2xl font-display font-bold text-accent tracking-[0.2em] cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+          title="Open Admin CMD"
+        >
+          ACE-2026
+        </h1>
+        <nav className="flex space-x-6 text-xs font-mono tracking-widest uppercase items-center">
+          <button
+            onClick={() => switchTheme('onyx')}
+            className={`cursor-pointer hover:text-accent transition-colors ${theme.id === 'onyx' ? 'text-accent' : 'text-text-muted'}`}
+          >
+            ONYX
+          </button>
+          <button
+            onClick={() => switchTheme('cyber')}
+            className={`cursor-pointer hover:text-accent transition-colors ${theme.id === 'cyber' ? 'text-accent' : 'text-text-muted'}`}
+          >
+            CYBER
+          </button>
+          <button
+            onClick={() => switchTheme('minimal')}
+            className={`cursor-pointer hover:text-accent transition-colors ${theme.id === 'minimal' ? 'text-accent' : 'text-text-muted'}`}
+          >
+            MINIMAL
+          </button>
         </nav>
       </header>
-      <main className="p-4">
-        <h2 className="text-3xl font-display mb-4">Welcome, Composer</h2>
-        {identity ? (
-          <div className="space-y-4">
-            <p className="text-xl">Name: {identity.name?.[locale]}</p>
-            <p className="text-muted">Tagline: {identity.tagline?.[locale]}</p>
-            {/* More identity details */}
-          </div>
-        ) : (
-          <p className="text-muted">Loading composer identity...</p>
-        )}
 
-        <h3 className="text-2xl font-display mt-8 mb-4">Audio Tracks</h3>
-        {audioState.playlist.length > 0 ? (
-          <div className="space-y-2">
-            {audioState.playlist.map((track) => (
-              <div key={track.id} className="flex items-center p-2 bg-surface2 border border-border rounded-md">
-                <p className="flex-grow">{track.title[locale] || track.title.en}</p>
-                <button
-                  onClick={() => playTrack(track)}
-                  className="ml-4 px-4 py-2 bg-accent text-surface rounded-md"
-                >
-                  {audioState.isPlaying && audioState.currentTrack?.id === track.id ? 'Pause' : 'Play'}
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted">No tracks available.</p>
-        )}
-      </main>
-      {/* Persistent Audio Player would go here, receiving state from useAudio */}
+      {/* Layout Randomization Engine */}
+      <GridLayoutEngine />
+
+      {/* Spatial HorizontalTimeline Scroll Engine */}
+      <SpatialScrollEngine />
+
+      {/* Persistent Audio Player */}
+      <PersistentAudioPlayer />
+
+      {/* Executive Studio Bot (positioned above bottom player) */}
+      <ExecutiveStudioBot />
+
+      {/* Admin Dashboard overlay */}
+      {showAdmin && <AdminDashboard onClose={() => setShowAdmin(false)} />}
     </div>
   );
 };

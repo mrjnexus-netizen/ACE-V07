@@ -3,7 +3,11 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
     "composite": true,
+    "allowSyntheticDefaultImports": true,
     "tsBuildInfoFile": "./node_modules/.pnpm-stores/tsbuildinfo-ace-2026.json"
   },
   "include": ["src"],

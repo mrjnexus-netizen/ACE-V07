@@ -8,7 +8,15 @@ import { RedisStore } from "rate-limit-redis";
 import Redis from "ioredis";
 import dotenv from "dotenv";
 import keysRoutes from "./routes/keys";
-// Import other routes here
+import authRoutes from "./routes/auth";
+import identityRoutes from "./routes/identity";
+import tracksRoutes from "./routes/tracks";
+import briefsRoutes from "./routes/briefs";
+import chatRoutes from "./routes/chat";
+import mediaRoutes from "./routes/media";
+import pipelineRoutes from "./routes/pipeline";
+import documentsRoutes from "./routes/documents";
+import healthRoutes from "./routes/health";
 
 dotenv.config();
 
@@ -72,7 +80,15 @@ app.use(limiter);
 
 // Routes
 app.use("/api/keys", keysRoutes);
-// Use other routes here: app.use("/api/some-route", someRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/identity", identityRoutes);
+app.use("/api/tracks", tracksRoutes);
+app.use("/api/briefs", briefsRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/media", mediaRoutes);
+app.use("/api/pipeline", pipelineRoutes);
+app.use("/api/documents", documentsRoutes);
+app.use("/api/health", healthRoutes);
 
 // Global error handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

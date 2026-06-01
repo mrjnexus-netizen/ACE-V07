@@ -1,28 +1,8 @@
 {
-  "name": "ace-2026-monorepo",
+  "name": "ace-v07-root",
   "version": "1.0.0",
   "private": true,
-  "description": "Autonomous Composer Ecosystem 2026 Monorepo",
-  "keywords": [
-    "react",
-    "typescript",
-    "monorepo",
-    "webgl",
-    "audio",
-    "ai",
-    "fullstack"
-  ],
   "scripts": {
-    "typecheck": "pnpm --filter \"./artifacts/*\" run typecheck",
-    "lint": "pnpm --filter \"./artifacts/*\" run lint",
-    "build": "pnpm --filter \"./artifacts/*\" run build",
-    "dev": "pnpm --filter @workspace/ace-2026 run dev",
-    "start:api": "pnpm --filter @workspace/api-server run dev",
-    "db:migrate": "pnpm --filter @workspace/api-server run db:migrate",
-    "db:seed": "pnpm --filter @workspace/api-server run db:seed",
-    "db:studio": "pnpm --filter @workspace/api-server run db:studio"
-  },
-  "devDependencies": {
-    "typescript": "5.7.2"
+    "build": "pnpm -r run build"
   }
 }

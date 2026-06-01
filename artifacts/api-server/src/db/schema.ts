@@ -1,4 +1,4 @@
-import { pgTable, uuid, jsonb, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, jsonb, text, integer, boolean, timestamp, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const composerIdentity = pgTable(
@@ -32,7 +32,10 @@ export const projects = pgTable(
     coverBlur: text('cover_blur'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  }
+  },
+  (table) => ({
+    composerIdIdx: index('idx_projects_composer_id').on(table.composerId),
+  })
 );
 
 export const tracks = pgTable(
@@ -55,7 +58,11 @@ export const tracks = pgTable(
     isLive: boolean('is_live').default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  }
+  },
+  (table) => ({
+    sortOrderIdx: index('idx_tracks_sort_order').on(table.sortOrder),
+    isLiveIdx: index('idx_tracks_is_live').on(table.isLive),
+  })
 );
 
 export const pipelineJobs = pgTable(
@@ -71,7 +78,10 @@ export const pipelineJobs = pgTable(
     errorMessage: text('error_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  }
+  },
+  (table) => ({
+    trackIdIdx: index('idx_pipeline_jobs_track_id').on(table.trackId),
+  })
 );
 
 export const apiKeys = pgTable(
@@ -85,7 +95,10 @@ export const apiKeys = pgTable(
     isActive: boolean('is_active').default(false),
     testedAt: timestamp('tested_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  }
+  },
+  (table) => ({
+    keyNameIdx: index('idx_api_keys_key_name').on(table.keyName),
+  })
 );
 
 export const adminUsers = pgTable(
@@ -113,7 +126,10 @@ export const briefs = pgTable(
     rawConversation: jsonb('raw_conversation').notNull().default({}),
     isRead: boolean('is_read').default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  }
+  },
+  (table) => ({
+    isReadIdx: index('idx_briefs_is_read').on(table.isRead),
+  })
 );
 
 export const stagingDrafts = pgTable(
@@ -125,7 +141,10 @@ export const stagingDrafts = pgTable(
     draftData: jsonb('draft_data').notNull().default({}),
     createdBy: uuid('created_by').references(() => adminUsers.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  }
+  },
+  (table) => ({
+    entityIdIdx: index('idx_staging_drafts_entity_id').on(table.entityId),
+  })
 );
 
 // Relations
