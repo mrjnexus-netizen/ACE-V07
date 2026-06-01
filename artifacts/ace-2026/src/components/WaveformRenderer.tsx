@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { useAudio } from '../context/AudioContext';
 
 interface WaveformRendererProps {
@@ -40,7 +40,7 @@ const WaveformRenderer = ({ color }: WaveformRendererProps) => {
 
         ctx.beginPath();
         for (let i = 0; i < bufferLength; i++) {
-          const sample = dataArray[i];
+          const sample = dataArray[i] ?? 0;
           const x = (i / bufferLength) * width;
           const y = (sample * 0.8 + 0.5) * height;
 

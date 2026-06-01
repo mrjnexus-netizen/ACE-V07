@@ -7,7 +7,7 @@ import { eq, desc } from 'drizzle-orm';
 const router: Router = Router();
 
 // GET /api/briefs - Admin only
-router.get('/', authenticateJWT, async (req: Request, res: Response) => {
+router.get('/', authenticateJWT, async (_req: Request, res: Response) => {
   try {
     const list = await db.query.briefs.findMany({
       orderBy: [desc(briefs.createdAt)],
@@ -86,7 +86,7 @@ router.put('/:id/read', authenticateJWT, async (req: Request, res: Response) => 
     const [updatedBrief] = await db
       .update(briefs)
       .set({ isRead: true })
-      .where(eq(briefs.id, id))
+      .where(eq(briefs.id, id!))
       .returning();
 
     if (!updatedBrief) {

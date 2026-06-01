@@ -10,7 +10,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 const router: Router = Router();
 
 // GET /api/tracks
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
     const list = await db.query.tracks.findMany({
       orderBy: [asc(tracks.sortOrder)],
@@ -122,25 +122,32 @@ router.put('/:id', authenticateJWT, async (req: Request, res: Response) => {
     const { id } = req.params;
     const data = req.body;
 
+    const updatePayload: any = {
+      title: data.title,
+      narrative: data.narrative,
+      audioUrl: data.audioUrl,
+      coverUrl: data.coverUrl,
+      coverBlur: data.coverBlur,
+      dominantColors: data.dominantColors,
+      vibrantPalette: data.vibrantPalette,
+      genre: data.genre,
+      bpm: data.bpm ? parseInt(data.bpm) : null,
+      mood: data.mood,
+      keySignature: data.keySignature,
+      updatedAt: new Date(),
+    };
+
+    if (data.duration !== undefined) {
+      updatePayload.duration = parseInt(data.duration);
+    }
+    if (data.isLive !== undefined) {
+      updatePayload.isLive = data.isLive;
+    }
+
     const [updatedTrack] = await db
       .update(tracks)
-      .set({
-        title: data.title,
-        narrative: data.narrative,
-        audioUrl: data.audioUrl,
-        coverUrl: data.coverUrl,
-        coverBlur: data.coverBlur,
-        dominantColors: data.dominantColors,
-        vibrantPalette: data.vibrantPalette,
-        genre: data.genre,
-        bpm: data.bpm ? parseInt(data.bpm) : null,
-        mood: data.mood,
-        keySignature: data.keySignature,
-        duration: data.duration ? parseInt(data.duration) : undefined,
-        isLive: data.isLive !== undefined ? data.isLive : undefined,
-        updatedAt: new Date(),
-      })
-      .where(eq(tracks.id, id))
+      .set(updatePayload)
+      .where(eq(tracks.id, id!))
       .returning();
 
     if (!updatedTrack) {
@@ -176,7 +183,7 @@ router.put('/:id', authenticateJWT, async (req: Request, res: Response) => {
 router.delete('/:id', authenticateJWT, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const deleted = await db.delete(tracks).where(eq(tracks.id, id)).returning();
+    const deleted = await db.delete(tracks).where(eq(tracks.id, id!)).returning();
 
     if (deleted.length === 0) {
       return res.status(404).json({
@@ -212,7 +219,7 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const track = await db.query.tracks.findFirst({
-      where: eq(tracks.id, id),
+      where: eq(tracks.id, id!),
     });
 
     if (!track || !track.audioUrl) {
@@ -246,7 +253,7 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
         if (fs.existsSync(publicAudioDir)) {
           const files = fs.readdirSync(publicAudioDir);
           if (files.length > 0) {
-            localPath = path.join(publicAudioDir, files[0]);
+            localPath = path.join(publicAudioDir, files[0]!);
           }
         }
       }
@@ -260,7 +267,7 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
 
       if (range) {
         const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
+        const start = parseInt(parts[0]!, 10);
         const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
         const chunksize = end - start + 1;
         const fileStream = fs.createReadStream(localPath, { start, end });

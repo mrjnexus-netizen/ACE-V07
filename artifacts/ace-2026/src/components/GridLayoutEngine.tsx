@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
@@ -15,7 +15,7 @@ const GridLayoutEngine = () => {
     if (stored) return stored;
 
     const variants = ['A', 'B', 'C'];
-    const chosen = variants[Math.floor(Math.random() * variants.length)];
+    const chosen = variants[Math.floor(Math.random() * variants.length)] || 'A';
     sessionStorage.setItem('ace-layout-variant', chosen);
     return chosen;
   }, []);

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import LiquidImage from './LiquidImage';
@@ -40,7 +40,7 @@ const SpatialScrollEngine = () => {
         <div className="hidden md:flex items-center h-full">
           <motion.div style={{ x }} className="flex space-x-12 px-12 items-center">
             {projects.length > 0 ? (
-              projects.map((proj, index) => (
+              projects.map((proj) => (
                 <div
                   key={proj.id}
                   className="w-[50vw] h-[55vh] flex-shrink-0 bg-surface2 border border-border rounded-lg overflow-hidden flex flex-col justify-between p-6 relative group hover:border-accent/40 transition-colors duration-500"

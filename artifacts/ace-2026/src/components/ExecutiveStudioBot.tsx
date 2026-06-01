@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
@@ -12,7 +12,7 @@ interface Message {
 
 const ExecutiveStudioBot = () => {
   const { locale } = useIdentity();
-  const { audioState, playTrack, pauseTrack } = useAudio();
+  const { audioState, playTrack } = useAudio();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [input, setInput] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([

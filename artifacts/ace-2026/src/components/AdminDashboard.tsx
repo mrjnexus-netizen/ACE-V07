@@ -10,9 +10,9 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard = ({ onClose }: AdminDashboardProps) => {
-  const { identity, playlist, fetchIdentity, fetchTracks } = useIdentity();
+  const { identity } = useIdentity();
   const { isEditMode, setIsEditMode, draftState, updateDraftField, commitDraft, rollbackDraft } = useStaging();
-  const { currentJob, startJob } = usePipeline();
+  const { currentJob } = usePipeline();
   const { theme } = useChromatic();
 
   const [activeTab, setActiveTab] = useState<number>(1);
@@ -24,7 +24,7 @@ const AdminDashboard = ({ onClose }: AdminDashboardProps) => {
     LLM_NARRATIVE_API_KEY: '',
     YOUTUBE_API_DATA_V3: '',
   });
-  const [keyStatus, setKeyStatus] = useState<any[]>([]);
+  const [, setKeyStatus] = useState<any[]>([]);
 
   // Tab 5 Document Assistant State
   const [documentChecklist, setDocumentChecklist] = useState<any[]>([]);

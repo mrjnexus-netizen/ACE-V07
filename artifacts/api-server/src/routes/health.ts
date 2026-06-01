@@ -2,11 +2,10 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db/db';
 import Redis from 'ioredis';
 import { sql } from 'drizzle-orm';
-import { apiKeys } from '../db/schema';
 
 const router: Router = Router();
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   const startPostgres = Date.now();
   let postgresStatus = 'unconfigured';
   let postgresLatency = 0;

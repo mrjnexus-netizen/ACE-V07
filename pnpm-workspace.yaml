@@ -1,5 +1,6 @@
 packages:
-  - 'artifacts/*'
+  - 'artifacts/ace-2026'
+  - 'artifacts/api-server'
 allowBuilds:
   bcrypt: true
   es5-ext: true

@@ -19,10 +19,10 @@ router.get('/status/:jobId', (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  clients.set(jobId, res);
+  clients.set(jobId!, res);
 
   req.on('close', () => {
-    clients.delete(jobId);
+    clients.delete(jobId!);
   });
 
   // Send initial connected event
@@ -64,7 +64,7 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
 
     // 2. Create the pipeline job
     const [job] = await db.insert(pipelineJobs).values({
-      trackId: draftTrack.id,
+      trackId: draftTrack!.id,
       status: 'uploading',
       progress: 10,
     }).returning();
@@ -74,7 +74,7 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
     // that operates asynchronously but safely handles step-by-step updates.
     setTimeout(async () => {
       try {
-        const jobId = job.id;
+        const jobId = job!.id;
 
         // Stage: Analyzing Audio (20%)
         broadcastJobStatus(jobId, 'analyzing_audio', 20);
@@ -121,14 +121,14 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
         await db.update(pipelineJobs).set({
           status: 'error',
           errorMessage: err.message || 'Pipeline processing failed',
-        }).where(eq(pipelineJobs.id, job.id));
-        broadcastJobStatus(job.id, 'error', 100, { error: err.message });
+        }).where(eq(pipelineJobs.id, job!.id));
+        broadcastJobStatus(job!.id, 'error', 100, { error: err.message });
       }
     }, 100);
 
     return res.status(202).json({
       success: true,
-      data: { jobId: job.id, trackId: draftTrack.id },
+      data: { jobId: job!.id, trackId: draftTrack!.id },
       error: null,
       code: null,
       timestamp: new Date().toISOString(),
@@ -152,7 +152,7 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
     const { title, narrative, genre, bpm, mood, keySignature } = req.body;
 
     const job = await db.query.pipelineJobs.findFirst({
-      where: eq(pipelineJobs.id, jobId),
+      where: eq(pipelineJobs.id, jobId!),
     });
 
     if (!job || !job.trackId) {
@@ -166,8 +166,8 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
     }
 
     // Complete the publishing
-    await db.update(pipelineJobs).set({ status: 'publishing', progress: 95 }).where(eq(pipelineJobs.id, jobId));
-    broadcastJobStatus(jobId, 'publishing', 95);
+    await db.update(pipelineJobs).set({ status: 'publishing', progress: 95 }).where(eq(pipelineJobs.id, jobId!));
+    broadcastJobStatus(jobId!, 'publishing', 95);
     await new Promise(r => setTimeout(r, 1000));
 
     // Update the track with finalized, approved details and make it live
@@ -184,8 +184,8 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
       updatedAt: new Date(),
     }).where(eq(tracks.id, job.trackId));
 
-    await db.update(pipelineJobs).set({ status: 'complete', progress: 100 }).where(eq(pipelineJobs.id, jobId));
-    broadcastJobStatus(jobId, 'complete', 100);
+    await db.update(pipelineJobs).set({ status: 'complete', progress: 100 }).where(eq(pipelineJobs.id, jobId!));
+    broadcastJobStatus(jobId!, 'complete', 100);
 
     return res.status(200).json({
       success: true,
@@ -213,7 +213,7 @@ router.post('/regenerate/:jobId', authenticateJWT, async (req: Request, res: Res
     const { field } = req.body; // 'art' or 'narrative'
 
     const job = await db.query.pipelineJobs.findFirst({
-      where: eq(pipelineJobs.id, jobId),
+      where: eq(pipelineJobs.id, jobId!),
     });
 
     if (!job) {
@@ -231,15 +231,15 @@ router.post('/regenerate/:jobId', authenticateJWT, async (req: Request, res: Res
 
     if (field === 'art') {
       const generatedArtUrl = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80';
-      await db.update(pipelineJobs).set({ generatedArtUrl }).where(eq(pipelineJobs.id, jobId));
-      broadcastJobStatus(jobId, 'awaiting_approval', 90, { generatedArtUrl });
+      await db.update(pipelineJobs).set({ generatedArtUrl }).where(eq(pipelineJobs.id, jobId!));
+      broadcastJobStatus(jobId!, 'awaiting_approval', 90, { generatedArtUrl });
     } else {
       const generatedNarrative = await translateText(
         `An intense and elegant gothic cinematic masterpiece with driving sub-basses, soaring violin lines, and rich orchestral string pads.`,
         'en'
       );
-      await db.update(pipelineJobs).set({ generatedNarrative }).where(eq(pipelineJobs.id, jobId));
-      broadcastJobStatus(jobId, 'awaiting_approval', 90, { generatedNarrative });
+      await db.update(pipelineJobs).set({ generatedNarrative }).where(eq(pipelineJobs.id, jobId!));
+      broadcastJobStatus(jobId!, 'awaiting_approval', 90, { generatedNarrative });
     }
 
     return res.status(200).json({

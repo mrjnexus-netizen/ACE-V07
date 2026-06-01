@@ -2,7 +2,20 @@
   "name": "ace-v07-root",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "22.11.0",
+    "pnpm": "9.12.3"
+  },
+  "packageManager": "pnpm@9.12.3",
   "scripts": {
-    "build": "pnpm -r run build"
+    "dev:frontend": "pnpm --filter @workspace/ace-2026 run dev",
+    "dev:api": "pnpm --filter @workspace/api-server run dev",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "build": "pnpm -r run build",
+    "db:migrate": "pnpm --filter @workspace/api-server run db:migrate",
+    "db:seed": "pnpm --filter @workspace/api-server run db:seed",
+    "db:studio": "pnpm --filter @workspace/api-server run db:studio",
+    "test:e2e": "pnpm --filter @workspace/ace-2026 run test:e2e"
   }
 }

@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/db';
-import { tracks } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { decrypt } from '../services/encryptionService';
 

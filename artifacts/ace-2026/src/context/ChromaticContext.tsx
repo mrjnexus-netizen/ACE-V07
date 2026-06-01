@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { ThemeId, ThemeConfig, Locale } from '../types';
 
 // Define theme configurations based on Section 2
@@ -117,13 +117,13 @@ export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
 
   const applyLocaleTypography = (locale: Locale, selectedTheme: ThemeConfig) => {
     const root = document.documentElement;
-    let fontDisplay = selectedTheme.variables['--font-display'];
-    let fontBody = selectedTheme.variables['--font-body'];
-    let fontMono = selectedTheme.variables['--font-mono'];
-    let letterSpacingBase = selectedTheme.variables['--letter-spacing-base'];
-    let lineHeightBase = selectedTheme.variables['--line-height-base'];
-    let fontCjk = selectedTheme.variables['--font-cjk'];
-    let lineHeightCjk = selectedTheme.variables['--line-height-cjk'];
+    let fontDisplay = selectedTheme.variables['--font-display'] ?? null;
+    let fontBody = selectedTheme.variables['--font-body'] ?? null;
+    let fontMono = selectedTheme.variables['--font-mono'] ?? null;
+    let letterSpacingBase = selectedTheme.variables['--letter-spacing-base'] ?? null;
+    let lineHeightBase = selectedTheme.variables['--line-height-base'] ?? null;
+    let fontCjk = selectedTheme.variables['--font-cjk'] ?? null;
+    let lineHeightCjk = selectedTheme.variables['--line-height-cjk'] ?? null;
 
     switch (locale) {
       case 'zh':
@@ -167,7 +167,7 @@ export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
     setCurrentThemeId(themeId);
   };
 
-  const memoizedContextValue = React.useMemo(() => ({
+  const memoizedContextValue = useMemo(() => ({
     theme,
     switchTheme,
     applyLocaleTypography,

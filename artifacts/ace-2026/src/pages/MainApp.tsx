@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useIdentity } from '../context/IdentityContext';
-import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
 import LinguisticPortal from '../components/LinguisticPortal';
 import GridLayoutEngine from '../components/GridLayoutEngine';
@@ -12,7 +11,7 @@ import MagneticCursor from '../components/MagneticCursor';
 import { Locale } from '../types';
 
 const MainApp = () => {
-  const { identity, locale, setLocale } = useIdentity();
+  const { locale, setLocale } = useIdentity();
   const { theme, switchTheme, applyLocaleTypography } = useChromatic();
   const [showPortal, setShowPortal] = useState(true);
   const [showAdmin, setShowAdmin] = useState(false);

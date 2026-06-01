@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -53,7 +53,7 @@ const ParticleSphere = () => {
     return 8000;                   // Desktop
   }, []);
 
-  const [geometry, aScaleArray] = useMemo(() => {
+  const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const scales = new Float32Array(particleCount);
@@ -75,7 +75,7 @@ const ParticleSphere = () => {
 
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
-    return [geo, scales];
+    return geo;
   }, [particleCount]);
 
   const uniforms = useMemo(() => ({
@@ -100,8 +100,9 @@ const ParticleSphere = () => {
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
 
-    if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = time;
+    if (materialRef.current && materialRef.current.uniforms) {
+      const u = materialRef.current.uniforms;
+      if (u.uTime) u.uTime.value = time;
 
       if (analyser && dataArray && audioState.isPlaying) {
         analyser.getByteFrequencyData(dataArray);
@@ -113,31 +114,37 @@ const ParticleSphere = () => {
 
         const len = dataArray.length;
         // Bass: 0-10 bins
-        for (let i = 0; i < 10; i++) bass += dataArray[i];
+        for (let i = 0; i < 10; i++) {
+          bass += dataArray[i] ?? 0;
+        }
         bass = bass / 10 / 255;
 
         // Mid: 10-100 bins
         const midEnd = Math.min(100, len);
-        for (let i = 10; i < midEnd; i++) mid += dataArray[i];
+        for (let i = 10; i < midEnd; i++) {
+          mid += dataArray[i] ?? 0;
+        }
         mid = mid / (midEnd - 10) / 255;
 
         // High: 100-512 bins
         const highEnd = Math.min(512, len);
-        for (let i = 100; i < highEnd; i++) high += dataArray[i];
+        for (let i = 100; i < highEnd; i++) {
+          high += dataArray[i] ?? 0;
+        }
         high = high / (highEnd - 10) / 255;
 
-        materialRef.current.uniforms.uBassLevel.value = bass;
-        materialRef.current.uniforms.uMidLevel.value = mid;
-        materialRef.current.uniforms.uHighLevel.value = high;
+        if (u.uBassLevel) u.uBassLevel.value = bass;
+        if (u.uMidLevel) u.uMidLevel.value = mid;
+        if (u.uHighLevel) u.uHighLevel.value = high;
 
         // Color flash on bass peak
         if (bass > 0.75) {
-          materialRef.current.uniforms.uColor.value.set('#FFFFFF');
-          materialRef.current.uniforms.uOpacity.value = 0.9;
+          if (u.uColor) u.uColor.value.set('#FFFFFF');
+          if (u.uOpacity) u.uOpacity.value = 0.9;
         } else {
           const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
-          materialRef.current.uniforms.uColor.value.set(accentColor);
-          materialRef.current.uniforms.uOpacity.value = 0.35 + bass * 0.5;
+          if (u.uColor) u.uColor.value.set(accentColor);
+          if (u.uOpacity) u.uOpacity.value = 0.35 + bass * 0.5;
         }
       } else {
         // Idle breathing state (Uniform scale 0.95 to 1.05, 4s ease loop)
@@ -146,10 +153,10 @@ const ParticleSphere = () => {
           meshRef.current.scale.set(breathe, breathe, breathe);
           meshRef.current.rotation.y = time * 0.05; // slow idle rotation
         }
-        materialRef.current.uniforms.uBassLevel.value = 0;
-        materialRef.current.uniforms.uMidLevel.value = 0;
-        materialRef.current.uniforms.uHighLevel.value = 0;
-        materialRef.current.uniforms.uOpacity.value = 0.35;
+        if (u.uBassLevel) u.uBassLevel.value = 0;
+        if (u.uMidLevel) u.uMidLevel.value = 0;
+        if (u.uHighLevel) u.uHighLevel.value = 0;
+        if (u.uOpacity) u.uOpacity.value = 0.35;
       }
     }
   });

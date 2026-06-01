@@ -67,7 +67,7 @@ if (process.env.NODE_ENV === "development") {
 // Rate limiting (100 req/min per IP)
 const limiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as Promise<any>,
+    sendCommand: (...args: string[]) => redisClient.call(args[0]!, ...args.slice(1)) as Promise<any>,
     prefix: "rate-limit:",
   }),
   windowMs: 60 * 1000, // 1 minute
@@ -91,7 +91,7 @@ app.use("/api/documents", documentsRoutes);
 app.use("/api/health", healthRoutes);
 
 // Global error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(500).json({
     success: false,

@@ -197,7 +197,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/logout
-router.post('/logout', async (req: Request, res: Response) => {
+router.post('/logout', async (_req: Request, res: Response) => {
   res.clearCookie('accessToken');
   res.clearCookie('refreshToken');
   return res.status(200).json({

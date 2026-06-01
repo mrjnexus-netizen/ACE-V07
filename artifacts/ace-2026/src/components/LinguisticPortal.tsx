@@ -1,5 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { useIdentity } from '../context/IdentityContext';
+import { useRef, useState } from 'react';
 import { useAudio } from '../context/AudioContext';
 import { Locale } from '../types';
 
@@ -11,7 +10,7 @@ const LinguisticPortal = ({ onLanguageSelect }: LinguisticPortalProps) => {
   const { playEnvironmentalSound } = useAudio();
   const [hovered, setHovered] = useState<Locale | null>(null);
   const [selected, setSelected] = useState<Locale | null>(null);
-  const [shattering, setShattering] = useState<boolean>(false);
+  const [, setShattering] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 

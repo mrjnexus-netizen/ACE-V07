@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useRef, useEffect, useMemo, ReactNode } from 'react';
 import { AudioState, AudioTrack, VibrantPalette } from '../types';
 import Vibrant from 'node-vibrant';
 
@@ -183,15 +183,17 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
 
   const nextTrack = () => {
     const nextIndex = (audioState.currentIndex + 1) % audioState.playlist.length;
-    if (audioState.playlist.length > 0) {
-      playTrack(audioState.playlist[nextIndex]);
+    const track = audioState.playlist[nextIndex];
+    if (track) {
+      playTrack(track);
     }
   };
 
   const prevTrack = () => {
     const prevIndex = (audioState.currentIndex - 1 + audioState.playlist.length) % audioState.playlist.length;
-    if (audioState.playlist.length > 0) {
-      playTrack(audioState.playlist[prevIndex]);
+    const track = audioState.playlist[prevIndex];
+    if (track) {
+      playTrack(track);
     }
   };
 
@@ -242,7 +244,7 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
   };
 
   // Expose playEnvironmentalSound through context for LinguisticPortal
-  const memoizedContextValue = React.useMemo(() => ({
+  const memoizedContextValue = useMemo(() => ({
     audioState,
     playTrack,
     pauseTrack,

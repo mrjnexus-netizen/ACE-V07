@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 const router: Router = Router();
 
 // GET /api/identity
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
     const identity = await db.query.composerIdentity.findFirst();
     if (!identity) {

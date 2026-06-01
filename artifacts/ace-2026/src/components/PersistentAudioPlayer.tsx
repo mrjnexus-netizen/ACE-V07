@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAudio } from '../context/AudioContext';
 import { useIdentity } from '../context/IdentityContext';
 import WaveformRenderer from './WaveformRenderer';
@@ -140,9 +139,10 @@ const PersistentAudioPlayer = () => {
 // Helper to convert hex to rgb for rgba box shadow
 function hexToRgb(hex: string): string {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
-    : '212, 175, 55';
+  if (result && result[1] && result[2] && result[3]) {
+    return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
+  }
+  return '212, 175, 55';
 }
 
 export default PersistentAudioPlayer;

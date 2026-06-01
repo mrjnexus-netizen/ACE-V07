@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
@@ -56,7 +56,7 @@ const DoubleExposurePortrait = () => {
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
-        for (let i = 0; i < 10; i++) sum += dataArray[i];
+        for (let i = 0; i < 10; i++) sum += dataArray[i] ?? 0;
         bassLevel = sum / 10 / 255;
       }
 

@@ -5,9 +5,8 @@ import multer from 'multer';
 const router: Router = Router();
 const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 
-router.post('/analyze', authenticateJWT, upload.single('file'), async (req: Request, res: Response) => {
+router.post('/analyze', authenticateJWT, upload.single('file'), async (_req: Request, res: Response) => {
   try {
-    const isDemo = process.env.DEMO_MODE === 'true';
 
     // Simulated delay
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -55,7 +54,7 @@ router.post('/analyze', authenticateJWT, upload.single('file'), async (req: Requ
   }
 });
 
-router.post('/export', authenticateJWT, async (req: Request, res: Response) => {
+router.post('/export', authenticateJWT, async (_req: Request, res: Response) => {
   try {
     return res.status(200).json({
       success: true,
@@ -75,7 +74,7 @@ router.post('/export', authenticateJWT, async (req: Request, res: Response) => {
   }
 });
 
-router.post('/email', authenticateJWT, async (req: Request, res: Response) => {
+router.post('/email', authenticateJWT, async (_req: Request, res: Response) => {
   try {
     return res.status(200).json({
       success: true,

@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/db'; // Assuming db client is exported from db.ts
 import { apiKeys } from '../db/schema';
-import { encrypt, decrypt } from '../services/encryptionService';
+import { encrypt } from '../services/encryptionService';
 import { z } from 'zod';
 
 const router: Router = Router();
@@ -64,7 +64,7 @@ router.post(
           .returning();
         res.status(200).json({
           success: true,
-          data: { id: updatedKey.id, keyName: updatedKey.keyName, isActive: updatedKey.isActive },
+          data: { id: updatedKey!.id, keyName: updatedKey!.keyName, isActive: updatedKey!.isActive },
           error: null,
           code: null,
           timestamp: new Date().toISOString(),
@@ -77,7 +77,7 @@ router.post(
           .returning();
         res.status(201).json({
           success: true,
-          data: { id: newKey.id, keyName: newKey.keyName, isActive: newKey.isActive },
+          data: { id: newKey!.id, keyName: newKey!.keyName, isActive: newKey!.isActive },
           error: null,
           code: null,
           timestamp: new Date().toISOString(),
@@ -97,7 +97,7 @@ router.post(
 );
 
 // GET /api/keys/status - Get status of all API keys (without revealing values)
-router.get('/status', async (req: Request, res: Response) => {
+router.get('/status', async (_req: Request, res: Response) => {
   try {
     const keys = await db.query.apiKeys.findMany();
 
