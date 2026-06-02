@@ -18,10 +18,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
-    environment:
-      DATABASE_URL: postgres://user:password@postgres:5432/ace_db
-      REDIS_URL: redis://redis:6379
-      # Other .env variables will be passed during actual deployment
+    env_file:
+      - ./.env.example
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,7 +39,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-HEALHTHCHECK", "pg_isready", "-U", "user"]
+      test: ["CMD-HEALTHCHECK", "pg_isready", "-U", "${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5

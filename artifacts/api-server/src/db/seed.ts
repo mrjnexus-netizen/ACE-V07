@@ -2,9 +2,19 @@ import { db } from "./db";
 import { adminUsers, composerIdentity } from "./schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
+import pino from "pino";
+
+const logger = pino({
+  transport: {
+    target: "pino-pretty",
+    options: {
+      colorize: true,
+    },
+  },
+});
 
 const seed = async () => {
-  console.log("Starting database seeding...");
+  logger.info("Starting database seeding...");
 
   // Seed Admin User
   const adminUsername = "admin";
@@ -20,9 +30,9 @@ const seed = async () => {
       username: adminUsername,
       passwordHash: hashedPassword,
     });
-    console.log("Admin user seeded.");
+    logger.info("Admin user seeded.");
   } else {
-    console.log("Admin user already exists, skipping.");
+    logger.info("Admin user already exists, skipping.");
   }
 
   // Seed Composer Identity
@@ -38,15 +48,15 @@ const seed = async () => {
       studioAddress: { en: "", es: "", fr: "", zh: "", ja: "", ko: "" },
       socialLinks: { spotify: null, imdb: null, instagram: null, youtube: null },
     });
-    console.log("Composer identity seeded.");
+    logger.info("Composer identity seeded.");
   } else {
-    console.log("Composer identity already exists, skipping.");
+    logger.info("Composer identity already exists, skipping.");
   }
 
-  console.log("Database seeding complete.");
+  logger.info("Database seeding complete.");
 };
 
 seed().catch((err) => {
-  console.error("Database seeding failed:", err);
+  logger.error("Database seeding failed:", err);
   process.exit(1);
 });

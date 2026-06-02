@@ -65,11 +65,11 @@ export interface AudioTrack {
   genre: 'cinematic' | 'gaming' | 'animation' | 'ambient';
   bpm: number | null;
   mood: string | null;
-  keySignature: string | null;
   duration: number;
   sortOrder: number;
   isLive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface AudioState {
@@ -113,7 +113,7 @@ export interface AudioMetadata {
   bpm: number | null;
   mood: string | null;
   keySignature: string | null;
-  duration: number | null;
+  duration: number;
   title: string | null;
 }
 

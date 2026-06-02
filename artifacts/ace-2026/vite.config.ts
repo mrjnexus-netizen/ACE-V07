@@ -9,6 +9,13 @@ export default defineConfig({
   root: path.resolve(__dirname, '../../'), // Root index.html is at the monorepo root
   server: {
     port: 18956,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   preview: {
     port: 18956,
@@ -42,6 +49,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@components': path.resolve(__dirname, './src/components'),
+      '@context': path.resolve(__dirname, './src/context'),
+      '@hooks': path.resolve(__dirname, './src/hooks'),
+      '@lib': path.resolve(__dirname, './src/lib'),
+      '@types': path.resolve(__dirname, './src/types'),
+      '@three': path.resolve(__dirname, './src/three'),
     },
   },
 })

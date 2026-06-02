@@ -8,7 +8,7 @@ export const composerIdentity = pgTable(
     name: jsonb('name').notNull().default({}),
     tagline: jsonb('tagline').notNull().default({}),
     biography: jsonb('biography').notNull().default({}),
-    awards: jsonb('awards').notNull().default([]).array(),
+    awards: jsonb('awards').array().notNull().default([]),
     studioAddress: jsonb('studio_address').notNull().default({}),
     portraitUrl: text('portrait_url'),
     portraitBlur: text('portrait_blur'),
@@ -171,3 +171,17 @@ export const adminUsersRelations = relations(adminUsers, ({ many }) => ({
 export const stagingDraftsRelations = relations(stagingDrafts, ({ one }) => ({
   adminUser: one(adminUsers, { fields: [stagingDrafts.createdBy], references: [adminUsers.id] }),
 }));
+
+// Infer types for Drizzle
+export type ComposerIdentityRow = typeof composerIdentity.$inferSelect;
+export type NewComposerIdentity = typeof composerIdentity.$inferInsert;
+export type ProjectRow = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
+export type TrackRow = typeof tracks.$inferSelect;
+export type NewTrack = typeof tracks.$inferInsert;
+export type PipelineJobRow = typeof pipelineJobs.$inferSelect;
+export type ApiKeyRow = typeof apiKeys.$inferSelect;
+export type AdminUserRow = typeof adminUsers.$inferSelect;
+export type BriefRow = typeof briefs.$inferSelect;
+export type StagingDraftRow = typeof stagingDrafts.$inferSelect;
+export type NewStagingDraft = typeof stagingDrafts.$inferInsert;

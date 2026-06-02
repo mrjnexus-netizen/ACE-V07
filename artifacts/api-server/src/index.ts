@@ -1,13 +1,16 @@
-import express, { Request, Response, NextFunction } from "express";
+import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
-import morgan from "morgan";
-import rateLimit from "express-rate-limit";
-import { RedisStore } from "rate-limit-redis";
-import Redis from "ioredis";
-import dotenv from "dotenv";
-import keysRoutes from "./routes/keys";
+import { requestTracer } from "./middleware/requestTracer";
+import { globalRateLimiter } from "./middleware/rateLimiter";
+import { errorMiddleware } from "./middleware/errorMiddleware";
+import { createChildLogger } from "./utils/logger";
+import { env } from "./config/env";
+import { pool } from "./db/db"; // For graceful shutdown
+import { redis } from "./db/redis"; // For graceful shutdown
+
+// Import routes
 import authRoutes from "./routes/auth";
 import identityRoutes from "./routes/identity";
 import tracksRoutes from "./routes/tracks";
@@ -17,19 +20,15 @@ import mediaRoutes from "./routes/media";
 import pipelineRoutes from "./routes/pipeline";
 import documentsRoutes from "./routes/documents";
 import healthRoutes from "./routes/health";
-
-dotenv.config();
+import keysRoutes from "./routes/keys";
 
 const app = express();
-const PORT = process.env.PORT || 8080;
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:18956";
+const PORT = 8080; // API server port is 8080 as per Blueprint
+const logger = createChildLogger("Index");
 
-// Redis client for rate limiting
-const redisClient = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+// Middleware order is crucial
+app.use(requestTracer);
 
-redisClient.on("error", (err) => console.error("Redis Client Error", err));
-
-// Helmet for security headers
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -38,83 +37,67 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https://s3.amazonaws.com"], // Adjust for S3 if needed
-      connectSrc: ["'self'", FRONTEND_URL, "ws:", "wss:", "http://localhost:8080", "http://localhost:6379"],
+      connectSrc: ["'self'", env.FRONTEND_URL, "ws:", "wss:", "http://localhost:8080", "http://localhost:6379"],
     },
   },
-  crossOriginEmbedderPolicy: false, // Required for SharedArrayBuffer in some contexts
+  crossOriginEmbedderPolicy: false,
 }));
 
-// CORS restricted to frontend origin
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: env.FRONTEND_URL,
     credentials: true,
   })
 );
 
-// Gzip compression
 app.use(compression());
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-// Body parsing
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.use(globalRateLimiter);
 
-// Request logging (development only)
-if (process.env.NODE_ENV === "development") {
-  app.use(morgan("dev"));
-}
-
-// Rate limiting (100 req/min per IP)
-const limiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(args[0]!, ...args.slice(1)) as Promise<any>,
-    prefix: "rate-limit:",
-  }),
-  windowMs: 60 * 1000, // 1 minute
-  limit: 100, // 100 requests per 1 minute (Express rate limit uses `limit` instead of `max` in newer typing versions or configs)
-  message: "Too many requests from this IP, please try again after a minute",
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-});
-app.use(limiter);
-
-// Routes
-app.use("/api/keys", keysRoutes);
+// Route mounts
 app.use("/api/auth", authRoutes);
 app.use("/api/identity", identityRoutes);
 app.use("/api/tracks", tracksRoutes);
-app.use("/api/briefs", briefsRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/media", mediaRoutes);
 app.use("/api/pipeline", pipelineRoutes);
+app.use("/api/media", mediaRoutes);
+app.use("/api/briefs", briefsRoutes);
+app.use("/api/keys", keysRoutes);
+app.use("/api/chat", chatRoutes);
 app.use("/api/documents", documentsRoutes);
 app.use("/api/health", healthRoutes);
 
-// Global error handler
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(err);
-  res.status(500).json({
-    success: false,
-    data: null,
-    error: process.env.NODE_ENV === "development" ? err.message : "Something went wrong",
-    code: "SERVER_ERROR",
-    timestamp: new Date().toISOString(),
-  });
-});
+// Error handling middleware (must be last)
+app.use(errorMiddleware);
 
 // Handle unhandled promise rejections and uncaught exceptions
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  // Optionally, you can gracefully shut down the server here
-  // process.exit(1);
+process.on("unhandledRejection", (reason: Error | any, promise: Promise<any>) => {
+  logger.error({ reason, promise }, "Unhandled Rejection caught");
+  // Application should ideally restart here in a controlled environment (e.g., PM2, Kubernetes)
+  // For now, we will exit to ensure the process doesn\'t continue in a bad state.
+  process.exit(1);
 });
 
-process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
-  // Optionally, you can gracefully shut down the server here
-  // process.exit(1);
+process.on("uncaughtException", (error: Error) => {
+  logger.fatal({ error }, "Uncaught Exception caught");
+  // For now, we will exit to ensure the process doesn\'t continue in a bad state.
+  process.exit(1);
 });
 
-app.listen(PORT, () => {
-  console.log(`API Server running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  logger.info(`API Server running on port ${PORT}`);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  logger.info("SIGTERM signal received: closing HTTP server");
+  server.close(async () => {
+    logger.info("HTTP server closed.");
+    await pool.end(); // Close PostgreSQL pool
+    logger.info("PostgreSQL pool closed.");
+    await redis.quit(); // Close Redis connection
+    logger.info("Redis client disconnected.");
+    process.exit(0);
+  });
 });

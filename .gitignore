@@ -1,17 +1,35 @@
 ﻿# Dependencies
 node_modules/
+**/node_modules/
 .pnpm-debug.log
+.pnpm-store/
 
 # Build output
 dist/
 build/
+**/dist/
 *.tsbuildinfo
 
 # Environment variables
 .env
-.env.*
+.env.local
+.env.production
+.env.*.local
 
 # Logs and OS files
 *.log
+logs/
 .DS_Store
 Thumbs.db
+
+# Test reports
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Secret keys
+*.key
+*.pem
+*.p12
+*.pfx

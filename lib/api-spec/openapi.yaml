@@ -1,0 +1,805 @@
+openapi: "3.0.0"
+info:
+  title: ACE-2026 API
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080
+    description: Development Server
+  - url: https://api.ace-2026.com
+    description: Production Server
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        code:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - success
+        - data
+        - error
+        - code
+        - timestamp
+    MultiLingual:
+      type: object
+      properties:
+        en: { type: string }
+        es: { type: string }
+        fr: { type: string }
+        zh: { type: string }
+        ja: { type: string }
+        ko: { type: string }
+      required:
+        - en
+        - es
+        - fr
+        - zh
+        - ja
+        - ko
+    MediaAsset:
+      type: object
+      properties:
+        url: { type: string, format: uri }
+        blurHash: { type: string }
+        width: { type: number }
+        height: { type: number }
+        format: { type: string, enum: [webp, jpg, png] }
+        dominantColors: { type: array, items: { type: string } }
+        vibrantPalette: { $ref: "#/components/schemas/VibrantPalette", nullable: true }
+      required:
+        - url
+        - blurHash
+        - width
+        - height
+        - format
+        - dominantColors
+    VibrantPalette:
+      type: object
+      properties:
+        vibrant: { type: string }
+        muted: { type: string }
+        darkVibrant: { type: string }
+        darkMuted: { type: string }
+        lightVibrant: { type: string }
+        lightMuted: { type: string }
+      required:
+        - vibrant
+        - muted
+        - darkVibrant
+        - darkMuted
+        - lightVibrant
+        - lightMuted
+    ComposerIdentity:
+      type: object
+      properties:
+        id: { type: string, format: uuid, nullable: true }
+        name: { $ref: "#/components/schemas/MultiLingual", nullable: true }
+        tagline: { $ref: "#/components/schemas/MultiLingual", nullable: true }
+        biography: { $ref: "#/components/schemas/MultiLingual", nullable: true }
+        awards: { type: array, items: { $ref: "#/components/schemas/MultiLingual" }, nullable: true }
+        studioAddress: { $ref: "#/components/schemas/MultiLingual", nullable: true }
+        portrait: { $ref: "#/components/schemas/MediaAsset", nullable: true }
+        logo: { $ref: "#/components/schemas/MediaAsset", nullable: true }
+        heroVideo: { type: string, nullable: true }
+        socialLinks: { $ref: "#/components/schemas/SocialLinks", nullable: true }
+        projects: { type: array, items: { $ref: "#/components/schemas/Project" }, nullable: true }
+    SocialLinks:
+      type: object
+      properties:
+        spotify: { type: string, format: uri, nullable: true }
+        imdb: { type: string, format: uri, nullable: true }
+        instagram: { type: string, format: uri, nullable: true }
+        youtube: { type: string, format: uri, nullable: true }
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { $ref: "#/components/schemas/MultiLingual" }
+        type: { type: string, enum: [film, game, animation, documentary] }
+        year: { type: number }
+        description: { $ref: "#/components/schemas/MultiLingual" }
+        coverImage: { $ref: "#/components/schemas/MediaAsset", nullable: true }
+      required:
+        - id
+        - title
+        - type
+        - year
+        - description
+    AudioTrack:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { $ref: "#/components/schemas/MultiLingual" }
+        narrative: { $ref: "#/components/schemas/MultiLingual" }
+        audioUrl: { type: string, format: uri }
+        coverArt: { $ref: "#/components/schemas/MediaAsset", nullable: true }
+        genre: { type: string, enum: [cinematic, gaming, animation, ambient] }
+        bpm: { type: number, nullable: true }
+        mood: { type: string, nullable: true }
+        keySignature: { type: string, nullable: true }
+        duration: { type: number }
+        sortOrder: { type: number }
+        isLive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required:
+        - id
+        - title
+        - narrative
+        - audioUrl
+        - duration
+        - sortOrder
+        - isLive
+        - createdAt
+        - updatedAt
+    PipelineStatus:
+      type: string
+      enum: [idle, uploading, analyzing_audio, generating_art, generating_narrative, applying_filters, awaiting_approval, publishing, complete, error]
+    PipelineJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/PipelineStatus" }
+        progress: { type: number }
+        audioMetadata: { $ref: "#/components/schemas/AudioMetadata", nullable: true }
+        generatedArtUrl: { type: string, format: uri, nullable: true }
+        generatedNarrative: { $ref: "#/components/schemas/MultiLingual", nullable: true }
+        errorMessage: { type: string, nullable: true }
+      required:
+        - id
+        - status
+        - progress
+    AudioMetadata:
+      type: object
+      properties:
+        dominantInstrument: { type: string, nullable: true }
+        bpm: { type: number, nullable: true }
+        mood: { type: string, nullable: true }
+        keySignature: { type: string, nullable: true }
+        duration: { type: number }
+        title: { type: string, nullable: true }
+      required:
+        - duration
+    Brief:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        locale: { type: string }
+        budgetRange: { type: string, nullable: true }
+        mediaType: { type: string, nullable: true }
+        deadline: { type: string, nullable: true }
+        emotionalDirection: { type: string, nullable: true }
+        rawConversation: { type: object }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required:
+        - id
+        - locale
+        - rawConversation
+        - isRead
+        - createdAt
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /api/auth/login:
+    post:
+      summary: Authenticate user and issue JWTs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+              required:
+                - username
+                - password
+      responses:
+        "200":
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/auth/logout:
+    post:
+      summary: Logout user and clear JWT cookies
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Successful logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/auth/refresh:
+    post:
+      summary: Refresh access token using refresh token
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Access token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/identity:
+    get:
+      summary: Get composer identity
+      responses:
+        "200":
+          description: Composer identity data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    put:
+      summary: Update composer identity
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComposerIdentity"
+      responses:
+        "200":
+          description: Composer identity updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /api/identity/translate:
+    post:
+      summary: Translate multilingual content using AI
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string }
+                sourceLang: { $ref: "#/components/schemas/Locale" }
+                fieldType: { type: string }
+              required:
+                - text
+                - sourceLang
+                - fieldType
+      responses:
+        "200":
+          description: Translated content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+  /api/media/upload:
+    post:
+      summary: Upload media asset to S3
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+              required:
+                - file
+      responses:
+        "200":
+          description: Media asset uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/media/staging-preview:
+    post:
+      summary: Generate staging preview for media asset
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+              required:
+                - file
+      responses:
+        "200":
+          description: Staging preview generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/pipeline/process:
+    post:
+      summary: Process audio or YouTube URL through AI pipeline
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                audioUrl: { type: string, format: uri, nullable: true }
+                youtubeUrl: { type: string, format: uri, nullable: true }
+              oneOf:
+                - required: [audioUrl]
+                - required: [youtubeUrl]
+      responses:
+        "200":
+          description: Pipeline job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/pipeline/status/{jobId}:
+    get:
+      summary: Get real-time status of a pipeline job
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Pipeline job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/pipeline/approve/{jobId}:
+    post:
+      summary: Approve and publish a pipeline job
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Pipeline job approved and published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/pipeline/regenerate/{jobId}:
+    post:
+      summary: Regenerate AI-generated content for a pipeline job
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                component: { type: string, enum: [art, narrative] }
+                language: { $ref: "#/components/schemas/Locale", nullable: true }
+              required:
+                - component
+      responses:
+        "200":
+          description: Content regeneration started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/tracks:
+    get:
+      summary: Get all audio tracks
+      responses:
+        "200":
+          description: List of audio tracks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    post:
+      summary: Create a new audio track
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioTrack"
+      responses:
+        "200":
+          description: Audio track created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/tracks/{id}:
+    get:
+      summary: Get a single audio track by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Audio track data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "404":
+          description: Track not found
+    put:
+      summary: Update an audio track by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioTrack"
+      responses:
+        "200":
+          description: Audio track updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "404":
+          description: Track not found
+    delete:
+      summary: Delete an audio track by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Audio track deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "404":
+          description: Track not found
+  /api/tracks/reorder:
+    put:
+      summary: Reorder audio tracks
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, items: { type: string, format: uuid } }
+              required:
+                - ids
+      responses:
+        "200":
+          description: Tracks reordered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/tracks/{id}/stream:
+    get:
+      summary: Stream audio track by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Range
+          in: header
+          schema:
+            type: string
+          description: "Bytes range, e.g., bytes=0-1023"
+      responses:
+        "200":
+          description: Full audio content
+          content:
+            audio/*:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: Partial audio content
+          content:
+            audio/*:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Track not found
+  /api/briefs:
+    get:
+      summary: Get all project briefs
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of project briefs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    post:
+      summary: Submit a new project brief
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Brief"
+      responses:
+        "200":
+          description: Project brief submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/keys:
+    get:
+      summary: Get status of all API keys
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: API key statuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+    post:
+      summary: Save or update an API key
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keyName: { type: string }
+                keyValue: { type: string }
+              required:
+                - keyName
+                - keyValue
+      responses:
+        "200":
+          description: API key saved/updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/keys/test:
+    post:
+      summary: Test connection for an API key
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keyName: { type: string }
+                keyValue: { type: string }
+              required:
+                - keyName
+                - keyValue
+      responses:
+        "200":
+          description: Connection test successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          description: Connection test failed
+  /api/chat:
+    post:
+      summary: Send a message to the Executive Studio Bot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message: { type: string }
+                locale: { $ref: "#/components/schemas/Locale" }
+              required:
+                - message
+                - locale
+      responses:
+        "200":
+          description: Bot response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/documents/analyze:
+    post:
+      summary: Analyze a document using AI
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+              required:
+                - file
+      responses:
+        "200":
+          description: Document analysis results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/documents/export:
+    post:
+      summary: Export a document to PDF
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                documentId: { type: string, format: uuid }
+                format: { type: string, enum: [pdf, docx] }
+              required:
+                - documentId
+                - format
+      responses:
+        "200":
+          description: Exported document
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  /api/documents/email:
+    post:
+      summary: Email a document
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                documentId: { type: string, format: uuid }
+                recipientEmail: { type: string, format: email }
+                subject: { type: string }
+                body: { type: string }
+              required:
+                - documentId
+                - recipientEmail
+                - subject
+                - body
+      responses:
+        "200":
+          description: Document emailed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/health:
+    get:
+      summary: Get API health status
+      responses:
+        "200":
+          description: API health data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /api/admin/queue-dashboard:
+    get:
+      summary: Get BullMQ queue dashboard (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Queue dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"

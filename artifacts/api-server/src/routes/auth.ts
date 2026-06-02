@@ -1,45 +1,41 @@
-import { Router, Request, Response } from 'express';
-import { eq } from 'drizzle-orm';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { db } from '../db/db';
-import { adminUsers } from '../db/schema';
-import { getCookies } from '../middleware/auth';
+import { Router, Request, Response, NextFunction } from "express";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { db } from "../db/db";
+import { adminUsers } from "../db/schema";
+import { AuthError } from "../utils/errors";
+import { sendError, sendSuccess } from "../utils/response";
+import { authRateLimiter } from "../middleware/rateLimiter";
+import { env } from "../config/env";
+import { z } from "zod";
+import { createChildLogger } from "../utils/logger";
 
 const router: Router = Router();
+const logger = createChildLogger("AuthRoutes");
 
 const ACCESS_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24h
 const REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30d
 
-const getJwtSecret = () => process.env.JWT_SECRET || 'fallback_secret_key_at_least_32_bytes_long';
+const getJwtSecret = () => env.JWT_SECRET;
+
+// Zod schema for login validation
+const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
 
 // POST /api/auth/login
-router.post('/login', async (req: Request, res: Response) => {
+router.post("/login", authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        data: null,
-        error: 'Username and password are required',
-        code: 'MISSING_CREDENTIALS',
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const { username, password } = loginSchema.parse(req.body);
 
     const admin = await db.query.adminUsers.findFirst({
       where: eq(adminUsers.username, username),
     });
 
     if (!admin) {
-      return res.status(401).json({
-        success: false,
-        data: null,
-        error: 'Invalid credentials',
-        code: 'INVALID_CREDENTIALS',
-        timestamp: new Date().toISOString(),
-      });
+      return sendError(res, "Invalid credentials", "INVALID_CREDENTIALS", 401);
     }
 
     // Check lockout state
@@ -47,13 +43,7 @@ router.post('/login', async (req: Request, res: Response) => {
       const remainingMinutes = Math.ceil(
         (new Date(admin.lockedUntil).getTime() - Date.now()) / (60 * 1000)
       );
-      return res.status(403).json({
-        success: false,
-        data: null,
-        error: `Account is locked. Please try again in ${remainingMinutes} minutes.`,
-        code: 'LOCKED_OUT',
-        timestamp: new Date().toISOString(),
-      });
+      return sendError(res, `Account is locked. Please try again in ${remainingMinutes} minutes.`, "LOCKED_OUT", 403);
     }
 
     const isMatch = await bcrypt.compare(password, admin.passwordHash);
@@ -64,27 +54,22 @@ router.post('/login', async (req: Request, res: Response) => {
 
       if (currentFailures >= 5) {
         lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 mins lockout
+        logger.warn({ requestId: req.id, username }, "Account locked due to too many failed login attempts.");
       }
 
       await db
         .update(adminUsers)
         .set({
-          failedAttempts: currentFailures >= 5 ? 0 : currentFailures, // Reset after lock sets or keep track
+          failedAttempts: currentFailures,
           lockedUntil,
         })
         .where(eq(adminUsers.id, admin.id));
 
       const errorMsg = currentFailures >= 5
-        ? 'Too many failed attempts. Account locked for 15 minutes.'
+        ? "Too many failed attempts. Account locked for 15 minutes."
         : `Invalid credentials. ${5 - currentFailures} attempts remaining.`;
 
-      return res.status(401).json({
-        success: false,
-        data: null,
-        error: errorMsg,
-        code: currentFailures >= 5 ? 'LOCKED_OUT' : 'INVALID_CREDENTIALS',
-        timestamp: new Date().toISOString(),
-      });
+      return sendError(res, errorMsg, currentFailures >= 5 ? "LOCKED_OUT" : "INVALID_CREDENTIALS", 401);
     }
 
     // Success! Reset failure count and update lastLogin
@@ -98,115 +83,82 @@ router.post('/login', async (req: Request, res: Response) => {
       .where(eq(adminUsers.id, admin.id));
 
     const secret = getJwtSecret();
-    const accessToken = jwt.sign({ id: admin.id, username: admin.username }, secret, {
-      expiresIn: '24h',
+    const accessToken = jwt.sign({ id: admin.id, username: admin.username, role: "admin" }, secret, {
+      expiresIn: "24h",
     });
-    const refreshToken = jwt.sign({ id: admin.id, username: admin.username }, secret, {
-      expiresIn: '30d',
+    const refreshToken = jwt.sign({ id: admin.id, username: admin.username, role: "admin" }, secret, {
+      expiresIn: "30d",
     });
 
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = env.NODE_ENV === "production";
 
-    res.cookie('accessToken', accessToken, {
+    res.cookie("accessToken", accessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'strict',
+      sameSite: "strict",
       maxAge: ACCESS_TOKEN_EXPIRY,
     });
 
-    res.cookie('refreshToken', refreshToken, {
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'strict',
+      sameSite: "strict",
       maxAge: REFRESH_TOKEN_EXPIRY,
     });
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        id: admin.id,
-        username: admin.username,
-        accessToken,
-      },
-      error: null,
-      code: null,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    console.error('Login error:', error);
-    return res.status(500).json({
-      success: false,
-      data: null,
-      error: 'An internal server error occurred',
-      code: 'SERVER_ERROR',
-      timestamp: new Date().toISOString(),
-    });
+    logger.info({ requestId: req.id, username: admin.username }, "Admin user logged in successfully.");
+    return sendSuccess(res, { username: admin.username }, 200);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return sendError(res, error.errors?.[0]?.message || "Validation error", "VALIDATION_ERROR", 400);
+    }
+    next(error); // Pass to global error handler
   }
 });
 
 // POST /api/auth/refresh
-router.post('/refresh', async (req: Request, res: Response) => {
+router.post("/refresh", async (req: Request, res: Response) => {
   try {
-    const cookies = getCookies(req);
-    const refreshToken = cookies.refreshToken || req.body.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
-      return res.status(401).json({
-        success: false,
-        data: null,
-        error: 'Refresh token required',
-        code: 'REFRESH_TOKEN_REQUIRED',
-        timestamp: new Date().toISOString(),
-      });
+      throw new AuthError("Refresh token required");
     }
 
     const secret = getJwtSecret();
-    const decoded = jwt.verify(refreshToken, secret) as { id: string; username: string };
+    const decoded = jwt.verify(refreshToken, secret) as { id: string; username: string, role: string };
 
-    const accessToken = jwt.sign({ id: decoded.id, username: decoded.username }, secret, {
-      expiresIn: '24h',
+    const newAccessToken = jwt.sign({ id: decoded.id, username: decoded.username, role: decoded.role }, secret, {
+      expiresIn: "24h",
     });
 
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = env.NODE_ENV === "production";
 
-    res.cookie('accessToken', accessToken, {
+    res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: 'strict',
+      sameSite: "strict",
       maxAge: ACCESS_TOKEN_EXPIRY,
     });
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        accessToken,
-      },
-      error: null,
-      code: null,
-      timestamp: new Date().toISOString(),
-    });
+    logger.info({ requestId: req.id, username: decoded.username }, "Access token refreshed.");
+    return sendSuccess(res, { username: decoded.username }, 200);
   } catch (error) {
-    return res.status(403).json({
-      success: false,
-      data: null,
-      error: 'Invalid or expired refresh token',
-      code: 'FORBIDDEN',
-      timestamp: new Date().toISOString(),
-    });
+    if (error instanceof AuthError) {
+      return sendError(res, error.message, error.code, error.statusCode);
+    }
+    // If JWT verification fails, it will throw an error
+    logger.error({ requestId: req.id, error }, "Refresh token validation failed.");
+    return sendError(res, "Invalid or expired refresh token", "FORBIDDEN", 403);
   }
 });
 
 // POST /api/auth/logout
-router.post('/logout', async (_req: Request, res: Response) => {
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
-  return res.status(200).json({
-    success: true,
-    data: 'Logged out successfully',
-    error: null,
-    code: null,
-    timestamp: new Date().toISOString(),
-  });
+router.post("/logout", async (req: Request, res: Response) => {
+  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken");
+  logger.info({ requestId: req.id }, "Admin user logged out successfully.");
+  return sendSuccess(res, "Logged out successfully", 200);
 });
 
 export default router;

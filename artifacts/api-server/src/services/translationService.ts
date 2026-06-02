@@ -30,8 +30,7 @@ const getAPIKey = async (keyName: string): Promise<string | null> => {
         encryptedValue: keyRecord.encryptedValue,
         iv: keyRecord.iv,
         authTag: keyRecord.authTag,
-      },
-      masterKey
+      }
     );
   } catch (error) {
     console.error(`Error retrieving key ${keyName}:`, error);

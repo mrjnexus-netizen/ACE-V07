@@ -1,13 +1,25 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "module": "CommonJS",
+    "target": "ES2022",
+    "moduleResolution": "node",
+    "strict": true,
+    "noImplicitAny": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "../",
+    "baseUrl": ".",
+    "paths": {
+      "*": ["./src/*"]
+    },
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.pnpm-stores/tsbuildinfo-api-server.json"
   },
   "include": [
-    "src"
+    "src",
+    "../ace-2026/src/types"
   ],
   "exclude": [
     "node_modules",

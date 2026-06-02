@@ -8,7 +8,20 @@
     "jsx": "react-jsx",
     "composite": true,
     "allowSyntheticDefaultImports": true,
-    "tsBuildInfoFile": "./node_modules/.pnpm-stores/tsbuildinfo-ace-2026.json"
+    "tsBuildInfoFile": "./node_modules/.pnpm-stores/tsbuildinfo-ace-2026.json",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@components/*": ["./src/components/*"],
+      "@context/*": ["./src/context/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@lib/*": ["./src/lib/*"],
+      "@types/*": ["./src/types/*"],
+      "@three/*": ["./src/three/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "build"]

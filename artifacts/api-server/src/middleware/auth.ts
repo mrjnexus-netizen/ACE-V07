@@ -5,6 +5,7 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     username: string;
+    role: string;
   };
 }
 
@@ -36,7 +37,7 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
 
   try {
     const secret = process.env.JWT_SECRET || 'fallback_secret_key_at_least_32_bytes_long';
-    const decoded = jwt.verify(token, secret) as { id: string; username: string };
+    const decoded = jwt.verify(token, secret) as { id: string; username: string; role: string };
     (req as AuthenticatedRequest).user = decoded;
     next();
   } catch (error) {

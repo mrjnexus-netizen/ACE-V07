@@ -1,107 +1,70 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { eq } from 'drizzle-orm';
-import { db } from '../db/db'; // Assuming db client is exported from db.ts
-import { apiKeys } from '../db/schema';
-import { encrypt } from '../services/encryptionService';
-import { z } from 'zod';
+import { Router, Request, Response, NextFunction } from "express";
+import { eq } from "drizzle-orm";
+import { db } from "../db/db";
+import { apiKeys } from "../db/schema";
+import { encrypt } from "../services/encryptionService";
+import { z } from "zod";
+import { sendError, sendSuccess } from "../utils/response";
+import { InternalError } from "../utils/errors";
+import { authGuard } from "../middleware/authGuard";
+import { createChildLogger } from "../utils/logger";
 
 const router: Router = Router();
+const logger = createChildLogger("ApiKeysRoute");
+
+const SUPPORTED_KEY_NAMES = ["AI_IMAGE_GENERATION_KEY", "LLM_NARRATIVE_API_KEY", "YOUTUBE_API_DATA_V3"];
 
 // Zod schema for API key creation/update
 const apiKeySchema = z.object({
-  keyName: z.string().min(1, 'Key name cannot be empty'),
-  keyValue: z.string().min(1, 'Key value cannot be empty'),
-  isActive: z.boolean().default(false),
+  keyName: z.enum(SUPPORTED_KEY_NAMES as [string, ...string[]], { message: "Invalid API key name" }),
+  keyValue: z.string().min(1, "Key value cannot be empty"),
 });
-
-// Middleware to validate API key schema
-const validateApiKey = (req: Request, res: Response, next: NextFunction) => {
-  try {
-    apiKeySchema.parse(req.body);
-    next();
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      data: null,
-      error: error.errors,
-      code: 'VALIDATION_ERROR',
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
 
 // POST /api/keys - Create or update an API key
 router.post(
-  '/',
-  validateApiKey,
-  async (req: Request, res: Response) => {
+  "/",
+  authGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { keyName, keyValue, isActive } = req.body;
-      const masterKey = process.env.ENCRYPTION_MASTER_KEY;
+      const { keyName, keyValue } = apiKeySchema.parse(req.body);
 
-      if (!masterKey) {
-        return res.status(500).json({
-          success: false,
-          data: null,
-          error: 'Encryption master key not configured.',
-          code: 'ENCRYPTION_ERROR',
-          timestamp: new Date().toISOString(),
-        });
-      }
+      const { encryptedValue, iv, authTag } = encrypt(keyValue);
 
       const existingKey = await db.query.apiKeys.findFirst({
         where: eq(apiKeys.keyName, keyName),
       });
 
-      const { encryptedValue, iv, authTag } = encrypt(keyValue, masterKey);
-
       if (existingKey) {
         // Update existing key
-        const [updatedKey] = await db
+        await db
           .update(apiKeys)
-          .set({ encryptedValue, iv, authTag, isActive, updatedAt: new Date() })
-          .where(eq(apiKeys.keyName, keyName))
-          .returning();
-        res.status(200).json({
-          success: true,
-          data: { id: updatedKey!.id, keyName: updatedKey!.keyName, isActive: updatedKey!.isActive },
-          error: null,
-          code: null,
-          timestamp: new Date().toISOString(),
-        });
+          .set({ encryptedValue, iv, authTag, updatedAt: new Date(), isActive: true })
+          .where(eq(apiKeys.keyName, keyName));
+        logger.info({ requestId: req.id, keyName }, "API key updated successfully.");
       } else {
         // Create new key
-        const [newKey] = await db
+        await db
           .insert(apiKeys)
-          .values({ keyName, encryptedValue, iv, authTag, isActive })
-          .returning();
-        res.status(201).json({
-          success: true,
-          data: { id: newKey!.id, keyName: newKey!.keyName, isActive: newKey!.isActive },
-          error: null,
-          code: null,
-          timestamp: new Date().toISOString(),
-        });
+          .values({ keyName, encryptedValue, iv, authTag, isActive: true });
+        logger.info({ requestId: req.id, keyName }, "API key created successfully.");
       }
-    } catch (error: any) {
-      console.error('Error managing API key:', error);
-      res.status(500).json({
-        success: false,
-        data: null,
-        error: error.message || 'Failed to manage API key',
-        code: 'SERVER_ERROR',
-        timestamp: new Date().toISOString(),
-      });
+      return sendSuccess(res, { message: `API key ${keyName} saved successfully.` });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return sendError(res, error.errors?.[0]?.message || "Validation error", "VALIDATION_ERROR", 400);
+      }
+      logger.error({ requestId: req.id, error }, "Error managing API key.");
+      next(new InternalError("Failed to manage API key."));
     }
   }
 );
 
 // GET /api/keys/status - Get status of all API keys (without revealing values)
-router.get('/status', async (_req: Request, res: Response) => {
+router.get("/status", authGuard, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const keys = await db.query.apiKeys.findMany();
 
-    const status = keys.map((key: any) => ({
+    const status = keys.map((key) => ({
       id: key.id,
       keyName: key.keyName,
       isActive: key.isActive,
@@ -109,68 +72,49 @@ router.get('/status', async (_req: Request, res: Response) => {
       testedAt: key.testedAt,
     }));
 
-    res.status(200).json({
-      success: true,
-      data: status,
-      error: null,
-      code: null,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    console.error('Error fetching API key status:', error);
-    res.status(500).json({
-      success: false,
-      data: null,
-      error: error.message || 'Failed to fetch API key status',
-      code: 'SERVER_ERROR',
-      timestamp: new Date().toISOString(),
-    });
+    return sendSuccess(res, status);
+  } catch (error) {
+    logger.error({ requestId: req.id, error }, "Error fetching API key status.");
+    next(new InternalError("Failed to fetch API key status."));
   }
 });
 
 // POST /api/keys/test - Test connection for a specific API key (mock implementation)
 router.post(
-  '/test',
-  async (req: Request, res: Response) => {
+  "/test",
+  authGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { keyName, keyValue } = req.body;
+      const { keyName, keyValue } = apiKeySchema.parse(req.body);
+
       // In a real application, you would make an actual API call to the respective service
       // using keyValue to test the connection.
-      // For this mock, we'll just simulate success/failure.
-
-      if (!keyValue || keyValue.length < 10) {
-        return res.status(400).json({
-          success: false,
-          data: null,
-          error: 'Invalid API key provided for testing',
-          code: 'INVALID_API_KEY',
-          timestamp: new Date().toISOString(),
-        });
+      // For this mock, we\'ll just simulate success/failure.
+      if (!SUPPORTED_KEY_NAMES.includes(keyName)) {
+        return sendError(res, "Unsupported API key name for testing", "INVALID_KEY_NAME", 400);
       }
 
-      // Simulate a successful connection test
-      // In a real scenario, this would involve calling the actual API of the service
-      // e.g., OpenAI, YouTube, etc.
+      // Simulate external API call success
+      const testSuccess = keyValue.length > 10; // Basic check, replace with actual API call
+
+      if (!testSuccess) {
+        return sendError(res, "API key connection test failed.", "CONNECTION_FAILED", 400);
+      }
 
       // Update testedAt timestamp in DB (only if successful)
-      await db.update(apiKeys).set({ testedAt: new Date() }).where(eq(apiKeys.keyName, keyName));
+      await db
+        .update(apiKeys)
+        .set({ testedAt: new Date(), isActive: true })
+        .where(eq(apiKeys.keyName, keyName));
+      logger.info({ requestId: req.id, keyName }, "API key connection test successful.");
 
-      res.status(200).json({
-        success: true,
-        data: { keyName, status: 'Connected' },
-        error: null,
-        code: null,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error: any) {
-      console.error('Error testing API key:', error);
-      res.status(500).json({
-        success: false,
-        data: null,
-        error: error.message || 'Failed to test API key',
-        code: 'SERVER_ERROR',
-        timestamp: new Date().toISOString(),
-      });
+      return sendSuccess(res, { keyName, status: "Connected" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return sendError(res, error.errors?.[0]?.message || "Validation error", "VALIDATION_ERROR", 400);
+      }
+      logger.error({ requestId: req.id, error }, "Error testing API key.");
+      next(new InternalError("Failed to test API key."));
     }
   }
 );

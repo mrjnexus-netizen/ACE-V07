@@ -1,7 +1,8 @@
-import { createCipheriv, createDecipheriv, randomBytes, CipherKey } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { env } from '../config/env';
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16; // For AES-256-GCM
+const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
 interface EncryptedData {
@@ -10,11 +11,12 @@ interface EncryptedData {
   authTag: string;
 }
 
-export const encrypt = (plaintext: string, masterKey: string): EncryptedData => {
-  if (!masterKey || masterKey.length !== 64) { // 32 bytes * 2 for hex
-    throw new Error('ENCRYPTION_MASTER_KEY must be a 64-character hex string (32 bytes).');
+export const encrypt = (plaintext: string): EncryptedData => {
+  const masterKey = env.ENCRYPTION_MASTER_KEY;
+  if (!masterKey || masterKey.length !== 64) {
+    throw new Error('Encryption master key is invalid or not set.');
   }
-  const keyBuffer: CipherKey = Buffer.from(masterKey, 'hex');
+  const keyBuffer = Buffer.from(masterKey, 'hex');
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, keyBuffer, iv, { authTagLength: AUTH_TAG_LENGTH });
 
@@ -30,11 +32,12 @@ export const encrypt = (plaintext: string, masterKey: string): EncryptedData => 
   };
 };
 
-export const decrypt = (encryptedData: EncryptedData, masterKey: string): string => {
+export const decrypt = (encryptedData: EncryptedData): string => {
+  const masterKey = env.ENCRYPTION_MASTER_KEY;
   if (!masterKey || masterKey.length !== 64) {
-    throw new Error('ENCRYPTION_MASTER_KEY must be a 64-character hex string (32 bytes).');
+    throw new Error('Encryption master key is invalid or not set.');
   }
-  const keyBuffer: CipherKey = Buffer.from(masterKey, 'hex');
+  const keyBuffer = Buffer.from(masterKey, 'hex');
   const iv = Buffer.from(encryptedData.iv, 'hex');
   const authTag = Buffer.from(encryptedData.authTag, 'hex');
 
@@ -46,4 +49,3 @@ export const decrypt = (encryptedData: EncryptedData, masterKey: string): string
 
   return decrypted;
 };
-

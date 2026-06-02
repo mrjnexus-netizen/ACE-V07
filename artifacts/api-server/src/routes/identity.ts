@@ -1,16 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/db';
-import { composerIdentity, projects as projectsTable } from '../db/schema';
+import { composerIdentity, projects as projectsTable, apiKeys } from '../db/schema';
 import { authenticateJWT } from '../middleware/auth';
-import { translateText } from '../services/translationService';
+import { z } from 'zod';
+import { ComposerIdentity, MultiLingual, ApiResponse } from '../../../ace-2026/src/types';
+import { decrypt } from '../services/encryptionService';
+import OpenAI from 'openai';
 import { eq } from 'drizzle-orm';
 
 const router: Router = Router();
 
 // GET /api/identity
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response<ApiResponse<ComposerIdentity | null>>) => {
   try {
     const identity = await db.query.composerIdentity.findFirst();
+
     if (!identity) {
       return res.status(200).json({
         success: true,
@@ -25,13 +29,13 @@ router.get('/', async (_req: Request, res: Response) => {
       where: eq(projectsTable.composerId, identity.id),
     });
 
-    const data = {
+    const data: ComposerIdentity = {
       id: identity.id,
-      name: identity.name,
-      tagline: identity.tagline,
-      biography: identity.biography,
-      awards: identity.awards,
-      studioAddress: identity.studioAddress,
+      name: identity.name as MultiLingual,
+      tagline: identity.tagline as MultiLingual,
+      biography: identity.biography as MultiLingual,
+      awards: identity.awards as MultiLingual[],
+      studioAddress: identity.studioAddress as MultiLingual,
       portrait: identity.portraitUrl ? {
         url: identity.portraitUrl,
         blurHash: identity.portraitBlur || '',
@@ -51,13 +55,13 @@ router.get('/', async (_req: Request, res: Response) => {
         vibrantPalette: null,
       } : null,
       heroVideo: identity.heroVideoUrl,
-      socialLinks: identity.socialLinks,
+      socialLinks: identity.socialLinks as ComposerIdentity['socialLinks'],
       projects: projects.map(p => ({
         id: p.id,
-        title: p.title,
-        type: p.type,
-        year: p.year,
-        description: p.description,
+        title: p.title as MultiLingual,
+        type: p.type as 'film' | 'game' | 'animation' | 'documentary',
+        year: p.year || 0,
+        description: p.description as MultiLingual,
         coverImage: p.coverUrl ? {
           url: p.coverUrl,
           blurHash: p.coverBlur || '',
@@ -89,63 +93,113 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
+const identityPutSchema = z.object({
+  name: z.record(z.string(), z.string().nullable()).nullable(),
+  tagline: z.record(z.string(), z.string().nullable()).nullable(),
+  biography: z.record(z.string(), z.string().nullable()).nullable(),
+  awards: z.array(z.record(z.string(), z.string().nullable())).nullable(),
+  studioAddress: z.record(z.string(), z.string().nullable()).nullable(),
+  portraitUrl: z.string().nullable(),
+  portraitBlur: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  heroVideoUrl: z.string().nullable(),
+  socialLinks: z.object({
+    spotify: z.string().nullable(),
+    imdb: z.string().nullable(),
+    instagram: z.string().nullable(),
+    youtube: z.string().nullable(),
+  }).nullable(),
+  projects: z.array(z.object({
+    id: z.string().optional(),
+    title: z.record(z.string(), z.string().nullable()),
+    type: z.enum(['film', 'game', 'animation', 'documentary']),
+    year: z.number().nullable(),
+    description: z.record(z.string(), z.string().nullable()),
+    coverImage: z.object({
+      url: z.string(),
+      blurHash: z.string(),
+      width: z.number(),
+      height: z.number(),
+      format: z.enum(['webp', 'jpg', 'png']),
+      dominantColors: z.array(z.string()),
+      vibrantPalette: z.object({
+        vibrant: z.string(),
+        muted: z.string(),
+        darkVibrant: z.string(),
+        darkMuted: z.string(),
+        lightVibrant: z.string(),
+        lightMuted: z.string(),
+      }).nullable(),
+    }).nullable(),
+  })).nullable(),
+});
+
 // PUT /api/identity
-router.put('/', authenticateJWT, async (req: Request, res: Response) => {
+router.put('/', authenticateJWT, async (req: Request, res: Response<ApiResponse<string>>) => {
   try {
-    const identity = await db.query.composerIdentity.findFirst();
-    if (!identity) {
-      return res.status(404).json({
+    const parsedBody = identityPutSchema.safeParse(req.body);
+
+    if (!parsedBody.success) {
+      return res.status(400).json({
         success: false,
         data: null,
-        error: 'Composer identity record not found',
-        code: 'NOT_FOUND',
+        error: 'Invalid request body: ' + parsedBody.error.errors.map(e => e.message).join(', '),
+        code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
     }
 
-    const {
-      name,
-      tagline,
-      biography,
-      awards,
-      studioAddress,
-      portraitUrl,
-      portraitBlur,
-      logoUrl,
-      heroVideoUrl,
-      socialLinks,
-      projects,
-    } = req.body;
+    const updateData = parsedBody.data;
 
-    // Update main identity
-    await db
-      .update(composerIdentity)
-      .set({
-        name: name || identity.name,
-        tagline: tagline || identity.tagline,
-        biography: biography || identity.biography,
-        awards: awards || identity.awards,
-        studioAddress: studioAddress || identity.studioAddress,
-        portraitUrl: portraitUrl !== undefined ? portraitUrl : identity.portraitUrl,
-        portraitBlur: portraitBlur !== undefined ? portraitBlur : identity.portraitBlur,
-        logoUrl: logoUrl !== undefined ? logoUrl : identity.logoUrl,
-        heroVideoUrl: heroVideoUrl !== undefined ? heroVideoUrl : identity.heroVideoUrl,
-        socialLinks: socialLinks || identity.socialLinks,
+    let identity = await db.query.composerIdentity.findFirst();
+
+    if (!identity) {
+      // If no identity exists, create one
+      const [newIdentity] = await db.insert(composerIdentity).values({
+        name: updateData.name || { en: "", es: "", fr: "", zh: "", ja: "", ko: "" },
+        tagline: updateData.tagline || { en: "", es: "", fr: "", zh: "", ja: "", ko: "" },
+        biography: updateData.biography || { en: "", es: "", fr: "", zh: "", ja: "", ko: "" },
+        awards: updateData.awards || [],
+        studioAddress: updateData.studioAddress || { en: "", es: "", fr: "", zh: "", ja: "", ko: "" },
+        portraitUrl: updateData.portraitUrl,
+        portraitBlur: updateData.portraitBlur,
+        logoUrl: updateData.logoUrl,
+        heroVideoUrl: updateData.heroVideoUrl,
+        socialLinks: updateData.socialLinks || { spotify: null, imdb: null, instagram: null, youtube: null },
         updatedAt: new Date(),
-      })
-      .where(eq(composerIdentity.id, identity.id));
+      }).returning();
+      identity = newIdentity;
+    } else {
+      // Update existing identity
+      await db
+        .update(composerIdentity)
+        .set({
+          name: updateData.name !== undefined ? updateData.name : identity.name,
+          tagline: updateData.tagline !== undefined ? updateData.tagline : identity.tagline,
+          biography: updateData.biography !== undefined ? updateData.biography : identity.biography,
+          awards: updateData.awards !== undefined ? updateData.awards as any[] : identity.awards as any[],
+          studioAddress: updateData.studioAddress !== undefined ? updateData.studioAddress : identity.studioAddress,
+          portraitUrl: updateData.portraitUrl !== undefined ? updateData.portraitUrl : identity.portraitUrl,
+          portraitBlur: updateData.portraitBlur !== undefined ? updateData.portraitBlur : identity.portraitBlur,
+          logoUrl: updateData.logoUrl !== undefined ? updateData.logoUrl : identity.logoUrl,
+          heroVideoUrl: updateData.heroVideoUrl !== undefined ? updateData.heroVideoUrl : identity.heroVideoUrl,
+          socialLinks: updateData.socialLinks !== undefined ? updateData.socialLinks : identity.socialLinks,
+          updatedAt: new Date(),
+        })
+        .where(eq(composerIdentity.id, identity.id));
+    }
 
     // Handle projects list sync
-    if (projects && Array.isArray(projects)) {
+    if (identity && updateData.projects && Array.isArray(updateData.projects)) {
       // For simplicity, delete all projects and insert new ones
       await db.delete(projectsTable).where(eq(projectsTable.composerId, identity.id));
 
-      for (const proj of projects) {
+      for (const proj of updateData.projects) {
         await db.insert(projectsTable).values({
           composerId: identity.id,
           title: proj.title,
           type: proj.type,
-          year: proj.year,
+          year: proj.year || 0,
           description: proj.description,
           coverUrl: proj.coverImage?.url || null,
           coverBlur: proj.coverImage?.blurHash || null,
@@ -172,22 +226,63 @@ router.put('/', authenticateJWT, async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/identity/translate
-router.post('/translate', authenticateJWT, async (req: Request, res: Response) => {
-  try {
-    const { text, sourceLang } = req.body;
+const translatePostSchema = z.object({
+  text: z.string(),
+  sourceLang: z.enum(['en', 'es', 'fr', 'zh', 'ja', 'ko']),
+  fieldType: z.string(),
+});
 
-    if (!text || !sourceLang) {
+// POST /api/identity/translate
+router.post('/translate', authenticateJWT, async (req: Request, res: Response<ApiResponse<MultiLingual>>) => {
+  try {
+    const parsedBody = translatePostSchema.safeParse(req.body);
+
+    if (!parsedBody.success) {
       return res.status(400).json({
         success: false,
         data: null,
-        error: 'text and sourceLang are required fields',
+        error: 'Invalid request body: ' + parsedBody.error.errors.map(e => e.message).join(', '),
         code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
     }
 
-    const translations = await translateText(text, sourceLang);
+    const { text, sourceLang } = parsedBody.data;
+
+    const apiKeyRecord = await db.query.apiKeys.findFirst({
+      where: eq(apiKeys.keyName, 'LLM_NARRATIVE_API_KEY'),
+    });
+
+    if (!apiKeyRecord || !apiKeyRecord.isActive) {
+      return res.status(500).json({
+        success: false,
+        data: null,
+        error: 'LLM_NARRATIVE_API_KEY not configured or not active.',
+        code: 'API_KEY_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const decryptedKey = decrypt({
+      encryptedValue: apiKeyRecord.encryptedValue,
+      iv: apiKeyRecord.iv,
+      authTag: apiKeyRecord.authTag,
+    });
+
+    const openai = new OpenAI({ apiKey: decryptedKey });
+
+    const systemPrompt = `You are the world's most celebrated music journalist writing liner notes for an Academy Award-winning composer's portfolio. Audio metadata: {}. Write a captivating dramatic narrative for this piece. Tone: cinematic, sophisticated, emotionally resonant. Length: 2-3 sentences per language. Output ONLY this JSON, no markdown, no preamble: { en: '', es: '', fr: '', zh: '', ja: '', ko: '' }`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Translate the following text from ${sourceLang}: "${text}"`},
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const translations: MultiLingual = JSON.parse(response.choices?.[0]?.message?.content || '{}');
 
     return res.status(200).json({
       success: true,
