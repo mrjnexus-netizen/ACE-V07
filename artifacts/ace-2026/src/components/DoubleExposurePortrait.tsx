@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
+import { useAudioReactive } from '../hooks/useAudioReactive';
 
 const DoubleExposurePortrait = () => {
   const { identity } = useIdentity();
@@ -39,6 +40,7 @@ const DoubleExposurePortrait = () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+    const { bassLevel } = useAudioReactive();
     let wavePhase = 0;
 
     const draw = () => {
@@ -48,17 +50,6 @@ const DoubleExposurePortrait = () => {
       // 1. Clear background based on theme surface color
       ctx.fillStyle = theme.id === 'minimal' ? '#F9F9F7' : '#080808';
       ctx.fillRect(0, 0, width, height);
-
-      // Get audio data for animation reactions
-      const analyser = audioState.analyserNode;
-      let bassLevel = 0;
-      if (analyser && audioState.isPlaying) {
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < 10; i++) sum += dataArray[i] ?? 0;
-        bassLevel = sum / 10 / 255;
-      }
 
       const bpm = audioState.currentTrack?.bpm || 80;
       const pulsePeriod = 60000 / bpm; // ms per beat

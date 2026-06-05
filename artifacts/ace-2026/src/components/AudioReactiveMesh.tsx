@@ -37,8 +37,11 @@ const MeshSkeletonLoader = () => (
   </div>
 );
 
+import { useAudioReactive } from "../hooks/useAudioReactive";
+
 const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolean> }) => {
   const { audioState } = useAudio();
+  const { bassLevel, midLevel, highLevel, timeDomainData } = useAudioReactive();
   const meshRef = useRef<THREE.Points | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const { gl: renderer } = useThree();
@@ -55,9 +58,9 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
       targetRotation.current.y = ((e.clientX / window.innerWidth) - 0.5) * Math.PI * 0.5;
       targetRotation.current.x = ((e.clientY / window.innerHeight) - 0.5) * Math.PI * 0.5;
     };
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener("mousemove", handleMouseMove);
     };
   }, []);
 
@@ -88,8 +91,8 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
       scales[i] = 0.5 + Math.random() * 2.0; // Per-particle random scale
     }
 
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("aScale", new THREE.BufferAttribute(scales, 1));
     return geo;
   }, [particleCount]);
 
@@ -99,21 +102,15 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
     uMidLevel: { value: 0 },
     uHighLevel: { value: 0 },
     uAudioData: { value: new Float32Array(128) }, // Placeholder, not used by current shaders but good to have
-    uColor: { value: new THREE.Color('#D4AF37') }, // Initial accent color
+    uColor: { value: new THREE.Color("#D4AF37") }, // Initial accent color
     uOpacity: { value: 0.35 },
   }), []);
 
   // Update theme accent color into uniforms
   useEffect(() => {
-    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue("--accent-color").trim() || "#D4AF37";
     uniforms.uColor.value.set(accentColor);
   }, [uniforms]);
-
-  // Audio analysis variables
-  const analyser = audioState.analyserNode;
-  // fftSize depends on device, 2048 desktop/tablet, 512 mobile (Blueprint Section 10)
-  const fftSize = window.innerWidth < 768 ? 512 : 2048;
-  const dataArray = useMemo(() => (analyser ? new Uint8Array(fftSize / 2) : null), [analyser, fftSize]);
 
   useFrame((state) => {
     // IntersectionObserver: pause useFrame calculations/renders when canvas off-screen
@@ -134,63 +131,36 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
       const u = materialRef.current.uniforms;
       if (u.uTime) u.uTime.value = time;
 
-      if (analyser && dataArray && audioState.isPlaying) {
-        analyser.getByteFrequencyData(dataArray);
+      if (audioState.isPlaying) {
 
-        // Process frequency bands (Blueprint Section 10)
-        let bass = 0;
-        let mid = 0;
-        let high = 0;
-
-        const len = dataArray.length;
-        // Bass: 0-10 bins
-        for (let i = 0; i < 10; i++) {
-          bass += dataArray[i] ?? 0;
-        }
-        bass = bass / 10 / 255; // Normalize to 0-1
-
-        // Mid: 10-100 bins
-        const midEnd = Math.min(100, len);
-        for (let i = 10; i < midEnd; i++) {
-          mid += dataArray[i] ?? 0;
-        }
-        mid = mid / (midEnd - 10) / 255; // Normalize to 0-1
-
-        // High: 100-512 bins
-        const highEnd = Math.min(512, len);
-        for (let i = 100; i < highEnd; i++) {
-          high += dataArray[i] ?? 0;
-        }
-        high = high / (highEnd - 100) / 255; // Normalize to 0-1
-
-        if (u.uBassLevel) u.uBassLevel.value = bass;
-        if (u.uMidLevel) u.uMidLevel.value = mid;
-        if (u.uHighLevel) u.uHighLevel.value = high;
+        if (u.uBassLevel) u.uBassLevel.value = bassLevel;
+        if (u.uMidLevel) u.uMidLevel.value = midLevel;
+        if (u.uHighLevel) u.uHighLevel.value = highLevel;
 
         // Populate uAudioData uniform (if needed by shaders, currently not explicitly used but kept for completeness)
         const audioData = u.uAudioData.value;
-        const step = Math.floor(len / 128) || 1;
+        const step = Math.floor(timeDomainData.length / 128) || 1;
         for (let i = 0; i < 128; i++) {
-          audioData[i] = (dataArray[i * step] ?? 0) / 255;
+          audioData[i] = (timeDomainData[i * step] ?? 0);
         }
 
-        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue("--accent-color").trim() || "#D4AF37";
         
         // Color dynamics (Blueprint Section 10)
-        if (bass > 0.7) {
+        if (bassLevel > 0.7) {
           flashTimer.current = 0.02; // 20ms flash duration
-          if (u.uColor) u.uColor.value.set('#FFFFFF');
+          if (u.uColor) u.uColor.value.set("#FFFFFF");
           if (u.uOpacity) u.uOpacity.value = 0.9;
         } else if (flashTimer.current > 0) {
           flashTimer.current -= state.clock.getDelta();
           if (u.uColor) u.uColor.value.set("#FFFFFF");
           if (u.uOpacity) u.uOpacity.value = 0.9; // Maintain white flash during decay
-        } else if (bass >= 0.3) {
+        } else if (bassLevel >= 0.3) {
           const accent = new THREE.Color(accentColor);
-          const white = new THREE.Color('#FFFFFF');
-          const t = (bass - 0.3) / 0.4; // Normalize bassLevel to [0, 1] for interpolation
+          const white = new THREE.Color("#FFFFFF");
+          const t = (bassLevel - 0.3) / 0.4; // Normalize bassLevel to [0, 1] for interpolation
           if (u.uColor) u.uColor.value.copy(accent).lerp(white, t);
-          if (u.uOpacity) u.uOpacity.value = 0.35 + (bass - 0.3) * 1.375; // Interpolate opacity from 0.35 to ~0.9
+          if (u.uOpacity) u.uOpacity.value = 0.35 + (bassLevel - 0.3) * 1.375; // Interpolate opacity from 0.35 to ~0.9
         } else {
           if (u.uColor) u.uColor.value.set(accentColor);
           if (u.uOpacity) u.uOpacity.value = 0.35;
@@ -198,9 +168,9 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
 
         // Apply active mesh rotation and scaling reactive to audio (Blueprint Section 10)
         if (meshRef.current) {
-          const activeScale = 1.0 + bass * 0.15; // Scale with bass
+          const activeScale = 1.0 + bassLevel * 0.15; // Scale with bass
           meshRef.current.scale.set(activeScale, activeScale, activeScale);
-          meshRef.current.rotation.y += 0.005 + bass * 0.01; // Faster rotation on bass peak
+          meshRef.current.rotation.y += 0.005 + bassLevel * 0.01; // Faster rotation on bass peak
         }
       } else {
         // Idle breathing state (Uniform scale 0.95 to 1.05, 4s ease-in-out loop, sin-based in useFrame)
@@ -216,7 +186,7 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
         if (u.uHighLevel) u.uHighLevel.value = 0;
         if (u.uOpacity) u.uOpacity.value = 0.35; // Default idle opacity
         // Set color to accent in idle state
-        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue("--accent-color").trim() || "#D4AF37";
         if (u.uColor) u.uColor.value.set(accentColor);
       }
     }
