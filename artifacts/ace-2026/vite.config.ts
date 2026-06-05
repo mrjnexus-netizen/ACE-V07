@@ -55,6 +55,7 @@ export default defineConfig({
       '@lib': path.resolve(__dirname, './src/lib'),
       '@types': path.resolve(__dirname, './src/types'),
       '@three': path.resolve(__dirname, './src/three'),
+      '/shaders': path.resolve(__dirname, '../../public/shaders'),
     },
   },
 })

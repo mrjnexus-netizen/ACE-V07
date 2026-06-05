@@ -3,7 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAudio } from '../context/AudioContext';
-import { loadShader } from '../lib/shaderLoader';
+import meshVert from '/shaders/mesh.vert?raw';
+import meshFrag from '/shaders/mesh.frag?raw';
 
 // React ErrorBoundary: wraps entire Canvas
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -36,37 +37,18 @@ const MeshSkeletonLoader = () => (
   </div>
 );
 
-const fragmentShader = `
-  uniform vec3 uColor;
-  uniform float uOpacity;
-
-  void main() {
-    float dist = distance(gl_PointCoord, vec2(0.5));
-    if (dist > 0.5) discard;
-    float alpha = 1.0 - (dist * 2.0);
-    gl_FragColor = vec4(uColor, alpha * uOpacity);
-  }
-`;
-
 const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolean> }) => {
   const { audioState } = useAudio();
   const meshRef = useRef<THREE.Points | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const { gl: renderer } = useThree();
-  const [vertexShader, setVertexShader] = useState<string>('');
-
-  // Fetch mesh.vert shader asynchronously on mount using shaderLoader
-  useEffect(() => {
-    loadShader('/shaders/mesh.vert').then((code) => {
-      if (code) {
-        setVertexShader(code);
-      }
-    });
-  }, []);
+  const vertexShader = meshVert;
+  const fragmentShader = meshFrag;
 
   // Mouse tracking with smooth lerp interpolation (inertia factor 0.05)
   const targetRotation = useRef({ x: 0, y: 0 });
   const currentRotation = useRef({ x: 0, y: 0 });
+  const flashTimer = useRef<number>(0);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -91,19 +73,19 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
     const positions = new Float32Array(particleCount * 3);
     const scales = new Float32Array(particleCount);
 
+    // Populate positions and aScale attribute
     for (let i = 0; i < particleCount; i++) {
-      // Uniform distribution on sphere
       const u = Math.random();
       const v = Math.random();
       const theta = u * 2.0 * Math.PI;
       const phi = Math.acos(2.0 * v - 1.0);
-      const r = 2.5;
+      const r = 2.5; // Radius from Blueprint Section 10
 
       positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       positions[i * 3 + 2] = r * Math.cos(phi);
 
-      scales[i] = 0.5 + Math.random() * 2.0;
+      scales[i] = 0.5 + Math.random() * 2.0; // Per-particle random scale
     }
 
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -116,8 +98,8 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
     uBassLevel: { value: 0 },
     uMidLevel: { value: 0 },
     uHighLevel: { value: 0 },
-    uAudioData: { value: new Float32Array(128) },
-    uColor: { value: new THREE.Color('#D4AF37') },
+    uAudioData: { value: new Float32Array(128) }, // Placeholder, not used by current shaders but good to have
+    uColor: { value: new THREE.Color('#D4AF37') }, // Initial accent color
     uOpacity: { value: 0.35 },
   }), []);
 
@@ -129,11 +111,13 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
 
   // Audio analysis variables
   const analyser = audioState.analyserNode;
-  const dataArray = useMemo(() => (analyser ? new Uint8Array(analyser.frequencyBinCount) : null), [analyser]);
+  // fftSize depends on device, 2048 desktop/tablet, 512 mobile (Blueprint Section 10)
+  const fftSize = window.innerWidth < 768 ? 512 : 2048;
+  const dataArray = useMemo(() => (analyser ? new Uint8Array(fftSize / 2) : null), [analyser, fftSize]);
 
   useFrame((state) => {
     // IntersectionObserver: pause useFrame calculations/renders when canvas off-screen
-    if (!isVisibleRef.current || !vertexShader) return;
+    if (!isVisibleRef.current || !vertexShader || !fragmentShader) return;
 
     const time = state.clock.getElapsedTime();
 
@@ -153,7 +137,7 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
       if (analyser && dataArray && audioState.isPlaying) {
         analyser.getByteFrequencyData(dataArray);
 
-        // Process frequency bands
+        // Process frequency bands (Blueprint Section 10)
         let bass = 0;
         let mid = 0;
         let high = 0;
@@ -163,53 +147,77 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
         for (let i = 0; i < 10; i++) {
           bass += dataArray[i] ?? 0;
         }
-        bass = bass / 10 / 255;
+        bass = bass / 10 / 255; // Normalize to 0-1
 
         // Mid: 10-100 bins
         const midEnd = Math.min(100, len);
         for (let i = 10; i < midEnd; i++) {
           mid += dataArray[i] ?? 0;
         }
-        mid = mid / (midEnd - 10) / 255;
+        mid = mid / (midEnd - 10) / 255; // Normalize to 0-1
 
         // High: 100-512 bins
         const highEnd = Math.min(512, len);
         for (let i = 100; i < highEnd; i++) {
           high += dataArray[i] ?? 0;
         }
-        high = high / (highEnd - 10) / 255;
+        high = high / (highEnd - 100) / 255; // Normalize to 0-1
 
         if (u.uBassLevel) u.uBassLevel.value = bass;
         if (u.uMidLevel) u.uMidLevel.value = mid;
         if (u.uHighLevel) u.uHighLevel.value = high;
 
-        // Populate uAudioData[128] uniform
+        // Populate uAudioData uniform (if needed by shaders, currently not explicitly used but kept for completeness)
         const audioData = u.uAudioData.value;
         const step = Math.floor(len / 128) || 1;
         for (let i = 0; i < 128; i++) {
           audioData[i] = (dataArray[i * step] ?? 0) / 255;
         }
 
-        // Color flash on bass peak
-        if (bass > 0.75) {
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
+        
+        // Color dynamics (Blueprint Section 10)
+        if (bass > 0.7) {
+          flashTimer.current = 0.02; // 20ms flash duration
           if (u.uColor) u.uColor.value.set('#FFFFFF');
           if (u.uOpacity) u.uOpacity.value = 0.9;
+        } else if (flashTimer.current > 0) {
+          flashTimer.current -= state.clock.getDelta();
+          if (u.uColor) u.uColor.value.set("#FFFFFF");
+          if (u.uOpacity) u.uOpacity.value = 0.9; // Maintain white flash during decay
+        } else if (bass >= 0.3) {
+          const accent = new THREE.Color(accentColor);
+          const white = new THREE.Color('#FFFFFF');
+          const t = (bass - 0.3) / 0.4; // Normalize bassLevel to [0, 1] for interpolation
+          if (u.uColor) u.uColor.value.copy(accent).lerp(white, t);
+          if (u.uOpacity) u.uOpacity.value = 0.35 + (bass - 0.3) * 1.375; // Interpolate opacity from 0.35 to ~0.9
         } else {
-          const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
           if (u.uColor) u.uColor.value.set(accentColor);
-          if (u.uOpacity) u.uOpacity.value = 0.35 + bass * 0.5;
+          if (u.uOpacity) u.uOpacity.value = 0.35;
+        }
+
+        // Apply active mesh rotation and scaling reactive to audio (Blueprint Section 10)
+        if (meshRef.current) {
+          const activeScale = 1.0 + bass * 0.15; // Scale with bass
+          meshRef.current.scale.set(activeScale, activeScale, activeScale);
+          meshRef.current.rotation.y += 0.005 + bass * 0.01; // Faster rotation on bass peak
         }
       } else {
-        // Idle breathing state (Uniform scale 0.95 to 1.05, 4s ease loop)
+        // Idle breathing state (Uniform scale 0.95 to 1.05, 4s ease-in-out loop, sin-based in useFrame)
         const breathe = 1.0 + Math.sin(time * Math.PI * 0.5) * 0.05;
         if (meshRef.current) {
           meshRef.current.scale.set(breathe, breathe, breathe);
-          meshRef.current.rotation.y = time * 0.05 + currentRotation.current.y; // combine idle and mouse
+          // Slow Y-axis rotation: 0.0005 rad/frame in idle (Blueprint Section 10)
+          meshRef.current.rotation.y += 0.0005;
         }
+        // Reset audio-reactive uniforms to idle state
         if (u.uBassLevel) u.uBassLevel.value = 0;
         if (u.uMidLevel) u.uMidLevel.value = 0;
         if (u.uHighLevel) u.uHighLevel.value = 0;
-        if (u.uOpacity) u.uOpacity.value = 0.35;
+        if (u.uOpacity) u.uOpacity.value = 0.35; // Default idle opacity
+        // Set color to accent in idle state
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
+        if (u.uColor) u.uColor.value.set(accentColor);
       }
     }
   });
@@ -219,11 +227,11 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
     return () => {
       geometry.dispose();
       if (materialRef.current) materialRef.current.dispose();
-      renderer.dispose();
+      renderer.dispose(); // Dispose Three.js renderer (Blueprint Section 10)
     };
   }, [geometry, renderer]);
 
-  if (!vertexShader) return null;
+  if (!vertexShader || !fragmentShader) return null;
 
   return (
     <points ref={meshRef}>
@@ -247,7 +255,7 @@ const AudioReactiveMesh = () => {
   const isVisibleRef = useRef<boolean>(true);
 
   useEffect(() => {
-    // IntersectionObserver: pause useFrame when canvas off-screen
+    // IntersectionObserver: pause useFrame when canvas off-screen (Blueprint Section 10)
     const observer = new IntersectionObserver(([entry]) => {
       isVisibleRef.current = entry?.isIntersecting ?? true;
     }, { threshold: 0.1 });
