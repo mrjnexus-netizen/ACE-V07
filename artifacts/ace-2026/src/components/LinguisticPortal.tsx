@@ -1,49 +1,259 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import * as THREE from 'three';
 import { useAudio } from '../context/AudioContext';
 import { Locale } from '../types';
 
 interface LinguisticPortalProps {
   onLanguageSelect: (locale: Locale) => void;
+  onTransitionComplete: () => void; // New prop for transition completion
 }
 
-const LinguisticPortal = ({ onLanguageSelect }: LinguisticPortalProps) => {
+const LinguisticPortal = ({ onLanguageSelect, onTransitionComplete }: LinguisticPortalProps) => {
   const { playEnvironmentalSound } = useAudio();
   const [hovered, setHovered] = useState<Locale | null>(null);
   const [selected, setSelected] = useState<Locale | null>(null);
-  const [, setShattering] = useState<boolean>(false);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isShattering, setShattering] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const shatterCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const threeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const targetLightPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 15));
+  const lastClickPosition = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    // Phase 3 (600-900ms): black void fills screen. MainApp fades in from opacity 0.
+    if (isShattering) {
+      const container = containerRef.current;
+      if (container) {
+        container.style.transition = "opacity 300ms ease-in 600ms";
+        container.style.opacity = "0";
+        setTimeout(() => {
+          onTransitionComplete();
+        }, 900);
+      }
+    }
+  }, [isShattering, onTransitionComplete]);
 
   const languages: { locale: Locale; label: string; frequency: number }[] = [
-    { locale: 'en', label: 'ENGLISH', frequency: 440 },
-    { locale: 'es', label: 'ESPAÑOL', frequency: 528 },
-    { locale: 'fr', label: 'FRANÇAIS', frequency: 396 },
-    { locale: 'zh', label: '中文', frequency: 639 },
-    { locale: 'ja', label: '日本語', frequency: 741 },
-    { locale: 'ko', label: '한국어', frequency: 852 },
+    { locale: 'en', label: 'EN', frequency: 440 },
+    { locale: 'es', label: 'ES', frequency: 528 },
+    { locale: 'fr', label: 'FR', frequency: 396 },
+    { locale: 'zh', label: 'ZH', frequency: 639 },
+    { locale: 'ja', label: 'JA', frequency: 741 },
+    { locale: 'ko', label: 'KO', frequency: 852 },
   ];
 
-  const handleMouseEnter = (lang: typeof languages[0]) => {
+  // Three.js Starfield Background setup
+  useEffect(() => {
+    const canvas = threeCanvasRef.current;
+    if (!canvas) return;
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2('#000000', 0.0008);
+
+    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+    camera.position.z = 50;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+    });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Ambient light: intensity 0.1
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+    scene.add(ambientLight);
+
+    // Directional light: intensity 0.3, position [5, 3, 5]
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    dirLight.position.set(5, 3, 5);
+    scene.add(dirLight);
+
+    // Point Light: Repositions toward hovered element (400ms lerp)
+    const pointLight = new THREE.PointLight(0xffffff, 1.5, 100);
+    pointLight.position.set(0, 0, 15);
+    scene.add(pointLight);
+
+    // Mouse tracker for particle physics drift
+    const mouse = { x: 0, y: 0 };
+    const handleMouseMove = (e: MouseEvent) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+
+    // 15,000 star particles via BufferGeometry Points
+    const starsCount = 15000;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(starsCount * 3);
+
+    for (let i = 0; i < starsCount * 3; i += 3) {
+      const radius = 500;
+      positions[i] = (Math.random() - 0.5) * radius * 2;
+      positions[i + 1] = (Math.random() - 0.5) * radius * 2;
+      positions[i + 2] = (Math.random() - 0.5) * radius * 2;
+    }
+
+    const initialPositions = positions.slice();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 1.2,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.8,
+    });
+
+    const starField = new THREE.Points(geometry, material);
+    scene.add(starField);
+
+    let animationFrameId: number;
+
+    const animate = () => {
+      // Slow Y-axis rotation: 0.00008 radians per frame
+      starField.rotation.y += 0.00008;
+
+      // Point light repositions toward target position (approx 400ms lerp at 60fps)
+      pointLight.position.lerp(targetLightPosRef.current, 0.1);
+
+      // Nearby particles drift toward cursor (physics-based)
+      const mouse3D = new THREE.Vector3(mouse.x * 40, mouse.y * 20, 0);
+      const posAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
+      const posArray = posAttr.array as Float32Array;
+
+      for (let i = 0; i < starsCount; i++) {
+        const idx = i * 3;
+        const px = posArray[idx]!;
+        const py = posArray[idx + 1]!;
+        const pz = posArray[idx + 2]!;
+
+        const dx = mouse3D.x - px;
+        const dy = mouse3D.y - py;
+        const dz = mouse3D.z - pz;
+        const distSq = dx * dx + dy * dy + dz * dz;
+
+        if (distSq < 400) {
+          const dist = Math.sqrt(distSq);
+          // Attraction force
+          const force = (1.0 - dist / 20.0) * 0.12;
+          posArray[idx] += dx * force;
+          posArray[idx + 1] += dy * force;
+          posArray[idx + 2] += dz * force;
+        } else {
+          // Slow recovery back to initial position
+          const origX = initialPositions[idx]!;
+          const origY = initialPositions[idx + 1]!;
+          const origZ = initialPositions[idx + 2]!;
+          posArray[idx] += (origX - px) * 0.02;
+          posArray[idx + 1] += (origY - py) * 0.02;
+          posArray[idx + 2] += (origZ - pz) * 0.02;
+        }
+      }
+      posAttr.needsUpdate = true;
+
+      renderer.render(scene, camera);
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
+      geometry.dispose();
+      material.dispose();
+      renderer.dispose();
+    };
+  }, []);
+
+  const handleMouseEnter = (lang: typeof languages[0], i: number) => {
     setHovered(lang.locale);
     // Micro-tone hover ping: 50ms fade-in, max volume 0.08
     playEnvironmentalSound(lang.frequency, 150, 0.08);
+
+    // Point light repositions toward hovered element (400ms lerp target)
+    const centerOffset = i - 2.5;
+    const x = centerOffset * 10;
+    const y = -(centerOffset * centerOffset * 0.5);
+    targetLightPosRef.current.set(x, y, 15);
+  };
+
+  const handleMouseLeave = () => {
+    setHovered(null);
+    // Return point light to center (400ms lerp target)
+    targetLightPosRef.current.set(0, 0, 15);
+  };
+
+  const handlePillarClick = (lang: typeof languages[0]) => {
+    if (selected) return;
+    if (isMobile) {
+      setHovered(lang.locale);
+      // Mobile: tap activates hover state for 400ms then triggers selection
+      setTimeout(() => {
+        handleSelect(lang.locale);
+      }, 400);
+    } else {
+      handleSelect(lang.locale);
+    }
   };
 
   const handleSelect = (locale: Locale) => {
     if (selected) return;
     setSelected(locale);
     setShattering(true);
+    onLanguageSelect(locale); // Immediately set locale in context
 
     // High-fidelity environmental select sound (Click Thud: 80Hz low thud)
     playEnvironmentalSound(80, 400, 0.15);
 
+    const useLowEndFallback = navigator.hardwareConcurrency < 4; // Low-end fallback condition
+    if (useLowEndFallback) {
+      // Low-end fallback: CSS clip-path dissolve, canvas fades to black (600ms) with scale(1.05) push.
+      const container = containerRef.current;
+      if (container) {
+        container.style.transition = "opacity 600ms ease-in, transform 600ms ease-out";
+        container.style.opacity = "0";
+        container.style.transform = "scale(1.05)";
+        setTimeout(() => {
+          onTransitionComplete();
+        }, 600);
+      }
+      return;
+    }
+
     // Phase 1 (0-200ms) & Phase 2 (200-600ms) trigger canvas shatter
-    const canvas = canvasRef.current;
+    const canvas = shatterCanvasRef.current;
     if (canvas) {
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
       if (ctx) {
-        let width = (canvas.width = window.innerWidth);
-        let height = (canvas.height = window.innerHeight);
+        const width = (canvas.width = window.innerWidth);
+        const height = (canvas.height = window.innerHeight);
 
         const fragments: {
           x1: number; y1: number;
@@ -56,23 +266,24 @@ const LinguisticPortal = ({ onLanguageSelect }: LinguisticPortalProps) => {
           opacity: number;
         }[] = [];
 
-        const isMobile = window.innerWidth < 768;
         const count = isMobile ? 24 : 48;
 
-        // Generate triangular fragments exploding from center
+        // Capture click position for explosion origin
+        const clickX = lastClickPosition.current?.x ?? width / 2;
+        const clickY = lastClickPosition.current?.y ?? height / 2;
+
+        // Generate triangular fragments exploding from click/tap point
         for (let i = 0; i < count; i++) {
-          const cx = width / 2;
-          const cy = height / 2;
           const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
           const length = 50 + Math.random() * 150;
 
           fragments.push({
-            x1: cx,
-            y1: cy,
-            x2: cx + Math.cos(angle) * length,
-            y2: cy + Math.sin(angle) * length,
-            x3: cx + Math.cos(angle + 0.3) * length,
-            y3: cy + Math.sin(angle + 0.3) * length,
+            x1: clickX,
+            y1: clickY,
+            x2: clickX + Math.cos(angle) * length,
+            y2: clickY + Math.sin(angle) * length,
+            x3: clickX + Math.cos(angle + 0.3) * length,
+            y3: clickY + Math.sin(angle + 0.3) * length,
             vx: Math.cos(angle) * (5 + Math.random() * 15),
             vy: Math.sin(angle) * (5 + Math.random() * 15),
             rotation: 0,
@@ -83,24 +294,25 @@ const LinguisticPortal = ({ onLanguageSelect }: LinguisticPortalProps) => {
         }
 
         let animationFrameId: number;
-        let startTime = Date.now();
+        const startTime = Date.now();
 
         const animate = () => {
           const elapsed = Date.now() - startTime;
           ctx.clearRect(0, 0, width, height);
 
-          // Dark overlay fading in
-          ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, elapsed / 800)})`;
+          // Dark overlay fading in (Phase 3 visual)
+          ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, (elapsed - 600) / 300)})`; // Fades in from 600ms to 900ms
           ctx.fillRect(0, 0, width, height);
 
-          // Draw and update shards
+          // Draw and update shards (Phase 2)
           fragments.forEach((f) => {
             f.x1 += f.vx; f.y1 += f.vy;
             f.x2 += f.vx; f.y2 += f.vy;
             f.x3 += f.vx; f.y3 += f.vy;
             f.rotation += f.rotSpeed;
-            f.opacity = Math.max(0, 1 - (elapsed - 200) / 400); // fade after 200ms
-            f.scale = Math.max(0, 1 - (elapsed - 200) / 600);
+            // Scale from 1 to 0 and fade from 1 to 0 after 200ms, complete by 600ms
+            f.opacity = Math.max(0, 1 - (elapsed - 200) / 400); 
+            f.scale = Math.max(0, 1 - (elapsed - 200) / 400);
 
             if (f.opacity > 0) {
               ctx.save();
@@ -127,6 +339,8 @@ const LinguisticPortal = ({ onLanguageSelect }: LinguisticPortalProps) => {
 
           if (elapsed < 900) {
             animationFrameId = requestAnimationFrame(animate);
+          } else {
+            onTransitionComplete(); // Notify parent component when shatter is complete
           }
         };
 
@@ -137,53 +351,118 @@ const LinguisticPortal = ({ onLanguageSelect }: LinguisticPortalProps) => {
         };
       }
     }
-
-    // Phase 3 (600-900ms): Execute selection callback
-    setTimeout(() => {
-      onLanguageSelect(locale);
-    }, 900);
   };
 
   return (
     <div
       ref={containerRef}
       className="fixed inset-0 bg-black flex flex-col justify-center items-center overflow-hidden select-none z-50 transition-all duration-900 ease-in-out"
+      style={{ margin: 0, padding: 0, overflow: 'hidden' }}
     >
-      <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-10" />
+      <style>{`
+        .linguistic-pillar {
+          font-size: 9vw;
+        }
+        @media (min-width: 768px) {
+          .linguistic-pillar {
+            font-size: 6vw;
+          }
+        }
+        @media (min-width: 1024px) {
+          .linguistic-pillar {
+            font-size: 3.5vw;
+          }
+        }
+        @keyframes custom-pulse {
+          0%, 100% { opacity: 0.2; }
+          50% { opacity: 0.6; }
+        }
+        .center-pulsing-rule {
+          animation: custom-pulse 3s ease-in-out infinite;
+        }
+      `}</style>
 
-      {/* Cinematic Starfield Background */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <div className="w-full h-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]"></div>
-      </div>
+      {/* Cinematic Starfield Background using Three.js */}
+      <canvas
+        ref={threeCanvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{ width: '100vw', height: '100vh', display: 'block', overflow: 'hidden' }}
+      />
 
-      <div className="relative flex flex-col items-center max-w-4xl w-full px-4 z-20">
-        {/* Monogram/Logo Header */}
-        <div className="text-accent font-mono text-sm tracking-[0.25em] mb-12 animate-pulse">
-          ACE-2026
-        </div>
+      <canvas ref={shatterCanvasRef} className="absolute inset-0 pointer-events-none z-10" />
 
+      <div className="relative flex flex-col items-center max-w-5xl w-full px-4 z-20">
         {/* 6 language vertical floating pillars arrangement */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-12 w-full justify-items-center mb-16">
-          {languages.map((lang) => {
+        <div 
+          className="grid grid-cols-2 md:grid-cols-6 gap-6 md:gap-12 w-full justify-items-center mb-16"
+          style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}
+        >
+          {languages.map((lang, i) => {
             const isHovered = hovered === lang.locale;
             const isSelected = selected === lang.locale;
             const isAnySelected = selected !== null;
+            const isAnyHovered = hovered !== null;
+
+            // Slight arc arrangement, staggered Z-axis depth
+            const centerOffset = i - 2.5; // -2.5 to 2.5
+            const translateY = centerOffset * centerOffset * 12; // curves outer down
+            const translateZ = -Math.abs(centerOffset) * 20; // pushes outer back
+
+            // Required hover behavior (exact steps, exact timings)
+            // 1. Opacity: 0.4 -> 1.0 (200ms ease-out)
+            // 2. Letter-spacing: 0.15em -> 0.45em (300ms ease-out)
+            // 4. All other columns: opacity -> 0.15 (200ms)
+            // On mouse leave: all elements return to default (300ms ease-in)
+            let transitionStr = 'opacity 300ms ease-in, letter-spacing 300ms ease-in, transform 300ms ease-in';
+            if (isAnySelected) {
+              transitionStr = 'opacity 600ms ease-out, letter-spacing 600ms ease-out, transform 600ms ease-out';
+            } else if (isAnyHovered) {
+              if (isHovered) {
+                transitionStr = 'opacity 200ms ease-out, letter-spacing 300ms ease-out, transform 400ms ease-out';
+              } else {
+                transitionStr = 'opacity 200ms ease-out, letter-spacing 300ms ease-in, transform 300ms ease-in';
+              }
+            }
+
+            const currentOpacity = isSelected
+              ? 1
+              : isAnySelected
+              ? 0
+              : isHovered
+              ? 1
+              : isAnyHovered
+              ? 0.15
+              : 0.4;
+
+            const currentLetterSpacing = isSelected
+              ? "0.45em"
+              : isHovered
+              ? "0.45em"
+              : "0.15em";
+
+            const currentTransform = !isMobile 
+              ? `translateY(${translateY}px) translateZ(${translateZ}px) ${isSelected ? "scale(2)" : isHovered ? "scale(1.1)" : ""}`
+              : `${isSelected ? "scale(1.25)" : isHovered ? "scale(1.1)" : ""}`;
 
             return (
               <button
                 key={lang.locale}
-                onClick={() => handleSelect(lang.locale)}
-                onMouseEnter={() => handleMouseEnter(lang)}
-                onMouseLeave={() => setHovered(null)}
-                style={{ minWidth: '150px', minHeight: '52px' }}
-                className={`text-center font-display text-2xl md:text-3xl transition-all duration-600 transform outline-none border-b border-transparent ${
-                  isSelected
-                    ? 'text-accent border-accent tracking-[0.45em] scale-150 opacity-100'
-                    : isAnySelected
-                    ? 'opacity-0 scale-50 translate-y-[-20px]'
-                    : isHovered
-                    ? 'text-accent border-accent tracking-[0.3em] scale-110 opacity-100'
-                    : 'text-text opacity-40 hover:opacity-100 tracking-wide'
+                onClick={(e) => {
+                  lastClickPosition.current = { x: e.clientX, y: e.clientY };
+                  handlePillarClick(lang);
+                }}
+                onMouseEnter={() => !isMobile && handleMouseEnter(lang, i)}
+                onMouseLeave={() => !isMobile && handleMouseLeave()}
+                style={{ 
+                  minWidth: isMobile ? "120px" : "150px", 
+                  minHeight: "52px",
+                  opacity: currentOpacity,
+                  letterSpacing: currentLetterSpacing,
+                  transition: transitionStr,
+                  transform: currentTransform,
+                }}
+                className={`linguistic-pillar text-center font-display transform outline-none border-b border-transparent ${
+                  isSelected || isHovered ? "text-accent border-accent" : "text-text"
                 }`}
               >
                 {lang.label}
@@ -192,9 +471,20 @@ const LinguisticPortal = ({ onLanguageSelect }: LinguisticPortalProps) => {
           })}
         </div>
 
-        {/* Center line element */}
-        <div className="w-2/3 h-[1px] bg-accent/20 relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-accent/60 to-transparent animate-pulse"></div>
+        {/* Center element with ACE monogram and horizontal rule */}
+        <div className="flex flex-col items-center justify-center w-full mt-12 z-20">
+          {/* ACE monogram: 32px, wide tracking, above center rule */}
+          <div 
+            className="text-accent font-display font-semibold mb-3 tracking-[0.3em] text-center"
+            style={{ fontSize: '32px' }}
+          >
+            ACE
+          </div>
+          {/* Center line element: thin 1px horizontal rule, 60% width, pulsing opacity (0.2 to 0.6, 3s ease-in-out infinite) */}
+          <div 
+            className="h-[1px] bg-accent center-pulsing-rule" 
+            style={{ width: '60%' }} 
+          />
         </div>
       </div>
     </div>

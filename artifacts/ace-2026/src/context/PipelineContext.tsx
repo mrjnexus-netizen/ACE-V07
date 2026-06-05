@@ -1,10 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { PipelineJob, PipelineStatus } from '../types';
 
 interface PipelineContextType {
   currentJob: PipelineJob | null;
   jobHistory: PipelineJob[];
-  startJob: (title: string, genre: string, audioUrl: string) => Promise<void>;
+  startPipeline: (input: { file?: File; youtubeUrl?: string }) => Promise<void>;
+  approvePipeline: (jobId: string) => Promise<void>;
   cancelJob: () => void;
   resetJob: () => void;
 }
@@ -14,98 +15,109 @@ const PipelineContext = createContext<PipelineContextType | undefined>(undefined
 export const PipelineProvider = ({ children }: { children: ReactNode }) => {
   const [currentJob, setCurrentJob] = useState<PipelineJob | null>(null);
   const [jobHistory, setJobHistory] = useState<PipelineJob[]>([]);
-  const [sseSource, setSseSource] = useState<EventSource | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  const closeEventSource = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
-      if (sseSource) {
-        sseSource.close();
-      }
+      closeEventSource();
     };
-  }, [sseSource]);
+  }, [closeEventSource]);
 
-  const startJob = async (title: string, genre: string, audioUrl: string) => {
+  const startPipeline = async (input: { file?: File; youtubeUrl?: string }) => {
+    if (currentJob) {
+      console.warn('A pipeline job is already in progress. Please wait or cancel it.');
+      return;
+    }
+
+    closeEventSource(); // Ensure any old connection is closed
+
     try {
       setCurrentJob({
-        id: 'starting',
+        id: 'temp-id',
         status: 'uploading',
-        progress: 10,
+        progress: 0,
         audioMetadata: null,
         generatedArtUrl: null,
         generatedNarrative: null,
         errorMessage: null,
       });
 
-      const response = await fetch('/api/pipeline/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, genre, audioUrl }),
-      });
+      let response;
+      let jobId: string;
+
+      if (input.file) {
+        const formData = new FormData();
+        formData.append('audioFile', input.file);
+        response = await fetch('/api/pipeline/process/upload', {
+          method: 'POST',
+          body: formData,
+        });
+      } else if (input.youtubeUrl) {
+        response = await fetch('/api/pipeline/process/youtube', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ youtubeUrl: input.youtubeUrl }),
+        });
+      } else {
+        throw new Error('Either file or youtubeUrl must be provided.');
+      }
 
       const resData = await response.json();
       if (!resData.success) {
-        throw new Error(resData.error || 'Failed to start pipeline processing');
+        throw new Error(resData.error || 'Failed to initiate pipeline processing');
       }
+      jobId = resData.data.jobId;
 
-      const { jobId } = resData.data;
+      setCurrentJob((prev) => prev ? { ...prev, id: jobId, progress: 10 } : null);
 
-      // Initialize SSE listener
       const source = new EventSource(`/api/pipeline/status/${jobId}`);
-      setSseSource(source);
-
-      setCurrentJob({
-        id: jobId,
-        status: 'uploading',
-        progress: 15,
-        audioMetadata: null,
-        generatedArtUrl: null,
-        generatedNarrative: null,
-        errorMessage: null,
-      });
+      eventSourceRef.current = source;
 
       source.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        setCurrentJob((prev) => {
+          if (!prev) return null;
 
-        if (data.type === 'STATUS_UPDATE') {
-          setCurrentJob((prev) => {
-            if (!prev) return null;
-            const updated: PipelineJob = {
-              ...prev,
-              status: data.status as PipelineStatus,
-              progress: data.progress,
-              audioMetadata: data.metadata || prev.audioMetadata,
-              generatedArtUrl: data.generatedArtUrl || prev.generatedArtUrl,
-              generatedNarrative: data.generatedNarrative || prev.generatedNarrative,
-              errorMessage: data.error || null,
-            };
+          const updatedJob: PipelineJob = {
+            ...prev,
+            status: data.status as PipelineStatus,
+            progress: data.progress,
+            audioMetadata: data.audioMetadata || prev.audioMetadata,
+            generatedArtUrl: data.generatedArtUrl || prev.generatedArtUrl,
+            generatedNarrative: data.generatedNarrative || prev.generatedNarrative,
+            errorMessage: data.errorMessage || null,
+          };
 
-            if (data.status === 'complete' || data.status === 'error') {
-              source.close();
-              setSseSource(null);
-              setJobHistory((history) => [...history, updated]);
-            }
-
-            return updated;
-          });
-        }
+          if (updatedJob.status === 'complete' || updatedJob.status === 'error') {
+            closeEventSource();
+            setJobHistory((history) => [...history, updatedJob]);
+          }
+          return updatedJob;
+        });
       };
 
-      source.onerror = (err) => {
-        console.error('SSE pipeline stream error:', err);
+      source.onerror = (error) => {
+        console.error('SSE connection error:', error);
         setCurrentJob((prev) => {
           if (!prev) return null;
           return {
             ...prev,
             status: 'error',
-            errorMessage: 'Real-time event sync lost',
+            errorMessage: 'Real-time updates interrupted.',
           };
         });
-        source.close();
-        setSseSource(null);
+        closeEventSource();
       };
 
-    } catch (err: any) {
-      console.error('Failed to process track media pipeline:', err);
+    } catch (error: any) {
+      console.error('Error starting pipeline:', error);
       setCurrentJob({
         id: 'error',
         status: 'error',
@@ -113,25 +125,47 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         audioMetadata: null,
         generatedArtUrl: null,
         generatedNarrative: null,
-        errorMessage: err.message || 'Failed to initialize background media process',
+        errorMessage: error.message || 'Failed to start pipeline process.',
+      });
+      closeEventSource();
+    }
+  };
+
+  const approvePipeline = async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/pipeline/approve/${jobId}`, {
+        method: 'POST',
+      });
+      const resData = await response.json();
+      if (!resData.success) {
+        throw new Error(resData.error || 'Failed to approve pipeline job');
+      }
+      setCurrentJob((prev) => prev ? { ...prev, status: 'publishing' } : null);
+    } catch (error: any) {
+      console.error('Error approving pipeline:', error);
+      setCurrentJob((prev) => {
+        if (!prev) return null;
+        return { ...prev, errorMessage: error.message || 'Approval failed.' };
       });
     }
   };
 
   const cancelJob = () => {
-    if (sseSource) {
-      sseSource.close();
-      setSseSource(null);
+    closeEventSource();
+    if (currentJob && currentJob.id !== 'temp-id' && currentJob.status !== 'complete' && currentJob.status !== 'error') {
+      // Optionally send a cancel request to the backend
+      fetch(`/api/pipeline/cancel/${currentJob.id}`, { method: 'POST' }).catch(console.error);
     }
     setCurrentJob(null);
   };
 
   const resetJob = () => {
+    closeEventSource();
     setCurrentJob(null);
   };
 
   return (
-    <PipelineContext.Provider value={{ currentJob, jobHistory, startJob, cancelJob, resetJob }}>
+    <PipelineContext.Provider value={{ currentJob, jobHistory, startPipeline, approvePipeline, cancelJob, resetJob }}>
       {children}
     </PipelineContext.Provider>
   );

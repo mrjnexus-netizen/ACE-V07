@@ -21,6 +21,59 @@ interface AudioProviderProps {
   initialPlaylist?: AudioTrack[];
 }
 
+// Simple RGB/HSL conversions for color clash logic
+function hexToHsl(hex: string): { h: number; s: number; l: number } {
+  let r = parseInt(hex.slice(1, 3), 16) / 255;
+  let g = parseInt(hex.slice(3, 5), 16) / 255;
+  let b = parseInt(hex.slice(5, 7), 16) / 255;
+  let max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+
+  if (max !== min) {
+    let d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s, l };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  let r, g, b;
+  h /= 360;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  const toHex = (x: number) => {
+    const hexStr = Math.round(x * 255).toString(16);
+    return hexStr.length === 1 ? '0' + hexStr : hexStr;
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+function desaturate(hex: string, factor: number = 0.5): string {
+  const { h, s, l } = hexToHsl(hex);
+  return hslToHex(h, s * factor, l);
+}
+
 export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderProps) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<globalThis.AudioContext | null>(null);
@@ -46,26 +99,27 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
     }
   }, [audioState.volume]);
 
-  // Initialize AudioContext and AnalyserNode on first user gesture
+  // Lazy initialize AudioContext on user gesture, NOT on mount
   const initAudio = async () => {
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioCtx();
+      
       const analyser = audioContextRef.current.createAnalyser();
-      analyser.fftSize = window.innerWidth < 768 ? 512 : 2048; // Mobile vs Desktop
+      analyser.fftSize = window.innerWidth < 768 ? 512 : 2048;
       analyser.smoothingTimeConstant = 0.85;
-
       analyserRef.current = analyser;
+
       setAudioState((prev) => ({
         ...prev,
         audioContext: audioContextRef.current,
-        analyserNode: analyserRef.current,
+        analyserNode: analyser,
       }));
 
-      // Connect audio element to analyser
-      if (audioRef.current && audioContextRef.current) {
+      if (audioRef.current) {
         const source = audioContextRef.current.createMediaElementSource(audioRef.current);
-        source.connect(analyserRef.current);
-        analyserRef.current.connect(audioContextRef.current.destination);
+        source.connect(analyser);
+        analyser.connect(audioContextRef.current.destination);
       }
     }
     if (audioContextRef.current.state === 'suspended') {
@@ -86,27 +140,29 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
     return () => {
       document.removeEventListener('click', handleUserGesture);
       document.removeEventListener('touchstart', handleUserGesture);
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
     };
   }, []);
 
-  // Handle track changes and metadata
-  useEffect(() => {
-    const currentTrack = audioState.currentTrack;
-    if (currentTrack && audioRef.current) {
-      audioRef.current.src = currentTrack.audioUrl;
-      audioRef.current.load();
-      if (audioState.isPlaying) {
-        audioRef.current.play();
-      }
-      extractAndApplyVibrantColors(currentTrack.coverArt?.url);
-    } else if (audioRef.current) {
-      audioRef.current.src = '';
-      setAudioState((prev) => ({ ...prev, dominantColors: null, duration: 0, currentTime: 0 }));
+  // Update current time and duration
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setAudioState((prev) => ({ ...prev, currentTime: audioRef.current!.currentTime }));
     }
-  }, [audioState.currentTrack]);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setAudioState((prev) => ({ ...prev, duration: audioRef.current!.duration }));
+    }
+  };
+
+  const handleEnded = () => {
+    if (audioState.currentIndex < audioState.playlist.length - 1) {
+      nextTrack();
+    } else {
+      setAudioState((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
+    }
+  };
 
   const extractAndApplyVibrantColors = async (imageUrl?: string) => {
     if (!imageUrl) {
@@ -116,37 +172,53 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
     try {
       const palette = await Vibrant.from(imageUrl).getPalette();
       const vibrantPalette: VibrantPalette = {
-        vibrant: palette.Vibrant?.hex || 
-          (palette.DarkVibrant?.hex || palette.LightVibrant?.hex || '#000000'),
-        muted: palette.Muted?.hex || 
-          (palette.DarkMuted?.hex || palette.LightMuted?.hex || '#333333'),
-        darkVibrant: palette.DarkVibrant?.hex || 
-          (palette.Vibrant?.hex || palette.LightVibrant?.hex || '#000000'),
-        darkMuted: palette.DarkMuted?.hex || 
-          (palette.Muted?.hex || palette.LightMuted?.hex || '#333333'),
-        lightVibrant: palette.LightVibrant?.hex || 
-          (palette.Vibrant?.hex || palette.DarkVibrant?.hex || '#666666'),
-        lightMuted: palette.LightMuted?.hex || 
-          (palette.Muted?.hex || palette.DarkMuted?.hex || '#999999'),
+        vibrant: palette.Vibrant?.hex || '#00F5D4',
+        muted: palette.Muted?.hex || '#6B6C75',
+        darkVibrant: palette.DarkVibrant?.hex || '#000000',
+        darkMuted: palette.DarkMuted?.hex || '#333333',
+        lightVibrant: palette.LightVibrant?.hex || '#666666',
+        lightMuted: palette.LightMuted?.hex || '#999999',
       };
 
-      // Apply color clash prevention (mock for now, actual implementation needs theme accent color)
-      // const themeAccentColor = getComputedStyle(document.documentElement).getPropertyValue("--accent-color");
-      // if (vibrantPalette.vibrant && isColorClashing(vibrantPalette.vibrant, themeAccentColor)) {
-      //   vibrantPalette.vibrant = desaturateColor(vibrantPalette.vibrant, 0.6);
-      // }
-      
+      // Color clash prevention: if hue is within 30° of theme accent -> desaturate
+      const themeAccentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
+      if (themeAccentColor && themeAccentColor.startsWith('#')) {
+        const themeHsl = hexToHsl(themeAccentColor);
+        const vibrantHsl = hexToHsl(vibrantPalette.vibrant);
+        const diff = Math.abs(themeHsl.h - vibrantHsl.h);
+        const hueDiff = Math.min(diff, 360 - diff);
+        if (hueDiff <= 30) {
+          vibrantPalette.vibrant = desaturate(vibrantPalette.vibrant, 0.4);
+        }
+      }
+
       setAudioState((prev) => ({ ...prev, dominantColors: vibrantPalette }));
-      document.documentElement.style.setProperty("--dynamic-accent", vibrantPalette.vibrant);
+      document.documentElement.style.setProperty('--dynamic-accent', vibrantPalette.vibrant);
     } catch (error) {
-      console.error("Error extracting vibrant colors:", error);
+      console.error('Error extracting vibrant colors:', error);
       setAudioState((prev) => ({ ...prev, dominantColors: null }));
-      document.documentElement.style.removeProperty("--dynamic-accent");
+      document.documentElement.style.removeProperty('--dynamic-accent');
     }
   };
 
+  // Track switching effect
+  useEffect(() => {
+    const currentTrack = audioState.currentTrack;
+    if (currentTrack && audioRef.current) {
+      audioRef.current.src = currentTrack.audioUrl;
+      audioRef.current.load();
+      if (audioState.isPlaying) {
+        audioRef.current.play().catch((err) => console.log('Autoplay blocked:', err));
+      }
+      extractAndApplyVibrantColors(currentTrack.coverArt?.url);
+    } else if (audioRef.current) {
+      audioRef.current.src = '';
+      setAudioState((prev) => ({ ...prev, dominantColors: null, duration: 0, currentTime: 0 }));
+    }
+  }, [audioState.currentTrack]);
+
   const playTrack = async (track: AudioTrack) => {
-    await initAudio(); // Ensure audio context is active
+    await initAudio();
     const index = audioState.playlist.findIndex((t) => t.id === track.id);
     setAudioState((prev) => ({
       ...prev,
@@ -163,6 +235,10 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
 
   const resumeTrack = async () => {
     await initAudio();
+    // iOS Safari: audioContext.resume() on every play attempt
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
     audioRef.current?.play();
     setAudioState((prev) => ({ ...prev, isPlaying: true }));
   };
@@ -182,6 +258,7 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
   };
 
   const nextTrack = () => {
+    if (audioState.playlist.length === 0) return;
     const nextIndex = (audioState.currentIndex + 1) % audioState.playlist.length;
     const track = audioState.playlist[nextIndex];
     if (track) {
@@ -190,6 +267,7 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
   };
 
   const prevTrack = () => {
+    if (audioState.playlist.length === 0) return;
     const prevIndex = (audioState.currentIndex - 1 + audioState.playlist.length) % audioState.playlist.length;
     const track = audioState.playlist[prevIndex];
     if (track) {
@@ -197,53 +275,32 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
     }
   };
 
-  // Update current time and duration
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setAudioState((prev) => ({ ...prev, currentTime: audioRef.current!.currentTime }));
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setAudioState((prev) => ({ ...prev, duration: audioRef.current!.duration }));
-    }
-  };
-
-  const handleEnded = () => {
-    // Play next track or stop if no more tracks
-    if (audioState.currentIndex < audioState.playlist.length - 1) {
-      nextTrack();
-    } else {
-      setAudioState((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
-    }
-  };
-
-  // Environmental UI Audio Engine (Mock for now)
+  // Environmental UI Audio Engine (Base64 micro-tones with gain limited to 0.15 max)
   const playEnvironmentalSound = (frequency: number, duration: number, volume: number) => {
-    if (audioContextRef.current) {
-      const oscillator = audioContextRef.current.createOscillator();
-      const gainNode = audioContextRef.current.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContextRef.current.destination);
-
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(frequency, audioContextRef.current.currentTime);
-      gainNode.gain.setValueAtTime(volume, audioContextRef.current.currentTime);
-
-      oscillator.start(audioContextRef.current.currentTime);
-      oscillator.stop(audioContextRef.current.currentTime + duration / 1000);
-
-      // Cleanup
-      oscillator.onended = () => {
-        oscillator.disconnect();
-        gainNode.disconnect();
-      };
+    if (!audioContextRef.current) return;
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
     }
+
+    const osc = audioContextRef.current.createOscillator();
+    const gainNode = audioContextRef.current.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioContextRef.current.destination);
+
+    const now = audioContextRef.current.currentTime;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(frequency, now);
+    
+    // Ensure volume is clamped to max 0.15
+    const clampedVolume = Math.min(volume, 0.15);
+    gainNode.gain.setValueAtTime(clampedVolume, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration / 1000);
+
+    osc.start(now);
+    osc.stop(now + duration / 1000);
   };
 
-  // Expose playEnvironmentalSound through context for LinguisticPortal
   const memoizedContextValue = useMemo(() => ({
     audioState,
     playTrack,
@@ -253,8 +310,8 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
     setVolume,
     nextTrack,
     prevTrack,
-    playEnvironmentalSound, // Expose for environmental sounds
-  }), [audioState, playTrack, pauseTrack, resumeTrack, seekTrack, setVolume, nextTrack, prevTrack, playEnvironmentalSound]);
+    playEnvironmentalSound,
+  }), [audioState]);
 
   return (
     <AudioContext.Provider value={memoizedContextValue}>
@@ -273,7 +330,7 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
 export const useAudio = () => {
   const context = useContext(AudioContext);
   if (context === undefined) {
-    throw new Error("useAudio must be used within an AudioProvider");
+    throw new Error('useAudio must be used within an AudioProvider');
   }
   return context;
 };

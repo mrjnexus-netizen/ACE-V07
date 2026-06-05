@@ -1,7 +1,13 @@
-import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  ReactNode,
+} from 'react';
 import { ThemeId, ThemeConfig, Locale } from '../types';
 
-// Define theme configurations based on Section 2
 const THEMES: Record<ThemeId, ThemeConfig> = {
   onyx: {
     id: 'onyx',
@@ -20,16 +26,16 @@ const THEMES: Record<ThemeId, ThemeConfig> = {
       '--border-color': '#2A2A2A',
       '--border-accent-color': '#D4AF3740',
       '--glow-color': '#D4AF3720',
-      '--font-display': '\'Cormorant Garamond\', \'Playfair Display\', serif',
-      '--font-body': '\'EB Garamond\', Georgia, serif',
-      '--font-mono': '\'Space Mono\', \'Courier New\', monospace',
-      '--font-cjk': '\'Noto Sans JP\', \'Noto Sans SC\', sans-serif',
+      '--font-display': "'Cormorant Garamond', 'Playfair Display', serif",
+      '--font-body': "'EB Garamond', Georgia, serif",
+      '--font-mono': "'Space Mono', 'Courier New', monospace",
+      '--font-cjk': "'Noto Sans JP', sans-serif",
       '--letter-spacing-base': '0.08em',
-      '--letter-spacing-hero': 'scroll-linked (0.05em to 0.30em)',
       '--line-height-base': '1.7',
       '--line-height-cjk': '1.9',
     },
   },
+
   cyber: {
     id: 'cyber',
     variables: {
@@ -43,20 +49,15 @@ const THEMES: Record<ThemeId, ThemeConfig> = {
       '--surface-rgb': '10, 10, 15',
       '--text-color': '#E8E9F0',
       '--text-muted-color': '#6B6C75',
-      '--text-dim-color': '#3A3B44',
       '--border-color': '#2A2B33',
-      '--border-accent-color': '#00F5D440',
       '--glow-color': '#00F5D415',
-      '--font-display': '\'Space Mono\', \'IBM Plex Mono\', monospace',
-      '--font-body': '\'IBM Plex Mono\', \'Courier New\', monospace',
-      '--font-mono': '\'Space Mono\', monospace',
-      '--font-cjk': '\'Noto Sans JP\', \'Noto Sans SC\', sans-serif',
+      '--font-display': "'Space Mono', 'IBM Plex Mono', monospace",
+      '--font-body': "'IBM Plex Mono', 'Courier New', monospace",
       '--letter-spacing-base': '0.12em',
-      '--letter-spacing-hero': '0.20em',
       '--line-height-base': '1.6',
-      '--line-height-cjk': '1.85',
     },
   },
+
   minimal: {
     id: 'minimal',
     variables: {
@@ -70,18 +71,12 @@ const THEMES: Record<ThemeId, ThemeConfig> = {
       '--surface-rgb': '249, 249, 247',
       '--text-color': '#0A0A08',
       '--text-muted-color': '#7A7A75',
-      '--text-dim-color': '#C0C0BC',
       '--border-color': '#D8D8D5',
-      '--border-accent-color': '#0A0A0830',
       '--glow-color': '#0A0A0808',
-      '--font-display': '\'Playfair Display\', \'Cormorant Garamond\', serif',
-      '--font-body': '\'Lora\', Georgia, serif',
-      '--font-mono': '\'Space Mono\', monospace',
-      '--font-cjk': '\'Noto Sans JP\', \'Noto Sans SC\', sans-serif',
+      '--font-display': "'Playfair Display', 'Cormorant Garamond', serif",
+      '--font-body': "'Lora', Georgia, serif",
       '--letter-spacing-base': '0.04em',
-      '--letter-spacing-hero': '0.15em',
       '--line-height-base': '1.8',
-      '--line-height-cjk': '2.0',
     },
   },
 };
@@ -89,101 +84,84 @@ const THEMES: Record<ThemeId, ThemeConfig> = {
 interface ChromaticContextType {
   theme: ThemeConfig;
   switchTheme: (themeId: ThemeId) => void;
-  applyLocaleTypography: (locale: Locale, theme: ThemeConfig) => void;
+  applyLocaleTypography: (locale: Locale) => void;
 }
 
-const ChromaticContext = createContext<ChromaticContextType | undefined>(undefined);
+const ChromaticContext = createContext<ChromaticContextType | null>(null);
 
 export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
-  const [currentThemeId, setCurrentThemeId] = useState<ThemeId>(() => {
-    const storedTheme = localStorage.getItem('ace-theme');
-    return (storedTheme as ThemeId) || THEMES.onyx.id; // Default to 'onyx'
-  });
+  const getInitialTheme = (): ThemeId => {
+    const stored = localStorage.getItem('ace-theme') as ThemeId | null;
+
+    if (stored && Object.keys(THEMES).includes(stored)) {
+      return stored;
+    }
+
+    const list: ThemeId[] = ['onyx', 'cyber', 'minimal'];
+    const random = list[Math.floor(Math.random() * list.length)]!;
+
+    localStorage.setItem('ace-theme', random);
+    return random;
+  };
+
+  const [currentThemeId, setCurrentThemeId] = useState<ThemeId>(() =>
+    getInitialTheme()
+  );
 
   const theme = THEMES[currentThemeId];
 
   useEffect(() => {
     localStorage.setItem('ace-theme', currentThemeId);
     applyTheme(theme);
-  }, [currentThemeId, theme]);
+  }, [currentThemeId]);
 
-  const applyTheme = (selectedTheme: ThemeConfig) => {
+  const applyTheme = (t: ThemeConfig) => {
     const root = document.documentElement;
-    Object.entries(selectedTheme.variables).forEach(([key, value]) => {
-      root.style.setProperty(key, value);
+
+    Object.entries(t.variables).forEach(([k, v]) => {
+      root.style.setProperty(k, String(v ?? ''));
     });
-    root.setAttribute('data-theme', selectedTheme.id);
+
+    root.setAttribute('data-theme', t.id);
   };
 
-  const applyLocaleTypography = (locale: Locale, selectedTheme: ThemeConfig) => {
+  const applyLocaleTypography = (locale: Locale) => {
     const root = document.documentElement;
-    let fontDisplay = selectedTheme.variables['--font-display'] ?? null;
-    let fontBody = selectedTheme.variables['--font-body'] ?? null;
-    let fontMono = selectedTheme.variables['--font-mono'] ?? null;
-    let letterSpacingBase = selectedTheme.variables['--letter-spacing-base'] ?? null;
-    let lineHeightBase = selectedTheme.variables['--line-height-base'] ?? null;
-    let fontCjk = selectedTheme.variables['--font-cjk'] ?? null;
-    let lineHeightCjk = selectedTheme.variables['--line-height-cjk'] ?? null;
+    const vars = theme.variables;
 
-    switch (locale) {
-      case 'zh':
-        fontCjk = '\'Noto Sans SC\', sans-serif';
-        letterSpacingBase = '0.05em';
-        lineHeightBase = lineHeightCjk;
-        break;
-      case 'ja':
-        fontCjk = '\'Noto Sans JP\', sans-serif';
-        letterSpacingBase = '0.03em';
-        lineHeightBase = lineHeightCjk;
-        break;
-      case 'ko':
-        fontCjk = '\'Noto Sans KR\', sans-serif';
-        letterSpacingBase = '0.04em';
-        lineHeightBase = lineHeightCjk;
-        break;
-      case 'es':
-      case 'fr':
-        lineHeightBase = `calc(${lineHeightBase} * 1.05)`; // +5% for accent character clearance
-        break;
-      default:
-        // English and other LTR languages, use base values
-        break;
-    }
+    let fontCjk: string = vars['--font-cjk'] ?? '';
+    let letterSpacing: string = vars['--letter-spacing-base'] ?? '';
+    let lineHeight: string = vars['--line-height-base'] ?? '';
 
-    root.style.setProperty('--font-display', fontDisplay);
-    root.style.setProperty('--font-body', fontBody);
-    root.style.setProperty('--font-mono', fontMono);
+    if (locale === 'zh') fontCjk = "'Noto Sans SC', sans-serif";
+    if (locale === 'ja') fontCjk = "'Noto Sans JP', sans-serif";
+    if (locale === 'ko') fontCjk = "'Noto Sans KR', sans-serif";
+
     root.style.setProperty('--font-cjk', fontCjk);
-    root.style.setProperty('--letter-spacing-base', letterSpacingBase);
-    root.style.setProperty('--line-height-base', lineHeightBase);
-    root.style.setProperty('--line-height-cjk', lineHeightCjk);
+    root.style.setProperty('--letter-spacing-base', letterSpacing);
+    root.style.setProperty('--line-height-base', lineHeight);
 
-    root.setAttribute('data-locale', locale);
     root.setAttribute('lang', locale);
-    root.setAttribute('dir', 'ltr');
   };
 
-  const switchTheme = (themeId: ThemeId) => {
-    setCurrentThemeId(themeId);
+  const switchTheme = (id: ThemeId) => {
+    setCurrentThemeId(id);
   };
 
-  const memoizedContextValue = useMemo(() => ({
-    theme,
-    switchTheme,
-    applyLocaleTypography,
-  }), [theme, switchTheme, applyLocaleTypography]);
+  const value = useMemo(
+    () => ({ theme, switchTheme, applyLocaleTypography }),
+    [theme]
+  );
 
   return (
-    <ChromaticContext.Provider value={memoizedContextValue}>
+    <ChromaticContext.Provider value={value}>
       {children}
     </ChromaticContext.Provider>
   );
 };
 
 export const useChromatic = () => {
-  const context = useContext(ChromaticContext);
-  if (context === undefined) {
-    throw new Error('useChromatic must be used within a ChromaticProvider');
-  }
-  return context;
+  const ctx = useContext(ChromaticContext);
+  if (!ctx) throw new Error('useChromatic must be inside provider');
+  return ctx;
 };

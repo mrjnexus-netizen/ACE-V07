@@ -11,6 +11,10 @@ interface StagingContextType {
   commitDraft: () => Promise<void>;
   rollbackDraft: () => void;
   updateDraftField: (field: keyof ComposerIdentity, value: any) => void;
+  draft: Partial<ComposerIdentity>;
+  stageDraft: (field: keyof ComposerIdentity, value: any) => void;
+  previewDraft: ComposerIdentity | null;
+  unsavedChanges: boolean;
 }
 
 const StagingContext = createContext<StagingContextType | undefined>(undefined);
@@ -21,26 +25,40 @@ export const StagingProvider = ({ children }: { children: ReactNode }) => {
   const [draftState, setDraftState] = useState<ComposerIdentity | null>(null);
   const [hasPendingChanges, setHasPendingChanges] = useState<boolean>(false);
 
-  // When edit mode is entered, clone the live identity state into local draft state
+  // Synchronize/Maintain new requested API fields as well to avoid breaks
+  const draft = draftState || {};
+  const unsavedChanges = hasPendingChanges;
+
   const toggleEditMode = (mode: boolean) => {
     setIsEditMode(mode);
     if (mode && !draftState) {
       setDraftState(identity ? JSON.parse(JSON.stringify(identity)) : null);
+      setHasPendingChanges(false);
+    } else if (!mode) {
+      setDraftState(null);
       setHasPendingChanges(false);
     }
   };
 
   const updateDraftField = (field: keyof ComposerIdentity, value: any) => {
     setDraftState((prev: ComposerIdentity | null) => {
-      if (!prev) return null;
+      const current = prev || identity || {
+        id: null, name: null, tagline: null, biography: null, awards: null, studioAddress: null, portrait: null, logo: null, heroVideo: null, socialLinks: null, projects: null
+      };
       const updated = {
-        ...prev,
+        ...current,
         [field]: value,
       };
       setHasPendingChanges(true);
       return updated;
     });
   };
+
+  const stageDraft = (field: keyof ComposerIdentity, value: any) => {
+    updateDraftField(field, value);
+  };
+
+  const previewDraft = draftState || identity;
 
   const rollbackDraft = () => {
     setDraftState(identity ? JSON.parse(JSON.stringify(identity)) : null);
@@ -83,6 +101,10 @@ export const StagingProvider = ({ children }: { children: ReactNode }) => {
         commitDraft,
         rollbackDraft,
         updateDraftField,
+        draft,
+        stageDraft,
+        previewDraft,
+        unsavedChanges,
       }}
     >
       {children}

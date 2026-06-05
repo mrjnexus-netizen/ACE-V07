@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './pages/MainApp';
+import AppRouter from './routes/AppRouter';
 import './index.css';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { ChromaticProvider } from './context/ChromaticContext';
@@ -17,7 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <PipelineProvider>
             <StagingProvider>
               <Router>
-                <App />
+                <AppRouter />
               </Router>
             </StagingProvider>
           </PipelineProvider>

@@ -40,17 +40,24 @@ export const broadcastJobStatus = (jobId: string, status: string, progress: numb
 // POST /api/pipeline/process - Trigger pipeline
 router.post('/process', authenticateJWT, async (req: Request, res: Response) => {
   try {
-    const { audioUrl, title, genre } = req.body;
+    const { audioUrl, youtubeUrl, title, genre } = req.body;
 
-    if (!audioUrl) {
+    if (!audioUrl && !youtubeUrl) {
       return res.status(400).json({
         success: false,
         data: null,
-        error: 'audioUrl is required',
+        error: 'audioUrl or youtubeUrl is required',
         code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
     }
+
+    // Handle multipart/form-data for audio file upload (if applicable)
+    // This example assumes `audioUrl` is already available from a prior upload step
+    // or is a direct URL. For actual file uploads, Multer middleware would be used.
+    // If using Multer, the file would be accessible via `req.file` and `audioUrl` would be derived from its path.
+
+
 
     // 1. Create a draft track
     const [draftTrack] = await db.insert(tracks).values({
@@ -75,6 +82,9 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
     setTimeout(async () => {
       try {
         const jobId = job!.id;
+
+        // In a real application, you would dispatch a BullMQ job here
+        // For now, we simulate the process with timeouts and direct DB updates
 
         // Stage: Analyzing Audio (20%)
         broadcastJobStatus(jobId, 'analyzing_audio', 20);
@@ -124,7 +134,9 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
         }).where(eq(pipelineJobs.id, job!.id));
         broadcastJobStatus(job!.id, 'error', 100, { error: err.message });
       }
-    }, 100);
+    }, 100); // Small delay to simulate async dispatch
+
+
 
     return res.status(202).json({
       success: true,
@@ -172,8 +184,8 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
 
     // Update the track with finalized, approved details and make it live
     await db.update(tracks).set({
-      title: title || job.generatedNarrative || { en: 'Final Composition', es: '', fr: '', zh: '', ja: '', ko: '' },
-      narrative: narrative || job.generatedNarrative || { en: '', es: '', fr: '', zh: '', ja: '', ko: '' },
+      title: title || (job.generatedNarrative as any)?.en || { en: 'Final Composition', es: '', fr: '', zh: '', ja: '', ko: '' },
+      narrative: narrative || (job.generatedNarrative as any)?.en || { en: '', es: '', fr: '', zh: '', ja: '', ko: '' },
       coverUrl: job.generatedArtUrl,
       genre: genre || 'cinematic',
       bpm: bpm ? parseInt(bpm) : (job.audioMetadata as any)?.bpm || 110,
@@ -185,7 +197,7 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
     }).where(eq(tracks.id, job.trackId));
 
     await db.update(pipelineJobs).set({ status: 'complete', progress: 100 }).where(eq(pipelineJobs.id, jobId!));
-    broadcastJobStatus(jobId!, 'complete', 100);
+    broadcastJobStatus(jobId!, 'complete', 100, { trackId: job.trackId });
 
     return res.status(200).json({
       success: true,

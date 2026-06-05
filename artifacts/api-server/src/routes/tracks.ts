@@ -13,6 +13,7 @@ const router: Router = Router();
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const list = await db.query.tracks.findMany({
+      where: eq(tracks.isLive, true),
       orderBy: [asc(tracks.sortOrder)],
     });
 

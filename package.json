@@ -17,5 +17,13 @@
     "db:seed": "pnpm --filter @workspace/api-server run db:seed",
     "db:studio": "pnpm --filter @workspace/api-server run db:studio",
     "test:e2e": "pnpm --filter @workspace/ace-2026 run test:e2e"
+  },
+  "devDependencies": {
+    "typescript": "5.7.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "three": "0.170.0"
+    }
   }
 }

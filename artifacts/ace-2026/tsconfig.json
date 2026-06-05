@@ -10,9 +10,6 @@
     "allowSyntheticDefaultImports": true,
     "tsBuildInfoFile": "./node_modules/.pnpm-stores/tsbuildinfo-ace-2026.json",
     "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@components/*": ["./src/components/*"],

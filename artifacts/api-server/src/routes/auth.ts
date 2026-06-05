@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken";
 import { db } from "../db/db";
 import { adminUsers } from "../db/schema";

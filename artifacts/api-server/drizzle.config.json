@@ -2,6 +2,7 @@
   "schema": "./src/db/schema.ts",
   "out": "./src/db/migrations",
   "driver": "pg",
+  "dialect": "postgresql",
   "dbCredentials": {
     "connectionString": "postgres://user:password@localhost:5432/ace_db"
   }
