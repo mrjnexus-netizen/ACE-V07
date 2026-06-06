@@ -1,14 +1,15 @@
 import { useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { useAudio } from '../context/AudioContext';
-import { Locale } from '../types';
+import { Locale, ThemeId } from '../types';
 
 interface LinguisticPortalProps {
   onLanguageSelect: (locale: Locale) => void;
   onTransitionComplete: () => void; // New prop for transition completion
+  themeId?: ThemeId; // Optional themeId passed down or from context
 }
 
-const LinguisticPortal = ({ onLanguageSelect, onTransitionComplete }: LinguisticPortalProps) => {
+const LinguisticPortal = ({ onLanguageSelect, onTransitionComplete, themeId = 'minimal' }: LinguisticPortalProps) => {
   const { playEnvironmentalSound } = useAudio();
   const [hovered, setHovered] = useState<Locale | null>(null);
   const [selected, setSelected] = useState<Locale | null>(null);
@@ -353,6 +354,28 @@ const LinguisticPortal = ({ onLanguageSelect, onTransitionComplete }: Linguistic
     }
   };
 
+  const getLanguageButtonStyle = (tId: ThemeId): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      minWidth: isMobile ? '120px' : '150px',
+      minHeight: '52px',
+      letterSpacing: '0.15em',
+      transition: 'all 200ms ease-out',
+    };
+    if (tId === 'minimal') {
+      // MINIMAL: use semi‑transparent dark text (no opacity on element)
+      return { ...baseStyle, color: 'rgba(10, 10, 8, 0.7)' };
+    }
+    // ONYX and CYBER: use opacity 0.4 as blueprint
+    return { ...baseStyle, opacity: 0.4 };
+  };
+
+  const getHoverStyle = (tId: ThemeId): React.CSSProperties => {
+    if (tId === 'minimal') {
+      return { color: '#0A0A08', letterSpacing: '0.45em' };
+    }
+    return { opacity: 1, letterSpacing: '0.45em' };
+  };
+
   return (
     <div
       ref={containerRef}
@@ -408,41 +431,24 @@ const LinguisticPortal = ({ onLanguageSelect, onTransitionComplete }: Linguistic
             const translateY = centerOffset * centerOffset * 12; // curves outer down
             const translateZ = -Math.abs(centerOffset) * 20; // pushes outer back
 
-            // Required hover behavior (exact steps, exact timings)
-            // 1. Opacity: 0.4 -> 1.0 (200ms ease-out)
-            // 2. Letter-spacing: 0.15em -> 0.45em (300ms ease-out)
-            // 4. All other columns: opacity -> 0.15 (200ms)
-            // On mouse leave: all elements return to default (300ms ease-in)
-            let transitionStr = 'opacity 300ms ease-in, letter-spacing 300ms ease-in, transform 300ms ease-in';
-            if (isAnySelected) {
-              transitionStr = 'opacity 600ms ease-out, letter-spacing 600ms ease-out, transform 600ms ease-out';
+            const baseStyle = getLanguageButtonStyle(themeId);
+            const hoverStyle = getHoverStyle(themeId);
+
+            let calculatedStyle: React.CSSProperties = { ...baseStyle };
+
+            if (isSelected || isHovered) {
+              calculatedStyle = { ...calculatedStyle, ...hoverStyle };
+            } else if (isAnySelected) {
+              calculatedStyle = { ...calculatedStyle, opacity: 0 };
             } else if (isAnyHovered) {
-              if (isHovered) {
-                transitionStr = 'opacity 200ms ease-out, letter-spacing 300ms ease-out, transform 400ms ease-out';
-              } else {
-                transitionStr = 'opacity 200ms ease-out, letter-spacing 300ms ease-in, transform 300ms ease-in';
-              }
+              calculatedStyle = { ...calculatedStyle, opacity: 0.15 };
             }
-
-            const currentOpacity = isSelected
-              ? 1
-              : isAnySelected
-              ? 0
-              : isHovered
-              ? 1
-              : isAnyHovered
-              ? 0.15
-              : 0.4;
-
-            const currentLetterSpacing = isSelected
-              ? "0.45em"
-              : isHovered
-              ? "0.45em"
-              : "0.15em";
 
             const currentTransform = !isMobile 
               ? `translateY(${translateY}px) translateZ(${translateZ}px) ${isSelected ? "scale(2)" : isHovered ? "scale(1.1)" : ""}`
               : `${isSelected ? "scale(1.25)" : isHovered ? "scale(1.1)" : ""}`;
+
+            calculatedStyle.transform = currentTransform;
 
             return (
               <button
@@ -453,14 +459,7 @@ const LinguisticPortal = ({ onLanguageSelect, onTransitionComplete }: Linguistic
                 }}
                 onMouseEnter={() => !isMobile && handleMouseEnter(lang, i)}
                 onMouseLeave={() => !isMobile && handleMouseLeave()}
-                style={{ 
-                  minWidth: isMobile ? "120px" : "150px", 
-                  minHeight: "52px",
-                  opacity: currentOpacity,
-                  letterSpacing: currentLetterSpacing,
-                  transition: transitionStr,
-                  transform: currentTransform,
-                }}
+                style={calculatedStyle}
                 className={`linguistic-pillar text-center font-display transform outline-none border-b border-transparent ${
                   isSelected || isHovered ? "text-accent border-accent" : "text-text"
                 }`}

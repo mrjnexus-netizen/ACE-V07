@@ -38,6 +38,8 @@ export interface ComposerIdentity {
   heroVideo: string | null;
   socialLinks: SocialLinks | null;
   projects: Project[] | null;
+  trackCount: number | null;
+  genres: string[] | null;
 }
 
 export interface SocialLinks {

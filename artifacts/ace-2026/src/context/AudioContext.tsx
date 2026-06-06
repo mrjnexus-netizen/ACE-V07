@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useRef, useEffect, useMemo, ReactNode } from 'react';
 import { AudioState, AudioTrack, VibrantPalette } from '../types';
-import Vibrant from 'node-vibrant';
+import { extractPalette } from '../lib/vibrantExtractor';
 
 interface AudioContextType {
   audioState: AudioState;
@@ -9,6 +9,7 @@ interface AudioContextType {
   resumeTrack: () => void;
   seekTrack: (time: number) => void;
   setVolume: (volume: number) => void;
+  setMuted: (isMuted: boolean) => void;
   nextTrack: () => void;
   prevTrack: () => void;
   playEnvironmentalSound: (frequency: number, duration: number, volume: number) => void;
@@ -164,59 +165,6 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
     }
   };
 
-  const extractAndApplyVibrantColors = async (imageUrl?: string) => {
-    if (!imageUrl) {
-      setAudioState((prev) => ({ ...prev, dominantColors: null }));
-      return;
-    }
-    try {
-      const palette = await Vibrant.from(imageUrl).getPalette();
-      const vibrantPalette: VibrantPalette = {
-        vibrant: palette.Vibrant?.hex || '#00F5D4',
-        muted: palette.Muted?.hex || '#6B6C75',
-        darkVibrant: palette.DarkVibrant?.hex || '#000000',
-        darkMuted: palette.DarkMuted?.hex || '#333333',
-        lightVibrant: palette.LightVibrant?.hex || '#666666',
-        lightMuted: palette.LightMuted?.hex || '#999999',
-      };
-
-      // Color clash prevention: if hue is within 30° of theme accent -> desaturate
-      const themeAccentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
-      if (themeAccentColor && themeAccentColor.startsWith('#')) {
-        const themeHsl = hexToHsl(themeAccentColor);
-        const vibrantHsl = hexToHsl(vibrantPalette.vibrant);
-        const diff = Math.abs(themeHsl.h - vibrantHsl.h);
-        const hueDiff = Math.min(diff, 360 - diff);
-        if (hueDiff <= 30) {
-          vibrantPalette.vibrant = desaturate(vibrantPalette.vibrant, 0.4);
-        }
-      }
-
-      setAudioState((prev) => ({ ...prev, dominantColors: vibrantPalette }));
-      document.documentElement.style.setProperty('--dynamic-accent', vibrantPalette.vibrant);
-    } catch (error) {
-      console.error('Error extracting vibrant colors:', error);
-      setAudioState((prev) => ({ ...prev, dominantColors: null }));
-      document.documentElement.style.removeProperty('--dynamic-accent');
-    }
-  };
-
-  // Track switching effect
-  useEffect(() => {
-    const currentTrack = audioState.currentTrack;
-    if (currentTrack && audioRef.current) {
-      audioRef.current.src = currentTrack.audioUrl;
-      audioRef.current.load();
-      if (audioState.isPlaying) {
-        audioRef.current.play().catch((err) => console.log('Autoplay blocked:', err));
-      }
-      extractAndApplyVibrantColors(currentTrack.coverArt?.url);
-    } else if (audioRef.current) {
-      audioRef.current.src = '';
-      setAudioState((prev) => ({ ...prev, dominantColors: null, duration: 0, currentTime: 0 }));
-    }
-  }, [audioState.currentTrack]);
-
   const playTrack = async (track: AudioTrack) => {
     await initAudio();
     const index = audioState.playlist.findIndex((t) => t.id === track.id);
@@ -255,6 +203,13 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
       audioRef.current.volume = volume;
       setAudioState((prev) => ({ ...prev, volume }));
     }
+  };
+
+  const setMuted = (isMuted: boolean) => {
+    if (audioRef.current) {
+      audioRef.current.muted = isMuted;
+    }
+    setAudioState((prev) => ({ ...prev, isMuted }));
   };
 
   const nextTrack = () => {
@@ -308,6 +263,7 @@ export const AudioProvider = ({ children, initialPlaylist = [] }: AudioProviderP
     resumeTrack,
     seekTrack,
     setVolume,
+    setMuted,
     nextTrack,
     prevTrack,
     playEnvironmentalSound,

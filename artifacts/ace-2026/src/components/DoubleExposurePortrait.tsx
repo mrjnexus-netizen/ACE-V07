@@ -8,6 +8,7 @@ const DoubleExposurePortrait = () => {
   const { identity } = useIdentity();
   const { audioState } = useAudio();
   const { theme } = useChromatic();
+  const { bassLevel } = useAudioReactive();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -15,13 +16,19 @@ const DoubleExposurePortrait = () => {
   const portraitUrl = identity?.portrait?.url;
 
   useEffect(() => {
-    if (!portraitUrl) return;
+    if (!portraitUrl) {
+      imageRef.current = null;
+      return;
+    }
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = portraitUrl;
     img.onload = () => {
       imageRef.current = img;
+    };
+    img.onerror = () => {
+      imageRef.current = null;
     };
   }, [portraitUrl]);
 
@@ -40,28 +47,33 @@ const DoubleExposurePortrait = () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    const { bassLevel } = useAudioReactive();
     let wavePhase = 0;
 
     const draw = () => {
       const width = canvas.width;
       const height = canvas.height;
 
-      // 1. Clear background based on theme surface color
-      ctx.fillStyle = theme.id === 'minimal' ? '#F9F9F7' : '#080808';
-      ctx.fillRect(0, 0, width, height);
+      // 1. NULL STATE background color clearing
+      // portrait null -> ONYX/CYBER: pure black canvas; MINIMAL: pure ivory canvas
+      const img = imageRef.current;
+      if (!img) {
+        ctx.fillStyle = theme.id === 'minimal' ? '#FFFFF0' : '#000000'; // ivory or black
+        ctx.fillRect(0, 0, width, height);
+      } else {
+        ctx.fillStyle = theme.id === 'minimal' ? '#F9F9F7' : '#080808';
+        ctx.fillRect(0, 0, width, height);
+      }
 
       const bpm = audioState.currentTrack?.bpm || 80;
       const pulsePeriod = 60000 / bpm; // ms per beat
       const now = Date.now();
+      // scale oscillates ±8% at BPM tempo
       const pulseScale = 1.0 + Math.sin((now / pulsePeriod) * Math.PI * 2) * 0.08;
 
       ctx.save();
 
       // 2. Draw Layer 1: Base Portrait
-      const img = imageRef.current;
       if (img) {
-        // Draw centered and cover-fit
         const imgRatio = img.width / img.height;
         const canvasRatio = width / height;
         let dw = width;
@@ -81,19 +93,16 @@ const DoubleExposurePortrait = () => {
 
         // Apply filters depending on active theme
         if (theme.id === 'minimal') {
-          // Desaturate grayscale
           ctx.globalCompositeOperation = 'color';
           ctx.fillStyle = 'gray';
           ctx.fillRect(0, 0, width, height);
           ctx.globalCompositeOperation = 'source-over';
         } else if (theme.id === 'cyber') {
-          // Cyan tint
           ctx.globalCompositeOperation = 'multiply';
           ctx.fillStyle = 'rgba(0, 245, 212, 0.2)';
           ctx.fillRect(0, 0, width, height);
           ctx.globalCompositeOperation = 'source-over';
         } else {
-          // High contrast onyx dark multiply boost
           ctx.globalCompositeOperation = 'multiply';
           ctx.fillStyle = 'rgba(8, 8, 8, 0.3)';
           ctx.fillRect(0, 0, width, height);
@@ -101,7 +110,8 @@ const DoubleExposurePortrait = () => {
         }
       }
 
-      // 3. Draw Layer 2: Procedural Music Motifs with proper Blend Mode
+      // 3. Draw Layer 2: Procedural Music Motifs
+      // Blend modes: ONYX='multiply' (gold motifs), CYBER='screen' (cyan motifs), MINIMAL='overlay' (dark motifs)
       if (theme.id === 'cyber') {
         ctx.globalCompositeOperation = 'screen';
       } else if (theme.id === 'minimal') {
@@ -110,35 +120,101 @@ const DoubleExposurePortrait = () => {
         ctx.globalCompositeOperation = 'multiply';
       }
 
+      ctx.save();
       ctx.translate(width / 2, height / 2);
       ctx.scale(pulseScale, pulseScale);
 
-      // Draw 5-line musical staves (procedural curves)
-      ctx.strokeStyle = theme.id === 'minimal' ? '#1A1A18' : theme.id === 'cyber' ? '#00F5D4' : '#D4AF37';
-      ctx.lineWidth = 1.0;
-      ctx.globalAlpha = 0.15 + bassLevel * 0.4;
+      // Colors & Opacity: Motif opacity increases with bassLevel
+      const motifColor = theme.id === 'minimal' ? '#1A1A18' : theme.id === 'cyber' ? '#00F5D4' : '#D4AF37';
+      ctx.strokeStyle = motifColor;
+      ctx.fillStyle = motifColor;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.2 + bassLevel * 0.7; // reactive opacity
 
-      for (let offset = -20; offset <= 20; offset += 10) {
+      wavePhase += 0.01;
+
+      // Motif A: Staff lines (5-line staves) + Treble clef outlines
+      ctx.save();
+      ctx.translate(0, -120);
+      // Staff lines
+      for (let s = -20; s <= 20; s += 10) {
         ctx.beginPath();
-        wavePhase += 0.002;
-        for (let xCoord = -width / 2; xCoord < width / 2; xCoord += 5) {
-          const yCoord = Math.sin(xCoord * 0.01 + wavePhase) * 30 + offset;
-          if (xCoord === -width / 2) {
-            ctx.moveTo(xCoord, yCoord);
-          } else {
-            ctx.lineTo(xCoord, yCoord);
-          }
-        }
+        ctx.moveTo(-150, s);
+        ctx.lineTo(150, s);
         ctx.stroke();
       }
-
-      // Draw frequency bar spirals/radial visualizer
+      // Treble Clef outline (procedural drawing)
       ctx.beginPath();
-      const radialBars = 36;
+      ctx.arc(0, 10, 15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -35);
+      ctx.bezierCurveTo(20, -35, 15, -10, 0, 15);
+      ctx.bezierCurveTo(-15, 25, -20, -5, 0, -35);
+      ctx.stroke();
+      ctx.restore();
+
+      // Motif B: Piano keyboard silhouette
+      ctx.save();
+      ctx.translate(-100, 150);
+      ctx.lineWidth = 1.0;
+      // White keys
+      for (let k = 0; k < 10; k++) {
+        ctx.strokeRect(k * 20, 0, 20, 50);
+      }
+      // Black keys
+      ctx.fillStyle = motifColor;
+      for (let k = 0; k < 9; k++) {
+        if (k !== 2 && k !== 6) {
+          ctx.fillRect(k * 20 + 13, 0, 14, 30);
+        }
+      }
+      ctx.restore();
+
+      // Motif C: Sinusoidal waveform curves
+      ctx.beginPath();
+      for (let xCoord = -200; xCoord <= 200; xCoord += 5) {
+        const yCoord = Math.sin(xCoord * 0.03 + wavePhase) * 20;
+        if (xCoord === -200) {
+          ctx.moveTo(xCoord, yCoord);
+        } else {
+          ctx.lineTo(xCoord, yCoord);
+        }
+      }
+      ctx.stroke();
+
+      // Motif D: Eighth/quarter note shapes
+      ctx.save();
+      ctx.translate(120, -50);
+      // Quarter Note
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 8, 6, -Math.PI / 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(7, 0);
+      ctx.lineTo(7, -30);
+      ctx.stroke();
+
+      // Eighth Note
+      ctx.translate(-50, 40);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 8, 6, -Math.PI / 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(7, 0);
+      ctx.lineTo(7, -30);
+      ctx.lineTo(17, -20);
+      ctx.stroke();
+      ctx.restore();
+
+      // Motif E: Frequency bar visualizations (radial layout)
+      ctx.save();
+      ctx.beginPath();
+      const radialBars = 24;
       for (let i = 0; i < radialBars; i++) {
         const angle = (i / radialBars) * Math.PI * 2;
-        const radius = 100 + (audioState.isPlaying ? bassLevel * 40 : 0);
-        const barHeight = 20 + Math.sin(i * 1.5 + wavePhase * 10) * 15 * (bassLevel + 0.5);
+        const radius = 60 + bassLevel * 20;
+        const barHeight = 15 + Math.sin(i * 1.5 + wavePhase) * 10;
 
         const xStart = Math.cos(angle) * radius;
         const yStart = Math.sin(angle) * radius;
@@ -149,7 +225,27 @@ const DoubleExposurePortrait = () => {
         ctx.lineTo(xEnd, yEnd);
       }
       ctx.stroke();
+      ctx.restore();
 
+      // Motif F: Vinyl groove spiral paths
+      ctx.save();
+      ctx.beginPath();
+      const numPoints = 120;
+      for (let i = 0; i < numPoints; i++) {
+        const angle = (i / 10) * Math.PI;
+        const radius = (i * 0.5) + Math.sin(angle * 2 + wavePhase) * 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.restore();
       ctx.restore();
 
       animationFrameRef.current = requestAnimationFrame(draw);
@@ -163,7 +259,7 @@ const DoubleExposurePortrait = () => {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [portraitUrl, theme, audioState.isPlaying, audioState.currentTrack, audioState.analyserNode]);
+  }, [portraitUrl, theme, audioState.currentTrack, bassLevel]);
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-black border border-border rounded-lg shadow-2xl">

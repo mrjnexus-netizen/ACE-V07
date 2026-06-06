@@ -1,6 +1,20 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { ComposerIdentity, AudioTrack, Locale } from '../types';
 import { useChromatic } from './ChromaticContext';
+
+// Simple API mock/wrapper logic since we just need the types to compile cleanly and avoid compiler errors
+const apiGet = async <T,>(url: string): Promise<{ success: boolean; data?: T; error?: string }> => {
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data && data.success) {
+      return { success: true, data: data.data };
+    }
+    return { success: false, error: data ? data.error : 'No data' };
+  } catch (error) {
+    throw error;
+  }
+};
 
 interface IdentityContextType {
   identity: ComposerIdentity | null;
@@ -17,20 +31,7 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
   const { applyLocaleTypography } = useChromatic();
   
   // Null-First setup: all ComposerIdentity fields initialized as null
-  const [identity, setIdentity] = useState<ComposerIdentity | null>({
-    id: null,
-    name: null,
-    tagline: null,
-    biography: null,
-    awards: null,
-    studioAddress: null,
-    portrait: null,
-    logo: null,
-    heroVideo: null,
-    socialLinks: null,
-    projects: null,
-  });
-
+  const [identity, setIdentity] = useState<ComposerIdentity | null>(null);
   const [playlist, setPlaylist] = useState<AudioTrack[]>([]);
   
   const [locale, setLocaleState] = useState<Locale>(() => {
@@ -55,42 +56,42 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
     setLocaleState(newLocale);
   };
 
-  const fetchIdentity = async () => {
+  const fetchIdentity = useCallback(async () => {
     try {
-      const response = await fetch('/api/identity');
-      const data = await response.json();
-      if (data && data.success && data.data) {
-        setIdentity(data.data);
+      const response = await apiGet<ComposerIdentity>('/api/identity');
+      if (response.success && response.data) {
+        setIdentity(response.data);
       } else {
-        console.error('Failed to fetch identity:', data ? data.error : 'No data');
-        // Fallback or keep fields as null, never crash
+        // Blueprint LAW 2: keep null, no error toast
+        console.warn('Identity API returned unsuccessful', response);
+        setIdentity(null);
       }
-    } catch (error) {
-      console.error('Error fetching identity:', error);
-      // Keep state safe, no crashes
+    } catch (err) {
+      // Backend offline or 500 – graceful degradation
+      console.warn('Identity fetch failed (backend may be offline):', err);
+      setIdentity(null);
     }
-  };
+  }, []);
 
-  const fetchTracks = async () => {
+  const fetchTracks = useCallback(async () => {
     try {
-      const response = await fetch('/api/tracks');
-      const data = await response.json();
-      if (data && data.success && data.data) {
-        setPlaylist(data.data);
+      const response = await apiGet<AudioTrack[]>('/api/tracks');
+      if (response.success && Array.isArray(response.data)) {
+        setPlaylist(response.data);
       } else {
-        console.error('Failed to fetch tracks:', data ? data.error : 'No data');
-        setPlaylist([]);
+        console.warn('Tracks API returned unsuccessful', response);
+        setPlaylist([]); // empty array, never null
       }
-    } catch (error) {
-      console.error('Error fetching tracks:', error);
+    } catch (err) {
+      console.warn('Tracks fetch failed:', err);
       setPlaylist([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchIdentity();
     fetchTracks();
-  }, []);
+  }, [fetchIdentity, fetchTracks]);
 
   return (
     <IdentityContext.Provider value={{ identity, playlist, locale, setLocale, fetchIdentity, fetchTracks }}>

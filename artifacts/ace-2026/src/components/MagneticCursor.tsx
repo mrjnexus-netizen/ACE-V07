@@ -3,7 +3,7 @@ import { motion, useMotionValue, useSpring } from 'framer-motion';
 
 const MagneticCursor = () => {
   const [visible, setVisible] = useState<boolean>(false);
-  const [cursorType, setCursorType] = useState<'default' | 'text' | 'media' | 'audio'>('default');
+  const [cursorType, setCursorType] = useState<'default' | 'text' | 'media' | 'play' | 'drag'>('default');
   const cursorRef = useRef<HTMLDivElement | null>(null);
 
   const posX = useMotionValue(-100);
@@ -14,38 +14,68 @@ const MagneticCursor = () => {
   const cursorY = useSpring(posY, springConfig);
 
   useEffect(() => {
-    // Gracefully hide on touch devices
+    // Hide completely on touch devices: pointer: coarse
     const isTouch = window.matchMedia('(pointer: coarse)').matches;
     if (isTouch) {
       document.body.style.cursor = 'auto';
       return;
     }
 
-    // Hide original cursor
+    // Hide original cursor on body
     document.body.style.cursor = 'none';
     setVisible(true);
 
+    let mouseX = 0;
+    let mouseY = 0;
+
     const moveCursor = (e: MouseEvent) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
       posX.set(e.clientX - 6);
       posY.set(e.clientY - 6);
+
+      // Magnetic snap physics: calculate distance to button center; if < 80px -> apply transform translate to button element toward cursor; snap cursor to button center
+      const magnetics = document.querySelectorAll('[data-magnetic], button, a');
+      magnetics.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const dx = mouseX - centerX;
+        const dy = mouseY - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 80) {
+          // Snap cursor to button center
+          posX.set(centerX - 6);
+          posY.set(centerY - 6);
+
+          // Apply magnetic translate force on button element
+          const htmlEl = el as HTMLElement;
+          htmlEl.style.transform = `translate3d(${dx * 0.35}px, ${dy * 0.35}px, 0)`;
+          htmlEl.style.transition = 'transform 0.1s ease-out';
+        } else {
+          const htmlEl = el as HTMLElement;
+          if (htmlEl.style.transform) {
+            htmlEl.style.transform = '';
+            htmlEl.style.transition = 'transform 0.3s ease-out';
+          }
+        }
+      });
     };
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target) return;
 
-      const cursorAttr = target.getAttribute('data-cursor');
-      if (cursorAttr === 'play') {
-        setCursorType('audio');
-      } else if (cursorAttr === 'view') {
-        setCursorType('media');
-      } else if (
-        target.tagName === 'A' ||
-        target.tagName === 'BUTTON' ||
-        target.closest('button') ||
-        target.closest('a')
-      ) {
+      const cursorAttr = target.getAttribute('data-cursor') || target.closest('[data-cursor]')?.getAttribute('data-cursor');
+      if (cursorAttr === 'text') {
         setCursorType('text');
+      } else if (cursorAttr === 'media') {
+        setCursorType('media');
+      } else if (cursorAttr === 'play') {
+        setCursorType('play');
+      } else if (cursorAttr === 'drag') {
+        setCursorType('drag');
       } else {
         setCursorType('default');
       }
@@ -58,6 +88,14 @@ const MagneticCursor = () => {
       window.removeEventListener('mousemove', moveCursor);
       window.removeEventListener('mouseover', handleMouseOver);
       document.body.style.cursor = 'auto';
+
+      // Reset transforms
+      const magnetics = document.querySelectorAll('[data-magnetic], button, a');
+      magnetics.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.transform = '';
+        htmlEl.style.transition = '';
+      });
     };
   }, [posX, posY]);
 
@@ -68,28 +106,34 @@ const MagneticCursor = () => {
       width: 12,
       height: 12,
       borderRadius: '50%',
-      backgroundColor: 'var(--accent-color)',
+      backgroundColor: '#FFFFFF', // exclusion blending will negate this cleanly
     },
     text: {
-      width: 32,
-      height: 32,
-      borderRadius: '50%',
-      border: '1px solid var(--accent-color)',
-      backgroundColor: 'transparent',
+      width: 4,
+      height: 24,
+      borderRadius: '2px',
+      backgroundColor: '#FFFFFF',
     },
     media: {
-      width: 48,
-      height: 48,
+      width: 52,
+      height: 52,
       borderRadius: '50%',
-      backgroundColor: 'rgba(var(--accent-rgb), 0.2)',
-      border: '1px solid var(--accent-color)',
+      border: '1px solid #FFFFFF',
+      backgroundColor: 'transparent',
     },
-    audio: {
-      width: 48,
-      height: 48,
+    play: {
+      width: 52,
+      height: 52,
       borderRadius: '50%',
-      backgroundColor: 'rgba(var(--accent-rgb), 0.3)',
-      border: '2px solid var(--accent-color)',
+      border: '1px solid #FFFFFF',
+      backgroundColor: 'transparent',
+    },
+    drag: {
+      width: 40,
+      height: 40,
+      borderRadius: '0%',
+      border: '2px solid #FFFFFF',
+      backgroundColor: 'transparent',
     },
   };
 
@@ -99,7 +143,7 @@ const MagneticCursor = () => {
       style={{
         left: cursorX,
         top: cursorY,
-        mixBlendMode: 'difference',
+        mixBlendMode: 'exclusion',
         pointerEvents: 'none',
         position: 'fixed',
         zIndex: 99999,
@@ -107,11 +151,14 @@ const MagneticCursor = () => {
       }}
       variants={cursorVariants}
       animate={cursorType}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-      className="flex items-center justify-center font-mono text-[9px] text-accent font-bold tracking-widest uppercase"
+      transition={{ type: 'spring', stiffness: springConfig.stiffness, damping: springConfig.damping }}
+      className="flex items-center justify-center font-mono text-[9px] text-white font-bold tracking-widest uppercase"
     >
-      {cursorType === 'audio' && 'PLAY'}
+      {cursorType === 'play' && 'PLAY'}
       {cursorType === 'media' && 'VIEW'}
+      {cursorType === 'drag' && (
+        <span className="text-[12px] flex items-center justify-center">⟷</span>
+      )}
     </motion.div>
   );
 };

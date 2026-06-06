@@ -3,8 +3,6 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAudio } from '../context/AudioContext';
-import meshVert from '/shaders/mesh.vert?raw';
-import meshFrag from '/shaders/mesh.frag?raw';
 
 // React ErrorBoundary: wraps entire Canvas
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -39,14 +37,14 @@ const MeshSkeletonLoader = () => (
 
 import { useAudioReactive } from "../hooks/useAudioReactive";
 
-const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolean> }) => {
+const ParticleSphere = ({ isVisibleRef, shaderTexts }: { isVisibleRef: React.RefObject<boolean>; shaderTexts: { vert: string; frag: string } }) => {
   const { audioState } = useAudio();
   const { bassLevel, midLevel, highLevel, timeDomainData } = useAudioReactive();
   const meshRef = useRef<THREE.Points | null>(null);
   const materialRef = useRef<THREE.ShaderMaterial | null>(null);
   const { gl: renderer } = useThree();
-  const vertexShader = meshVert;
-  const fragmentShader = meshFrag;
+  const vertexShader = shaderTexts.vert;
+  const fragmentShader = shaderTexts.frag;
 
   // Mouse tracking with smooth lerp interpolation (inertia factor 0.05)
   const targetRotation = useRef({ x: 0, y: 0 });
@@ -223,6 +221,14 @@ const ParticleSphere = ({ isVisibleRef }: { isVisibleRef: React.RefObject<boolea
 const AudioReactiveMesh = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isVisibleRef = useRef<boolean>(true);
+  const [shaderTexts, setShaderTexts] = useState({ vert: '', frag: '' });
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/shaders/mesh.vert').then(res => res.text()),
+      fetch('/shaders/mesh.frag').then(res => res.text()),
+    ]).then(([vert, frag]) => setShaderTexts({ vert, frag }));
+  }, []);
 
   useEffect(() => {
     // IntersectionObserver: pause useFrame when canvas off-screen (Blueprint Section 10)
@@ -238,6 +244,10 @@ const AudioReactiveMesh = () => {
     };
   }, []);
 
+  if (!shaderTexts.vert || !shaderTexts.frag) {
+    return <MeshSkeletonLoader />;
+  }
+
   return (
     <div ref={containerRef} className="w-full h-full min-h-[400px] relative bg-transparent">
       <ErrorBoundary>
@@ -245,7 +255,7 @@ const AudioReactiveMesh = () => {
           <Canvas camera={{ position: [0, 0, 5], fov: 60 }} dpr={[1, 2]}>
             <ambientLight intensity={0.15} />
             <pointLight position={[10, 10, 10]} intensity={0.5} />
-            <ParticleSphere isVisibleRef={isVisibleRef} />
+            <ParticleSphere isVisibleRef={isVisibleRef} shaderTexts={shaderTexts} />
             <OrbitControls
               enableZoom={false}
               enablePan={false}

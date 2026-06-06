@@ -43,7 +43,7 @@ export const StagingProvider = ({ children }: { children: ReactNode }) => {
   const updateDraftField = (field: keyof ComposerIdentity, value: any) => {
     setDraftState((prev: ComposerIdentity | null) => {
       const current = prev || identity || {
-        id: null, name: null, tagline: null, biography: null, awards: null, studioAddress: null, portrait: null, logo: null, heroVideo: null, socialLinks: null, projects: null
+        id: null, name: null, tagline: null, biography: null, awards: null, studioAddress: null, portrait: null, logo: null, heroVideo: null, socialLinks: null, projects: null, trackCount: null, genres: null
       };
       const updated = {
         ...current,

@@ -37,3 +37,27 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+.skip-nav {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.skip-nav:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  background: var(--surface-color);
+  color: var(--accent-color);
+  padding: 1rem;
+  z-index: 100000;
+}
+
+/* Hide third‑party injected iframes that lack title from accessibility tree */
+iframe:not([title]):not([aria-label]) {
+  display: none !important;
+}

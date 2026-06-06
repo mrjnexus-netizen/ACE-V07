@@ -1,11 +1,14 @@
 import { useAudio } from '../context/AudioContext';
 import { useIdentity } from '../context/IdentityContext';
 import WaveformRenderer from './WaveformRenderer';
+import { BlurhashCanvas } from 'react-blurhash';
+import { useState } from 'react';
 
 const PersistentAudioPlayer = () => {
-  const { audioState, pauseTrack, resumeTrack, seekTrack, setVolume, nextTrack, prevTrack } = useAudio();
+  const { audioState, pauseTrack, resumeTrack, seekTrack, setVolume, setMuted, nextTrack, prevTrack } = useAudio();
   const { locale } = useIdentity();
-  const { currentTrack, isPlaying, currentTime, duration, volume, dominantColors } = audioState;
+  const { currentTrack, isPlaying, currentTime, duration, volume, isMuted, dominantColors } = audioState;
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   if (!currentTrack) return null;
 
@@ -49,9 +52,23 @@ const PersistentAudioPlayer = () => {
       {/* Cover Art and Title Info */}
       <div className="flex items-center space-x-4 max-w-[25%] truncate">
         <div className="w-[52px] h-[52px] rounded border border-border overflow-hidden relative bg-surface3 flex-shrink-0">
-          {currentTrack.coverArt?.url ? (
-            <img src={currentTrack.coverArt.url} alt="Cover" className="w-full h-full object-cover" />
-          ) : (
+          {currentTrack.coverArt?.url && (
+            <img
+              src={currentTrack.coverArt.url}
+              alt="Cover"
+              className={`w-full h-full object-cover ${imageLoaded ? "opacity-100" : "opacity-0"} transition-opacity duration-500`}
+              onLoad={() => setImageLoaded(true)}
+            />
+          )}
+          {!imageLoaded && currentTrack.coverArt?.blurHash && (
+            <BlurhashCanvas
+              hash={currentTrack.coverArt.blurHash}
+              width={52}
+              height={52}
+              className="absolute inset-0 w-full h-full"
+            />
+          )}
+          {!currentTrack.coverArt?.url && !currentTrack.coverArt?.blurHash && (
             <div className="w-full h-full bg-accent/10 flex items-center justify-center font-bold text-accent">
               ACE
             </div>
@@ -59,7 +76,7 @@ const PersistentAudioPlayer = () => {
         </div>
         <div className="truncate">
           <p className="font-display text-text font-bold text-sm tracking-wide leading-tight truncate">
-            {currentTrack.title[locale] || currentTrack.title.en}
+            {currentTrack.title?.[locale] || currentTrack.title?.en || ""}
           </p>
           <p className="font-mono text-[10px] text-text-muted mt-0.5 tracking-wider truncate">
             {currentTrack.genre?.toUpperCase()} | {currentTrack.bpm} BPM
@@ -118,9 +135,21 @@ const PersistentAudioPlayer = () => {
 
         {/* Volume Control */}
         <div className="flex items-center space-x-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-          </svg>
+          <button
+            onClick={() => setMuted(!isMuted)}
+            className="text-text-muted hover:text-accent transition-colors duration-200 outline-none"
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                <path d="M16.5 12a4.5 4.5 0 00-4.5-4.5c-.373 0-.736.08-1.09.23.473-.787.795-1.666.795-2.585C11.605 2.515 8.995 0 6 0H0v12h10.45l4.05 4.05c1.474-1.282 2.45-3.13 2.45-5.05zM3 3h3c.828 0 1.5.672 1.5 1.5v3c0 .828-.672 1.5-1.5 1.5H3V3z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+            )}
+          </button>
           <input
             type="range"
             min={0}
