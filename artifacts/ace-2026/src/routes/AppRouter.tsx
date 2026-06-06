@@ -15,7 +15,7 @@ export const AppRouter = () => {
         <Routes>
           <Route path="/" element={!locale ? <LinguisticPortal /> : <Navigate to="/app" replace />} />
           <Route path="/app" element={<MainApp />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<AdminDashboard onClose={() => window.history.back()} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

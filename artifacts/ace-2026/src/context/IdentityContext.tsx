@@ -4,9 +4,9 @@ import type { ComposerIdentity, AudioTrack, Locale } from '../types';
 
 interface IdentityContextType {
   composerIdentity: ComposerIdentity | null;
-  identity: ComposerIdentity | null;
+  identity: ComposerIdentity | null;   // alias
   tracks: AudioTrack[];
-  playlist: AudioTrack[];
+  playlist: AudioTrack[];              // alias
   locale: Locale;
   setLocale: (locale: Locale) => void;
   loading: boolean;
@@ -25,9 +25,8 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchIdentity = useCallback(async () => {
     try {
-      const res = await apiGet<ComposerIdentity>('/api/identity');
-      if (res.success && res.data) setComposerIdentity(res.data);
-      else setComposerIdentity(null);
+      const data = await apiGet<ComposerIdentity>('/api/identity');
+      setComposerIdentity(data);
     } catch {
       setComposerIdentity(null);
     }
@@ -35,9 +34,8 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchTracks = useCallback(async () => {
     try {
-      const res = await apiGet<AudioTrack[]>('/api/tracks');
-      if (res.success && Array.isArray(res.data)) setTracks(res.data);
-      else setTracks([]);
+      const data = await apiGet<AudioTrack[]>('/api/tracks');
+      setTracks(data);
     } catch {
       setTracks([]);
     }
@@ -45,8 +43,8 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
 
   const updateIdentity = useCallback(async (data: Partial<ComposerIdentity>) => {
     try {
-      const res = await apiPut<ComposerIdentity>('/api/identity', data);
-      if (res.success && res.data) setComposerIdentity(res.data);
+      const updated = await apiPut<ComposerIdentity>('/api/identity', data);
+      setComposerIdentity(updated);
     } catch (err) {
       console.error('Update failed', err);
     }

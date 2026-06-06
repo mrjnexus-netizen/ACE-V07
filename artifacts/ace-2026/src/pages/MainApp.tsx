@@ -1,15 +1,15 @@
 import { useEffect } from 'react';
 import { useIdentity } from '../context/IdentityContext';
 import { useChromatic } from '../context/ChromaticContext';
-import { GridLayoutEngine } from '../components/GridLayoutEngine';
-import { SpatialScrollEngine } from '../components/SpatialScrollEngine';
-import { DoubleExposurePortrait } from '../components/DoubleExposurePortrait';
-import { PersistentAudioPlayer } from '../components/PersistentAudioPlayer';
-import { ExecutiveStudioBot } from '../components/ExecutiveStudioBot';
+import GridLayoutEngine from '../components/GridLayoutEngine';
+import SpatialScrollEngine from '../components/SpatialScrollEngine';
+import DoubleExposurePortrait from '../components/DoubleExposurePortrait';
+import PersistentAudioPlayer from '../components/PersistentAudioPlayer';
+import ExecutiveStudioBot from '../components/ExecutiveStudioBot';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 
-export const MainApp = () => {
+export default function MainApp() {
   const { fetchIdentity, fetchTracks } = useIdentity();
   const { themeId, applyLocaleTypography } = useChromatic();
   const locale = localStorage.getItem('ace-locale') || 'en';
@@ -20,9 +20,7 @@ export const MainApp = () => {
   }, [fetchIdentity, fetchTracks]);
 
   useEffect(() => {
-    if (applyLocaleTypography) {
-      applyLocaleTypography(locale);
-    }
+    applyLocaleTypography?.(locale);
   }, [locale, applyLocaleTypography]);
 
   return (
@@ -38,4 +36,4 @@ export const MainApp = () => {
       <Footer />
     </div>
   );
-};
+}

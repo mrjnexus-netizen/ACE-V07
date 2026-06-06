@@ -4,7 +4,7 @@ type ThemeId = 'onyx' | 'cyber' | 'minimal';
 
 interface ChromaticContextType {
   themeId: ThemeId;
-  theme: ThemeId;
+  theme: ThemeId;  // alias
   switchTheme: (theme: ThemeId) => void;
   applyLocaleTypography?: (locale: string) => void;
 }
@@ -32,7 +32,7 @@ export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const applyLocaleTypography = (locale: string) => {
-    // stub
+    // stub – will be implemented later
   };
 
   return (

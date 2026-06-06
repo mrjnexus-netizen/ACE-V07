@@ -20,7 +20,7 @@ interface StagingContextType {
 const StagingContext = createContext<StagingContextType | undefined>(undefined);
 
 export const StagingProvider = ({ children }: { children: ReactNode }) => {
-  const { identity, fetchIdentity } = useIdentity();
+  const { composerIdentity: identity, fetchIdentity } = useIdentity();
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [draftState, setDraftState] = useState<ComposerIdentity | null>(null);
   const [hasPendingChanges, setHasPendingChanges] = useState<boolean>(false);
