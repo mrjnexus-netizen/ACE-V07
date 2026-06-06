@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { AuthError, ForbiddenError } from "../utils/errors";
+
 import { env } from "../config/env";
-import { createChildLogger } from "../utils/logger";
 import { CustomJwtPayload } from "../types/express";
+import { AuthError, ForbiddenError } from "../utils/errors";
+import { createChildLogger } from "../utils/logger";
 
 const logger = createChildLogger("AuthGuard");
 
@@ -64,7 +65,7 @@ export const authGuard = (req: Request, res: Response, next: NextFunction) => {
         req.user = { id: decodedRefresh.id, username: decodedRefresh.username, role: decodedRefresh.role };
         logger.info({ requestId: req.id, username: decodedRefresh.username }, "Access token refreshed via refresh token.");
         next();
-      } catch (refreshError) {
+      } catch (_refreshError) {
         logger.warn({ requestId: req.id, authFailure: "refresh_token_invalid" }, "Auth failure: Invalid or expired refresh token.");
         return next(new ForbiddenError("Invalid or expired refresh token. Please log in again."));
       }
@@ -74,3 +75,4 @@ export const authGuard = (req: Request, res: Response, next: NextFunction) => {
     }
   }
 };
+

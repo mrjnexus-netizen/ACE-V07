@@ -29,7 +29,7 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
     return res.status(401).json({
       success: false,
       data: null,
-      error: 'Access token required',
+      _error: 'Access token required',
       code: 'UNAUTHORIZED',
       timestamp: new Date().toISOString(),
     });
@@ -40,13 +40,14 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
     const decoded = jwt.verify(token, secret) as { id: string; username: string; role: string };
     (req as AuthenticatedRequest).user = decoded;
     next();
-  } catch (error) {
+  } catch (_error) {
     return res.status(403).json({
       success: false,
       data: null,
-      error: 'Invalid or expired access token',
+      _error: 'Invalid or expired access token',
       code: 'FORBIDDEN',
       timestamp: new Date().toISOString(),
     });
   }
 };
+

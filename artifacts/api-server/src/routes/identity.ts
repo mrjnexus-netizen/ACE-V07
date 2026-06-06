@@ -1,12 +1,14 @@
+import { eq } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
+import OpenAI from 'openai';
+import { z } from 'zod';
+
+import { ComposerIdentity, MultiLingual, ApiResponse } from '../../../ace-2026/src/types';
 import { db } from '../db/db';
 import { composerIdentity, projects as projectsTable, apiKeys } from '../db/schema';
 import { authenticateJWT } from '../middleware/auth';
-import { z } from 'zod';
-import { ComposerIdentity, MultiLingual, ApiResponse } from '../../../ace-2026/src/types';
 import { decrypt } from '../services/encryptionService';
-import OpenAI from 'openai';
-import { eq } from 'drizzle-orm';
+
 
 const router: Router = Router();
 
@@ -81,7 +83,7 @@ router.get('/', async (_req: Request, res: Response<ApiResponse<ComposerIdentity
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Error fetching identity:', error);
     return res.status(500).json({
       success: false,
@@ -214,7 +216,7 @@ router.put('/', authenticateJWT, async (req: Request, res: Response<ApiResponse<
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Error updating identity:', error);
     return res.status(500).json({
       success: false,
@@ -291,7 +293,7 @@ router.post('/translate', authenticateJWT, async (req: Request, res: Response<Ap
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Error in translate route:', error);
     return res.status(500).json({
       success: false,

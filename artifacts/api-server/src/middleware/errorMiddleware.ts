@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
+
+import { env } from "../config/env";
 import { AppError, InternalError } from "../utils/errors";
 import { createChildLogger } from "../utils/logger";
-import { env } from "../config/env";
 
 const logger = createChildLogger("ErrorMiddleware");
 

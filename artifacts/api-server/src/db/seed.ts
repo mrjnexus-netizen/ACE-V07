@@ -1,8 +1,9 @@
+import bcrypt from "bcrypt";
+import { eq } from "drizzle-orm";
+import pino from "pino";
+
 import { db } from "./db";
 import { adminUsers, composerIdentity } from "./schema";
-import { eq } from "drizzle-orm";
-import bcrypt from "bcrypt";
-import pino from "pino";
 
 const logger = pino({
   transport: {
@@ -21,7 +22,7 @@ const seed = async () => {
   const adminPassword = process.env.ADMIN_PASSWORD || "adminpassword"; // Use a strong password in production
   const hashedPassword = await bcrypt.hash(adminPassword, 12);
 
-  let existingAdmin = await db.query.adminUsers.findFirst({
+  const existingAdmin = await db.query.adminUsers.findFirst({
     where: eq(adminUsers.username, adminUsername),
   });
 
@@ -36,7 +37,7 @@ const seed = async () => {
   }
 
   // Seed Composer Identity
-  let existingComposerIdentity = await db.query.composerIdentity.findFirst();
+  const existingComposerIdentity = await db.query.composerIdentity.findFirst();
 
   if (!existingComposerIdentity) {
     await db.insert(composerIdentity).values({

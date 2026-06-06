@@ -1,14 +1,14 @@
+import { eq } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
-import { authenticateJWT } from '../middleware/auth';
 import multer from 'multer';
-// @ts-ignore
-import { v4 as uuidv4 } from 'uuid';
+import nodemailer from 'nodemailer';
 import OpenAI from 'openai';
+import pdfkit from 'pdfkit';
+import { v4 as uuidv4 } from 'uuid';
+
 import { db } from '../db/db';
 import { apiKeys } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import nodemailer from 'nodemailer';
-import pdfkit from 'pdfkit';
+import { authenticateJWT } from '../middleware/auth';
 
 const router: Router = Router();
 
@@ -22,11 +22,9 @@ const upload = multer({
       'text/plain',
     ];
     if (allowedMimes.includes(file.mimetype)) {
-      // @ts-ignore
       cb(null, true);
     } else {
-      // @ts-ignore
-      cb(new Error('Invalid file type. Only PDF and text files are allowed.'), false);
+      const error = new Error('Invalid file type. Only PDF and text files are allowed.'); cb(error, false);
     }
   },
 });
@@ -185,7 +183,7 @@ router.post(
         code: null,
         timestamp: new Date().toISOString(),
       });
-    } catch (error: any) {
+    } catch (err: unknown) { const error = err as Error;
       console.error('Error analyzing document:', error);
       return res.status(500).json({
         success: false,
@@ -221,7 +219,7 @@ router.post(
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="project-checklist-${uuidv4()}.pdf"`);
       return res.send(pdfBuffer);
-    } catch (error: any) {
+    } catch (err: unknown) { const error = err as Error;
       console.error('Error exporting document:', error);
       return res.status(500).json({
         success: false,
@@ -253,7 +251,7 @@ router.post(
       }
 
       let htmlContent = body || '';
-      let attachments: any[] = [];
+      const attachments: any[] = [];
 
       if (checklist) {
         const pdfBuffer = await generatePdfFromChecklist(checklist);
@@ -275,7 +273,7 @@ router.post(
         code: null,
         timestamp: new Date().toISOString(),
       });
-    } catch (error: any) {
+    } catch (err: unknown) { const error = err as Error;
       console.error('Error sending email:', error);
       return res.status(500).json({
         success: false,

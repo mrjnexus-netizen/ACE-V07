@@ -1,8 +1,9 @@
+import { Request, Response, NextFunction } from "express";
 import { rateLimit, RateLimitRequestHandler } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
+
 import { redis } from "../db/redis";
 import { AppError } from "../utils/errors";
-import { Request, Response, NextFunction } from "express";
 
 const handler = (_req: Request, _res: Response, _next: NextFunction, _options: any) => {
   throw new AppError("Rate limit exceeded", 429, "RATE_LIMITED");

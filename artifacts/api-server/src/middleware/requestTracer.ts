@@ -1,5 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
+
+import { Request, Response, NextFunction } from 'express';
+
 import { createChildLogger } from "../utils/logger";
 
 // Extend the Express Request interface to include the `id` property

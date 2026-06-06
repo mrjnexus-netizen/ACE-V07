@@ -19,6 +19,7 @@
     "test:e2e": "pnpm --filter @workspace/ace-2026 run test:e2e"
   },
   "devDependencies": {
+    "@types/uuid": "^11.0.0",
     "typescript": "5.7.2"
   },
   "pnpm": {

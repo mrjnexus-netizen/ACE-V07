@@ -1,11 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { eq, asc } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
+
 import { db } from '../db/db';
 import { tracks } from '../db/schema';
 import { authenticateJWT } from '../middleware/auth';
-import { eq, asc } from 'drizzle-orm';
-import fs from 'node:fs';
-import path from 'node:path';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+
 
 const router: Router = Router();
 
@@ -24,7 +27,8 @@ router.get('/', async (_req: Request, res: Response) => {
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.error('Error listing tracks:', error);
     return res.status(500).json({
       success: false,
@@ -64,7 +68,8 @@ router.post('/', authenticateJWT, async (req: Request, res: Response) => {
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.error('Error creating track:', error);
     return res.status(500).json({
       success: false,
@@ -105,7 +110,8 @@ router.put('/reorder', authenticateJWT, async (req: Request, res: Response) => {
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.error('Error reordering tracks:', error);
     return res.status(500).json({
       success: false,
@@ -123,7 +129,7 @@ router.put('/:id', authenticateJWT, async (req: Request, res: Response) => {
     const { id } = req.params;
     const data = req.body;
 
-    const updatePayload: any = {
+    const updatePayload: Record<string, unknown> = {
       title: data.title,
       narrative: data.narrative,
       audioUrl: data.audioUrl,
@@ -168,7 +174,8 @@ router.put('/:id', authenticateJWT, async (req: Request, res: Response) => {
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.error('Error updating track:', error);
     return res.status(500).json({
       success: false,
@@ -203,7 +210,8 @@ router.delete('/:id', authenticateJWT, async (req: Request, res: Response) => {
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.error('Error deleting track:', error);
     return res.status(500).json({
       success: false,
@@ -245,8 +253,8 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
 
     if (isDemo || !isS3) {
       // Stream local fallback files
-      // If the url contains "/public" or "assets", find the local file
-      let localPath = path.join(__dirname, '../../../../public', track.audioUrl.replace(/^\/public/, ''));
+      // If the url contains "/public" or "assets", findthe local file
+      let localPath = path.join(__dirname, '../../../../public', track.audioUrl.replace(/^\/public\//, ''));
       if (!fs.existsSync(localPath)) {
         // Fallback to a mock silent mp3 file if it doesn't exist, or just read whatever audio we can find
         // Let's check if the directory exists
@@ -324,10 +332,12 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
         });
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const stream = s3Response.Body as any;
       stream.pipe(res);
     }
-  } catch (error: any) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.error('Streaming error:', error);
     if (!res.headersSent) {
       return res.status(500).json({

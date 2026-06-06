@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+
 import { authenticateJWT } from '../middleware/auth';
 import { requireRole } from '../middleware/roleGuard';
 
@@ -59,7 +60,7 @@ router.get(
       `;
       res.setHeader('Content-Type', 'text/html');
       return res.status(200).send(html);
-    } catch (error: any) {
+    } catch (err: unknown) { const error = err as Error;
       console.error('Error fetching queue status:', error);
       return res.status(500).json({
         success: false,

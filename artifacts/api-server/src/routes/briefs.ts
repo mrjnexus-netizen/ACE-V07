@@ -1,10 +1,10 @@
+import { desc } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+
 import { db } from '../db/db';
 import { briefs } from '../db/schema';
 import { authenticateJWT } from '../middleware/auth';
-import { desc } from 'drizzle-orm';
-// @ts-ignore
-import { v4 as uuidv4 } from 'uuid';
 
 const router: Router = Router();
 
@@ -25,7 +25,7 @@ router.get(
         code: null,
         timestamp: new Date().toISOString(),
       });
-    } catch (error: any) {
+    } catch (err: unknown) { const error = err as Error;
       console.error('Error fetching briefs:', error);
       return res.status(500).json({
         success: false,
@@ -72,7 +72,7 @@ router.post('/', async (req: Request, res: Response) => {
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Error creating brief:', error);
     return res.status(500).json({
       success: false,

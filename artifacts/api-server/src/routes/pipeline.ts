@@ -1,8 +1,9 @@
+import { eq } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
+
 import { db } from '../db/db';
 import { tracks, pipelineJobs } from '../db/schema';
 import { authenticateJWT } from '../middleware/auth';
-import { eq } from 'drizzle-orm';
 import { translateText } from '../services/translationService';
 
 const router: Router = Router();
@@ -145,7 +146,7 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Error starting pipeline:', error);
     return res.status(500).json({
       success: false,
@@ -206,7 +207,7 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Approval error:', error);
     return res.status(500).json({
       success: false,
@@ -261,7 +262,7 @@ router.post('/regenerate/:jobId', authenticateJWT, async (req: Request, res: Res
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Regeneration failed:', error);
     return res.status(500).json({
       success: false,

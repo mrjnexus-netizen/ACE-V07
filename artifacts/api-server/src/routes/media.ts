@@ -1,12 +1,14 @@
-import { Router, Request, Response } from 'express';
-import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { extname } from 'path';
+
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { authenticateJWT } from '../middleware/auth';
-import sharp from 'sharp';
 import { encode } from 'blurhash';
+import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import sharp from 'sharp';
+
+import { authenticateJWT } from '../middleware/auth';
 
 const router: Router = Router();
 
@@ -23,11 +25,9 @@ const upload = multer({
       'image/png',
     ];
     if (allowedMimes.includes(file.mimetype)) {
-      // @ts-ignore
       cb(null, true);
     } else {
-      // @ts-ignore
-      cb(new Error('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.'), false);
+      const error = new Error('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.'); cb(error, false);
     }
   },
 });
@@ -122,7 +122,7 @@ router.post('/upload', authenticateJWT, upload.single('media'), async (req: Requ
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Error uploading media:', error);
     return res.status(500).json({
       success: false,
@@ -179,7 +179,7 @@ router.post('/staging-preview', authenticateJWT, upload.single('media'), async (
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (err: unknown) { const error = err as Error;
     console.error('Error generating staging preview:', error);
     return res.status(500).json({
       success: false,

@@ -1,8 +1,9 @@
+import { eq, sql } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
+import OpenAI from 'openai';
+
 import { db } from '../db/db';
 import { apiKeys, tracks } from '../db/schema';
-import { eq, sql } from 'drizzle-orm';
-import OpenAI from 'openai';
 
 const router: Router = Router();
 
@@ -84,7 +85,7 @@ router.post(
         code: null,
         timestamp: new Date().toISOString(),
       });
-    } catch (error: any) {
+    } catch (err: unknown) { const error = err as Error;
       console.error('Error in chat endpoint:', error);
       return res.status(500).json({
         success: false,

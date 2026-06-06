@@ -1,5 +1,5 @@
-import { pgTable, uuid, jsonb, text, integer, boolean, timestamp, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { pgTable, uuid, jsonb, text, integer, boolean, timestamp, index } from 'drizzle-orm/pg-core';
 
 export const composerIdentity = pgTable(
   'composer_identity',

@@ -1,15 +1,19 @@
+import { randomUUID } from 'node:crypto';
+
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { encode } from 'blurhash';
+import { createCanvas, loadImage } from 'canvas';
+import { eq } from 'drizzle-orm';
+import Vibrant from 'node-vibrant';
+import { OpenAI } from 'openai';
+import sharp from 'sharp';
+
 import { env } from '../config/env';
 import { db } from '../db/db';
 import { apiKeys } from '../db/schema';
-import { eq } from 'drizzle-orm';
+
 import { decrypt } from './encryptionService';
-import { OpenAI } from 'openai';
-import { createCanvas, loadImage } from 'canvas';
-import sharp from 'sharp';
-import { encode } from 'blurhash';
-import Vibrant from 'node-vibrant';
-import { randomUUID } from 'node:crypto';
+
 
 export interface AudioMetadata {
   dominantInstrument?: string;

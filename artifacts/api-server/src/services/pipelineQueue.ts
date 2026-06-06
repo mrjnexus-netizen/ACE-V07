@@ -1,8 +1,10 @@
 import { Queue, Worker, Job } from 'bullmq';
-import { redis } from '../db/redis';
-import { db } from '../db/db';
-import { pipelineJobs } from '../db/schema';
 import { eq } from 'drizzle-orm';
+
+import { db } from '../db/db';
+import { redis } from '../db/redis';
+import { pipelineJobs } from '../db/schema';
+
 
 // Redis connection share
 const connection = redis;
@@ -90,7 +92,7 @@ export const worker = new Worker(
         })
         .where(eq(pipelineJobs.id, jobId));
 
-    } catch (error: any) {
+    } catch (err: unknown) { const error = err as Error;
       console.error(`Pipeline job ${job.id} failed:`, error);
       await db
         .update(pipelineJobs)

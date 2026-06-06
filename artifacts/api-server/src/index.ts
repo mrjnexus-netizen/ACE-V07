@@ -1,26 +1,27 @@
+import compression from "compression";
+import cors from "cors";
 import express from "express";
 import helmet from "helmet";
-import cors from "cors";
-import compression from "compression";
-import { requestTracer } from "./middleware/requestTracer";
-import { globalRateLimiter } from "./middleware/rateLimiter";
-import { errorMiddleware } from "./middleware/errorMiddleware";
-import { createChildLogger } from "./utils/logger";
+
 import { env } from "./config/env";
 import { pool } from "./db/db"; // For graceful shutdown
 import { redis } from "./db/redis"; // For graceful shutdown
+import { errorMiddleware } from "./middleware/errorMiddleware";
+import { globalRateLimiter } from "./middleware/rateLimiter";
+import { requestTracer } from "./middleware/requestTracer";
 
 // Import routes
 import authRoutes from "./routes/auth";
-import identityRoutes from "./routes/identity";
-import tracksRoutes from "./routes/tracks";
 import briefsRoutes from "./routes/briefs";
 import chatRoutes from "./routes/chat";
-import mediaRoutes from "./routes/media";
-import pipelineRoutes from "./routes/pipeline";
 import documentsRoutes from "./routes/documents";
 import healthRoutes from "./routes/health";
+import identityRoutes from "./routes/identity";
 import keysRoutes from "./routes/keys";
+import mediaRoutes from "./routes/media";
+import pipelineRoutes from "./routes/pipeline";
+import tracksRoutes from "./routes/tracks";
+import { createChildLogger } from "./utils/logger";
 
 const app = express();
 const PORT = 8080; // API server port is 8080 as per Blueprint
