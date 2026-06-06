@@ -1,98 +1,24 @@
-import React, { Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useIdentity } from '../context/IdentityContext';
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Spinner } from '../components/Spinner';
 
-// Simple Spinner component
-const Spinner = () => (
-  <div className="flex items-center justify-center min-h-screen bg-black text-accent font-mono text-sm uppercase tracking-widest">
-    <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mb-4" />
-    Loading Ecosystem...
-  </div>
-);
+const LinguisticPortal = lazy(() => import('../components/LinguisticPortal'));
+const MainApp = lazy(() => import('../pages/MainApp'));
+const AdminDashboard = lazy(() => import('../components/AdminDashboard'));
 
-// Basic ErrorBoundary fallback component
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error('AppRouter Route Error Boundary caught:', error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-black text-red-500 font-mono text-xs p-6 text-center">
-          <h2>CRITICAL ENGINE FAULT DETECTED</h2>
-          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 border border-red-500 rounded hover:bg-red-500/10">
-            HOT RESTART
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-// Lazy loaded components with React.lazy
-const LinguisticPortal = React.lazy(() => import('../components/LinguisticPortal'));
-const MainApp = React.lazy(() => import('../pages/MainApp'));
-const AdminDashboard = React.lazy(() => import('../components/AdminDashboard'));
-
-const AppRouter = () => {
-  const { locale } = useIdentity();
-
-  // Null-First language check: if locale is unset/null, force LinguisticPortal selection
-  const hasLocale = !!locale;
+export const AppRouter = () => {
+  const locale = localStorage.getItem('ace-locale');
 
   return (
-    <Suspense fallback={<Spinner />}>
-      <Routes>
-        {/* '/' route loads LinguisticPortal if locale is unset/null, else redirects to App */}
-        <Route
-          path="/"
-          element={
-            <ErrorBoundary>
-              {!hasLocale ? (
-                <LinguisticPortal 
-                  onLanguageSelect={() => window.location.href = '/app'} 
-                  onTransitionComplete={() => {}}
-                />
-              ) : (
-                <Navigate to="/app" replace />
-              )}
-            </ErrorBoundary>
-          }
-        />
-
-        {/* '/app' route requires locale; redirects to '/' if unset */}
-        <Route
-          path="/app"
-          element={
-            <ErrorBoundary>
-              {hasLocale ? <MainApp /> : <Navigate to="/" replace />}
-            </ErrorBoundary>
-          }
-        />
-
-        {/* '/admin' route leads directly to AdminDashboard (authGuard can be handled here or inside component) */}
-        <Route
-          path="/admin"
-          element={
-            <ErrorBoundary>
-              <AdminDashboard onClose={() => window.location.href = '/app'} />
-            </ErrorBoundary>
-          }
-        />
-
-        {/* Fallback route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <BrowserRouter>
+      <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-surface"><Spinner size="lg" /></div>}>
+        <Routes>
+          <Route path="/" element={!locale ? <LinguisticPortal /> : <Navigate to="/app" replace />} />
+          <Route path="/app" element={<MainApp />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   );
 };
-
-export default AppRouter;

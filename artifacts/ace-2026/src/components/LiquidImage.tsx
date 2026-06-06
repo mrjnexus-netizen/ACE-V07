@@ -48,7 +48,7 @@ export const LiquidImage = ({ src, alt = '', className = '' }: LiquidImageProps)
       ref={inViewRef}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`relative overflow-hidden ${className}`}
+      className={'relative overflow-hidden ' + className}
     >
       <canvas ref={canvasRef} className="w-full h-full object-cover" />
       {!inView && <div className="absolute inset-0 bg-surface animate-pulse" />}
