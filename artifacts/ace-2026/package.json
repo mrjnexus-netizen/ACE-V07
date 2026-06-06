@@ -16,6 +16,7 @@
     "@dnd-kit/sortable": "8.0.0",
     "@react-three/drei": "9.115.0",
     "@react-three/fiber": "8.17.10",
+    "@react-three/postprocessing": "^3.0.4",
     "@studio-freight/lenis": "1.0.42",
     "blurhash": "2.0.5",
     "clsx": "2.1.1",

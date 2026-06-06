@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
-import { PipelineJob, PipelineStatus } from '../types';
+import { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect } from 'react';
+import { PipelineJob, PipelineStatus, ApiResponse } from '../types';
+import { apiPost } from '../lib/apiClient';
 
 interface PipelineContextType {
   currentJob: PipelineJob | null;
@@ -30,17 +31,17 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [closeEventSource]);
 
-  const startPipeline = async (input: { file?: File; youtubeUrl?: string }) => {
+  const startPipeline = useCallback(async (input: { file?: File; youtubeUrl?: string }) => {
     if (currentJob) {
-      console.warn('A pipeline job is already in progress. Please wait or cancel it.');
+      console.warn('A pipeline job is already in progress.');
       return;
     }
 
-    closeEventSource(); // Ensure any old connection is closed
+    closeEventSource();
 
     try {
       setCurrentJob({
-        id: 'temp-id',
+        id: 'initiating',
         status: 'uploading',
         progress: 0,
         audioMetadata: null,
@@ -49,31 +50,20 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         errorMessage: null,
       });
 
-      let response;
-      let jobId: string;
+      let resData: ApiResponse<{ jobId: string; trackId: string }>;
 
       if (input.file) {
         const formData = new FormData();
         formData.append('audioFile', input.file);
-        response = await fetch('/api/pipeline/process/upload', {
-          method: 'POST',
-          body: formData,
-        });
+        resData = await apiPost<ApiResponse<{ jobId: string; trackId: string }>>('/api/pipeline/process', formData);
       } else if (input.youtubeUrl) {
-        response = await fetch('/api/pipeline/process/youtube', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ youtubeUrl: input.youtubeUrl }),
-        });
+        resData = await apiPost<ApiResponse<{ jobId: string; trackId: string }>>('/api/pipeline/process', { youtubeUrl: input.youtubeUrl });
       } else {
         throw new Error('Either file or youtubeUrl must be provided.');
       }
 
-      const resData = await response.json();
-      if (!resData.success) {
-        throw new Error(resData.error || 'Failed to initiate pipeline processing');
-      }
-      jobId = resData.data.jobId;
+      const jobId = resData.data?.jobId;
+      if (!jobId) throw new Error('No jobId returned from pipeline');
 
       setCurrentJob((prev) => prev ? { ...prev, id: jobId, progress: 10 } : null);
 
@@ -88,11 +78,11 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
           const updatedJob: PipelineJob = {
             ...prev,
             status: data.status as PipelineStatus,
-            progress: data.progress,
-            audioMetadata: data.audioMetadata || prev.audioMetadata,
-            generatedArtUrl: data.generatedArtUrl || prev.generatedArtUrl,
-            generatedNarrative: data.generatedNarrative || prev.generatedNarrative,
-            errorMessage: data.errorMessage || null,
+            progress: data.progress ?? prev.progress,
+            audioMetadata: data.audioMetadata ?? prev.audioMetadata,
+            generatedArtUrl: data.generatedArtUrl ?? prev.generatedArtUrl,
+            generatedNarrative: data.generatedNarrative ?? prev.generatedNarrative,
+            errorMessage: data.errorMessage ?? null,
           };
 
           if (updatedJob.status === 'complete' || updatedJob.status === 'error') {
@@ -103,20 +93,13 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         });
       };
 
-      source.onerror = (error) => {
-        console.error('SSE connection error:', error);
-        setCurrentJob((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            status: 'error',
-            errorMessage: 'Real-time updates interrupted.',
-          };
-        });
+      source.onerror = () => {
+        setCurrentJob((prev) => prev ? { ...prev, status: 'error', errorMessage: 'Real-time updates interrupted.' } : null);
         closeEventSource();
       };
 
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       console.error('Error starting pipeline:', error);
       setCurrentJob({
         id: 'error',
@@ -129,40 +112,31 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
       });
       closeEventSource();
     }
-  };
+  }, [currentJob, closeEventSource]);
 
-  const approvePipeline = async (jobId: string) => {
+  const approvePipeline = useCallback(async (jobId: string) => {
     try {
-      const response = await fetch(`/api/pipeline/approve/${jobId}`, {
-        method: 'POST',
-      });
-      const resData = await response.json();
-      if (!resData.success) {
-        throw new Error(resData.error || 'Failed to approve pipeline job');
-      }
+      await apiPost<ApiResponse<null>>(`/api/pipeline/approve/${jobId}`, {});
       setCurrentJob((prev) => prev ? { ...prev, status: 'publishing' } : null);
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       console.error('Error approving pipeline:', error);
-      setCurrentJob((prev) => {
-        if (!prev) return null;
-        return { ...prev, errorMessage: error.message || 'Approval failed.' };
-      });
+      setCurrentJob((prev) => prev ? { ...prev, errorMessage: error.message || 'Approval failed.' } : null);
     }
-  };
+  }, []);
 
-  const cancelJob = () => {
+  const cancelJob = useCallback(() => {
     closeEventSource();
-    if (currentJob && currentJob.id !== 'temp-id' && currentJob.status !== 'complete' && currentJob.status !== 'error') {
-      // Optionally send a cancel request to the backend
+    if (currentJob && currentJob.id !== 'initiating' && currentJob.status !== 'complete' && currentJob.status !== 'error') {
       fetch(`/api/pipeline/cancel/${currentJob.id}`, { method: 'POST' }).catch(console.error);
     }
     setCurrentJob(null);
-  };
+  }, [currentJob, closeEventSource]);
 
-  const resetJob = () => {
+  const resetJob = useCallback(() => {
     closeEventSource();
     setCurrentJob(null);
-  };
+  }, [closeEventSource]);
 
   return (
     <PipelineContext.Provider value={{ currentJob, jobHistory, startPipeline, approvePipeline, cancelJob, resetJob }}>

@@ -1,19 +1,16 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { ComposerIdentity } from '../types';
 import { useIdentity } from './IdentityContext';
+import { apiPut } from '../lib/apiClient';
 
 interface StagingContextType {
   isEditMode: boolean;
   setIsEditMode: (val: boolean) => void;
   draftState: ComposerIdentity | null;
-  setDraftState: React.Dispatch<React.SetStateAction<ComposerIdentity | null>>;
   hasPendingChanges: boolean;
   commitDraft: () => Promise<void>;
   rollbackDraft: () => void;
   updateDraftField: (field: keyof ComposerIdentity, value: any) => void;
-  draft: Partial<ComposerIdentity>;
-  stageDraft: (field: keyof ComposerIdentity, value: any) => void;
-  previewDraft: ComposerIdentity | null;
   unsavedChanges: boolean;
 }
 
@@ -25,11 +22,9 @@ export const StagingProvider = ({ children }: { children: ReactNode }) => {
   const [draftState, setDraftState] = useState<ComposerIdentity | null>(null);
   const [hasPendingChanges, setHasPendingChanges] = useState<boolean>(false);
 
-  // Synchronize/Maintain new requested API fields as well to avoid breaks
-  const draft = draftState || {};
   const unsavedChanges = hasPendingChanges;
 
-  const toggleEditMode = (mode: boolean) => {
+  const toggleEditMode = useCallback((mode: boolean) => {
     setIsEditMode(mode);
     if (mode && !draftState) {
       setDraftState(identity ? JSON.parse(JSON.stringify(identity)) : null);
@@ -38,57 +33,46 @@ export const StagingProvider = ({ children }: { children: ReactNode }) => {
       setDraftState(null);
       setHasPendingChanges(false);
     }
-  };
+  }, [identity, draftState]);
 
-  const updateDraftField = (field: keyof ComposerIdentity, value: any) => {
-    setDraftState((prev: ComposerIdentity | null) => {
+  const updateDraftField = useCallback((field: keyof ComposerIdentity, value: any) => {
+    setDraftState((prev) => {
       const current = prev || identity || {
-        id: null, name: null, tagline: null, biography: null, awards: null, studioAddress: null, portrait: null, logo: null, heroVideo: null, socialLinks: null, projects: null, trackCount: null, genres: null
+        id: null,
+        name: null,
+        tagline: null,
+        biography: null,
+        awards: null,
+        studioAddress: null,
+        portrait: null,
+        logo: null,
+        heroVideo: null,
+        socialLinks: null,
+        projects: null,
       };
-      const updated = {
-        ...current,
-        [field]: value,
-      };
+      const updated = { ...current, [field]: value };
       setHasPendingChanges(true);
       return updated;
     });
-  };
+  }, [identity]);
 
-  const stageDraft = (field: keyof ComposerIdentity, value: any) => {
-    updateDraftField(field, value);
-  };
-
-  const previewDraft = draftState || identity;
-
-  const rollbackDraft = () => {
+  const rollbackDraft = useCallback(() => {
     setDraftState(identity ? JSON.parse(JSON.stringify(identity)) : null);
     setHasPendingChanges(false);
-  };
+  }, [identity]);
 
-  const commitDraft = async () => {
+  const commitDraft = useCallback(async () => {
+    if (!draftState) return;
     try {
-      if (!draftState) return;
-
-      const response = await fetch('/api/identity', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draftState),
-      });
-
-      const resData = await response.json();
-      if (!resData.success) {
-        throw new Error(resData.error || 'Failed to publish draft changes');
-      }
-
-      await fetchIdentity(); // reload live state
+      await apiPut<ComposerIdentity>('/api/identity', draftState);
+      await fetchIdentity();
       setHasPendingChanges(false);
       setIsEditMode(false);
       setDraftState(null);
     } catch (err) {
       console.error('Error committing draft state:', err);
-      alert(err instanceof Error ? err.message : 'Commit failed');
     }
-  };
+  }, [draftState, fetchIdentity]);
 
   return (
     <StagingContext.Provider
@@ -96,14 +80,10 @@ export const StagingProvider = ({ children }: { children: ReactNode }) => {
         isEditMode,
         setIsEditMode: toggleEditMode,
         draftState,
-        setDraftState,
         hasPendingChanges,
         commitDraft,
         rollbackDraft,
         updateDraftField,
-        draft,
-        stageDraft,
-        previewDraft,
         unsavedChanges,
       }}
     >

@@ -1,90 +1,53 @@
-import { useEffect, useState, useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 export function useInertia<T extends number | [number, number]>(
   target: T,
   factor: number,
   threshold = 0.001
 ): T {
-  const isArray = Array.isArray(target);
-  
-  // Set up state for current value
-  const [current, setCurrent] = useState<T>(target);
-  
-  // Refs to track latest values safely inside the animation loop
-  const targetRef = useRef<T>(target);
   const currentRef = useRef<T>(target);
-  const rAFRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const [value, setValue] = useState<T>(target);
 
-  // Update targetRef when target changes
   useEffect(() => {
-    targetRef.current = target;
-    
-    // Start or restart loop when target changes
-    const startLoop = () => {
-      if (rAFRef.current !== null) return;
+    const animate = () => {
+      const current = currentRef.current;
 
-      const loop = () => {
-        const tgt = targetRef.current;
-        const cur = currentRef.current;
+      if (typeof current === 'number' && typeof target === 'number') {
+        const next = current + (target - current) * factor;
+        currentRef.current = next as T;
+        setValue(next as T);
 
-        let changed = false;
-        let next: any;
-
-        if (Array.isArray(tgt) && Array.isArray(cur)) {
-          const nextVal: [number, number] = [
-            cur[0] + (tgt[0] - cur[0]) * factor,
-            cur[1] + (tgt[1] - cur[1]) * factor,
-          ];
-
-          const diffX = Math.abs(tgt[0] - nextVal[0]);
-          const diffY = Math.abs(tgt[1] - nextVal[1]);
-
-          if (diffX < threshold && diffY < threshold) {
-            next = tgt; // snap to exact target
-          } else {
-            next = nextVal;
-            changed = true;
-          }
-        } else if (typeof tgt === 'number' && typeof cur === 'number') {
-          const nextVal = cur + (tgt - cur) * factor;
-          const diff = Math.abs(tgt - nextVal);
-
-          if (diff < threshold) {
-            next = tgt; // snap to exact target
-          } else {
-            next = nextVal;
-            changed = true;
-          }
+        if (Math.abs(target - next) >= threshold) {
+          rafRef.current = requestAnimationFrame(animate);
         }
+      } else if (Array.isArray(current) && Array.isArray(target)) {
+        const next: [number, number] = [
+          current[0] + (target[0] - current[0]) * factor,
+          current[1] + (target[1] - current[1]) * factor,
+        ];
+        currentRef.current = next as T;
+        setValue(next as T);
 
-        if (next !== undefined) {
-          currentRef.current = next;
-          setCurrent(next);
+        if (
+          Math.abs(target[0] - next[0]) >= threshold ||
+          Math.abs(target[1] - next[1]) >= threshold
+        ) {
+          rafRef.current = requestAnimationFrame(animate);
         }
-
-        if (changed) {
-          rAFRef.current = requestAnimationFrame(loop);
-        } else {
-          rAFRef.current = null;
-        }
-      };
-
-      rAFRef.current = requestAnimationFrame(loop);
-    };
-
-    startLoop();
-  }, [target, factor, threshold]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (rAFRef.current !== null) {
-        cancelAnimationFrame(rAFRef.current);
       }
     };
-  }, []);
 
-  return current;
+    rafRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [target, factor, threshold]);
+
+  return value;
 }
 
 export default useInertia;

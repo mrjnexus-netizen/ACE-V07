@@ -6,6 +6,18 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
   return res.json();
 }
 
+export async function apiPost<T>(endpoint: string, data: any): Promise<T> {
+  const isFormData = data instanceof FormData;
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: isFormData ? undefined : { 'Content-Type': 'application/json' },
+    body: isFormData ? data : JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function apiPut<T>(endpoint: string, data: any): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     method: 'PUT',
