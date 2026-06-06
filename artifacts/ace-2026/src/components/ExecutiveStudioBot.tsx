@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
+import { useMediaQuery } from '../hooks/useMediaQuery'; // Assuming this hook exists for mobile detection
 
 interface Message {
   id: string;
@@ -10,9 +11,21 @@ interface Message {
   recommendation?: string; // trackId
 }
 
+const SYSTEM_PROMPT_TEMPLATE = (locale: string, tracks: any[]) => `You are the Executive Studio Manager for a world-class international composer. You speak ${locale} fluently and exclusively. Your tone is professional, cinematic, warm.
+Composer portfolio: ${JSON.stringify(tracks)}
+When recommending tracks, include the track ID for inline player.
+When asked for a project brief, collect in this order:
+1. Media type (film / game / animation / documentary / commercial)
+2. Emotional direction (3 keywords)
+3. Budget range (below $5k / $5k-$25k / $25k-$100k / above $100k)
+4. Deadline
+Then confirm and submit via POST /api/briefs.`;
+
 const ExecutiveStudioBot = () => {
-  const { locale } = useIdentity();
+  const { locale, identity, playlist } = useIdentity();
   const { audioState, playTrack } = useAudio();
+  const isMobile = useMediaQuery('(max-width: 767px)'); // Custom hook to detect mobile
+
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [input, setInput] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([
@@ -59,7 +72,7 @@ const ExecutiveStudioBot = () => {
       return;
     }
 
-    // Standard AI or Simulated chat response
+    // Standard AI chat response
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -67,6 +80,7 @@ const ExecutiveStudioBot = () => {
         body: JSON.stringify({
           message: input,
           locale,
+          systemPrompt: SYSTEM_PROMPT_TEMPLATE(locale, playlist),
           conversationHistory: messages.map((m) => ({
             role: m.sender === 'user' ? 'user' : 'assistant',
             content: m.text,
@@ -95,10 +109,32 @@ const ExecutiveStudioBot = () => {
         // If bot suggests project brief collection, trigger brief steps
         if (input.toLowerCase().includes('brief') || input.toLowerCase().includes('hire') || input.toLowerCase().includes('project')) {
           setBriefStep(1);
+          setMessages(prev => [...prev, {
+            id: `brief-start-${Date.now()}`,
+            sender: 'bot',
+            text: locale === 'es'
+              ? '¡Excelente! Para empezar un nuevo proyecto, ¿cuál es el tipo de medio? (Película / Juego / Animación / Documental / Comercial)'
+              : locale === 'fr'
+              ? 'Super ! Pour lancer un nouveau projet, quel est le type de média ? (Film / Jeu / Animation / Documentaire / Publicité)'
+              : 'Excellent! To start a new project brief, what is the media type? (Film / Game / Animation / Documentary / Commercial)',
+          }]);
         }
+
+      } else {
+        console.error('API Error:', resData.error);
+        setMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          sender: 'bot',
+          text: 'I apologize, but I encountered an error. Please try again later.',
+        }]);
       }
     } catch (error) {
       console.error('Error in chat:', error);
+      setMessages(prev => [...prev, {
+        id: `error-${Date.now()}`,
+        sender: 'bot',
+        text: 'I am currently offline. Please try again later.',
+      }]);
     }
   };
 
@@ -116,6 +152,8 @@ const ExecutiveStudioBot = () => {
           sender: 'bot',
           text: locale === 'es'
             ? 'Entendido. Segundo, ¿cuál es la dirección emocional del proyecto? (Escribe 3 palabras clave)'
+            : locale === 'fr'
+            ? 'Compris. Ensuite, quelle est la direction émotionnelle de la partition ? (Veuillez fournir 3 mots-clés)'
             : 'Got it. Second, what is the emotional direction for the score? (Please provide 3 keywords)',
         },
       ]);
@@ -127,7 +165,11 @@ const ExecutiveStudioBot = () => {
         {
           id: `brief-${Date.now()}`,
           sender: 'bot',
-          text: 'Third, what is your budget range? (e.g. below $5k / $5k-$25k / $25k-$100k / above $100k)',
+          text: locale === 'es'
+            ? 'Tercero, ¿cuál es tu rango de presupuesto? (ej. menos de $5k / $5k-$25k / $25k-$100k / más de $100k)'
+            : locale === 'fr'
+            ? 'Troisièmement, quelle est votre fourchette de budget ? (ex. moins de 5k$ / 5k$-25k$ / 25k$-100k$ / plus de 100k$)'
+            : 'Third, what is your budget range? (e.g. below $5k / $5k-$25k / $25k-$100k / above $100k)',
         },
       ]);
     } else if (briefStep === 3) {
@@ -138,7 +180,11 @@ const ExecutiveStudioBot = () => {
         {
           id: `brief-${Date.now()}`,
           sender: 'bot',
-          text: 'Fourth, what is the final deadline or delivery date for the completed compositions?',
+          text: locale === 'es'
+            ? 'Cuarto, ¿cuál es la fecha límite final o fecha de entrega para las composiciones completas?'
+            : locale === 'fr'
+            ? 'Quatrièmement, quelle est la date limite finale ou la date de livraison pour les compositions terminées ?'
+            : 'Fourth, what is the final deadline or delivery date for the completed compositions?',
         },
       ]);
     } else if (briefStep === 4) {
@@ -167,11 +213,18 @@ const ExecutiveStudioBot = () => {
             sender: 'bot',
             text: locale === 'es'
               ? '¡Muchas gracias! Tu informe de proyecto ha sido enviado con éxito al estudio del compositor. Nos pondremos en contacto contigo pronto.'
+              : locale === 'fr'
+              ? 'Merci beaucoup ! Vos spécifications de projet ont été enregistrées en toute sécurité et soumises au compositeur. Notre équipe vous contactera sous peu.'
               : 'Thank you very much! Your project specifications have been securely recorded and submitted to the composer. Our team will contact you shortly.',
           },
         ]);
       } catch (err) {
         console.error('Failed to submit brief:', err);
+        setMessages(prev => [...prev, {
+          id: `brief-error-${Date.now()}`,
+          sender: 'bot',
+          text: 'There was an error submitting your brief. Please try again later.',
+        }]);
       }
     }
 
@@ -210,16 +263,16 @@ const ExecutiveStudioBot = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            initial={{ opacity: 0, y: isMobile ? '70vh' : 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            exit={{ opacity: 0, y: isMobile ? '70vh' : 50, scale: 0.9 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             style={{
               backdropFilter: 'blur(30px) saturate(180%) brightness(0.85)',
               WebkitBackdropFilter: 'blur(30px) saturate(180%) brightness(0.85)',
               background: 'rgba(var(--surface-rgb), 0.75)',
             }}
-            className="fixed bottom-[160px] right-[24px] w-[380px] h-[520px] rounded-2xl border border-border flex flex-col overflow-hidden shadow-2xl z-[9998]"
+            className={`fixed ${isMobile ? 'inset-x-0 bottom-0 h-[70vh] rounded-t-2xl' : 'bottom-[160px] right-[24px] w-[380px] h-[520px] rounded-2xl'} border border-border flex flex-col overflow-hidden shadow-2xl z-[9998]`}
           >
             {/* Header */}
             <div className="p-4 border-b border-border bg-surface4 flex justify-between items-center">
@@ -239,9 +292,7 @@ const ExecutiveStudioBot = () => {
                       backgroundColor: m.sender === 'user' ? 'var(--accent-color)' : 'rgba(var(--surface-rgb), 0.5)',
                       color: m.sender === 'user' ? 'var(--surface-color)' : 'var(--text-color)',
                     }}
-                    className={`max-w-[85%] p-3 rounded-xl border border-border text-xs leading-relaxed ${
-                      m.sender === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'
-                    }`}
+                    className={`max-w-[85%] p-3 rounded-xl border border-border text-xs leading-relaxed ${m.sender === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'}`}
                   >
                     <p>{m.text}</p>
 
@@ -267,7 +318,7 @@ const ExecutiveStudioBot = () => {
             <div className="p-3 border-t border-border bg-surface4 flex items-center space-x-2">
               <input
                 type="text"
-                placeholder={locale === 'es' ? 'Escribe un mensaje...' : 'Type a message...'}
+                placeholder={locale === 'es' ? 'Escribe un mensaje...' : locale === 'fr' ? 'Écrivez un message...' : 'Type a message...'}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
@@ -289,4 +340,4 @@ const ExecutiveStudioBot = () => {
   );
 };
 
-export default ExecutiveStudioBot;
+export default ExecutiveStudioBot; 

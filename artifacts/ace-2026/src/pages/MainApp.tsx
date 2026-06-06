@@ -35,6 +35,13 @@ const MainApp = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Ensure routing and click-based navigation trigger /admin access method
+  useEffect(() => {
+    if (window.location.pathname === '/admin') {
+      setShowAdmin(true);
+    }
+  }, []);
+
   // Fix 5: Iframe Title (Third-Party Injection - Defensive)
   useEffect(() => {
     const setIframeAttributes = () => {
