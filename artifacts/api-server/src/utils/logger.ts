@@ -28,7 +28,7 @@ const logger = pino({
   }),
 });
 
-export const createChildLogger = (moduleName: string) => {
+export const createChildLogger = (moduleName: string): pino.Logger => {
   return logger.child({ module: moduleName });
 };
 

@@ -5,7 +5,7 @@ import { RedisStore } from "rate-limit-redis";
 import { redis } from "../db/redis";
 import { AppError } from "../utils/errors";
 
-const handler = (_req: Request, _res: Response, _next: NextFunction, _options: any) => {
+const handler = (_req: Request, _res: Response, _next: NextFunction, _options: any): void => {
   throw new AppError("Rate limit exceeded", 429, "RATE_LIMITED");
 };
 

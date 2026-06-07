@@ -50,16 +50,14 @@ jobs:
 
       - name: Get pnpm store directory
         shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_ENV
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_ENV
 
       - name: Cache pnpm modules
         uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          restore-keys: ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -70,7 +68,10 @@ jobs:
       - name: Run ESLint Max Strict Execution
         run: pnpm run lint
 
-      - name: Build All Workspaces (Vite Frontend & Esbuild Backend)
+      - name: Run Unit & E2E Tests
+        run: pnpm run test
+
+      - name: Build All Workspaces
         run: pnpm run build
 
       - name: Wait for PostgreSQL Healthy
@@ -81,20 +82,17 @@ jobs:
             sleep 1
           done
 
-      - name: Run Relational Database Migrations
-        run: pnpm --filter @workspace/api-server run db:push
+      - name: Run Database Migrations
+        run: pnpm --filter @workspace/api-server run db:migrate
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/ace_db
 
-      - name: Deploy Production Stack (Mock Zero-Downtime Rolling Update)
+      - name: Deploy to Production
         run: |
-          echo "Initiating zero-downtime rolling update deployment..."
-          echo "Deploying client to CDN..."
-          echo "Deploying api service container..."
-          echo "Reloading Nginx Reverse Proxy..."
+          echo "Deploying ACE-2026 to production..."
+          docker-compose up -d --build
+          echo "Reloading Nginx..."
+          docker-compose exec -T api nginx -s reload
 
-      - name: Post-Deployment Health Check Verification
-        run: |
-          echo "Verifying server status..."
-          # Curl /api/health to confirm 200 and healthy checks
-          curl --fail http://localhost:8080/api/health || true
+      - name: Post-Deployment Health Check
+        run: bash scripts/health-check.sh

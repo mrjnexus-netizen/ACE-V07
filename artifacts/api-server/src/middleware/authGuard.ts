@@ -11,7 +11,7 @@ const logger = createChildLogger("AuthGuard");
 const ACCESS_TOKEN_EXPIRY = "24h";
 const REFRESH_TOKEN_EXPIRY = "30d";
 
-export const authGuard = (req: Request, res: Response, next: NextFunction) => {
+export const authGuard = (req: Request, res: Response, next: NextFunction): void => {
   const accessToken = req.cookies?.accessToken;
   const refreshToken = req.cookies?.refreshToken;
   const secret = env.JWT_SECRET;

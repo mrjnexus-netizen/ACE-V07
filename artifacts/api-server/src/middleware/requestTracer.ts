@@ -13,7 +13,7 @@ declare module 'express' {
 
 const logger = createChildLogger("RequestTracer");
 
-export const requestTracer = (req: Request, res: Response, next: NextFunction) => {
+export const requestTracer = (req: Request, res: Response, next: NextFunction): void => {
   req.id = randomUUID();
   res.setHeader('X-Request-ID', req.id);
 

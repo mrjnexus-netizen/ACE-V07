@@ -24,7 +24,7 @@ const upload = multer({
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      const error = new Error('Invalid file type. Only PDF and text files are allowed.'); cb(error, false);
+      cb(new (Error as any)('Invalid file type. Only PDF and text files are allowed.') as any, false);
     }
   },
 });

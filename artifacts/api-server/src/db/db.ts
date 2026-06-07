@@ -15,7 +15,7 @@ export const pool = new Pool({
 
 export const db = drizzle(pool, { schema });
 
-export async function connectDb() {
+export async function connectDb(): Promise<void> {
   try {
     await pool.query('SELECT 1');
     console.log('Database connection verified.');

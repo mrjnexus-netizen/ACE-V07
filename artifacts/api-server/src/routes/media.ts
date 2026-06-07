@@ -27,7 +27,7 @@ const upload = multer({
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      const error = new Error('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.'); cb(error, false);
+      cb(new (Error as any)('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.') as any, false);
     }
   },
 });

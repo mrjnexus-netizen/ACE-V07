@@ -22,7 +22,7 @@ redis.on('error', (err) => {
 });
 
 // Verify connection on startup
-async function verifyRedisConnection() {
+async function verifyRedisConnection(): Promise<void> {
   try {
     const start = Date.now();
     await redis.ping();
