@@ -6,7 +6,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), nodePolyfills()],
-  root: path.resolve(__dirname, '../../'), // Root index.html is at the monorepo root
+  // Root index.html is at the monorepo root
   server: {
     port: 18956,
     proxy: {
@@ -59,3 +59,4 @@ export default defineConfig({
     },
   },
 })
+

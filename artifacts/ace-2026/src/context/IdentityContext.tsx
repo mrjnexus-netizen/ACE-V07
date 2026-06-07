@@ -20,7 +20,7 @@ const IdentityContext = createContext<IdentityContextType | undefined>(undefined
 export const IdentityProvider = ({ children }: { children: ReactNode }) => {
   const [composerIdentity, setComposerIdentity] = useState<ComposerIdentity | null>(null);
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
-  const [locale, setLocale] = useState<Locale | null>(null);
+  const [locale, setLocaleState] = useState<Locale | null>(() => { const stored = localStorage.getItem('ace-locale') as Locale | null; const valid: Locale[] = ['en','es','fr','zh','ja','ko']; return stored && valid.includes(stored) ? stored : null; });
   const [loading, setLoading] = useState(false);
 
   const fetchIdentity = useCallback(async () => {
@@ -58,7 +58,7 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
         tracks,
         playlist: tracks,
         locale,
-        setLocale,
+        setLocale: (l: Locale) => { setLocaleState(l); localStorage.setItem('ace-locale', l); },
         loading,
         fetchIdentity,
         fetchTracks,
