@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" dir="ltr" data-theme="onyx" data-locale="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,9 +10,18 @@
   <title>ACE-2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=EB+Garamond:wght@400;700&family=IBM+Plex+Mono:wght@400;700&family=Lora:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Sans+SC:wght@400;700&family=Playfair+Display:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Sans+SC:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; background-color: #080808; -webkit-font-smoothing: antialiased; }
+    :root {
+      --font-display: 'Cormorant Garamond', 'EB Garamond', 'Playfair Display', 'Lora', serif;
+      --font-mono: 'IBM Plex Mono', 'Space Mono', monospace;
+      --font-ui: system-ui, -apple-system, sans-serif;
+      --surface-color: #080808;
+      --text-color: #f0f0f0;
+      --accent-color: #c8a96e;
+      --muted-color: #3a3a3a;
+    }
+    html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; background-color: #080808; -webkit-font-smoothing: antialiased; font-family: var(--font-display); }
     #root { width: 100%; min-height: 100dvh; }
   </style>
 </head>
