@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { db } from '../db/db';
 import { apiKeys } from '../db/schema';
-import { authenticateJWT } from '../middleware/auth';
+import { authGuard } from '../middleware/auth';
 
 const router: Router = Router();
 
@@ -148,7 +148,7 @@ async function sendEmail(to: string, subject: string, text: string, html: string
 // POST /api/documents/analyze - Analyze PDF/txt file
 router.post(
   '/analyze',
-  authenticateJWT,
+  authGuard,
   upload.single('document'),
   async (req: Request, res: Response) => {
     try {
@@ -212,7 +212,7 @@ router.post(
 // POST /api/documents/export - Generate PDF from checklist
 router.post(
   '/export',
-  authenticateJWT,
+  authGuard,
   async (req: Request, res: Response) => {
     try {
       const { checklist } = req.body;
@@ -248,7 +248,7 @@ router.post(
 // POST /api/documents/email - Send checklist via SMTP
 router.post(
   '/email',
-  authenticateJWT,
+  authGuard,
   async (req: Request, res: Response) => {
     try {
       const { to, subject, body, checklist } = req.body;

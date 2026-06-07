@@ -3,8 +3,12 @@ import { JwtPayload } from "jsonwebtoken";
 declare global {
   namespace Express {
     interface Request {
-      id: string; // injected by requestTracer
-      user?: { id: string, username: string, role: string }; // injected by authGuard
+      id: string;
+      user?: {
+        id: string;
+        username: string;
+        role: string;
+      };
     }
   }
 }

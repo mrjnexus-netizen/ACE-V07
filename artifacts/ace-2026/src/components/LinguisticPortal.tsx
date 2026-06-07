@@ -7,9 +7,9 @@ const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'ENGLISH' },
   { code: 'es', label: 'ESPAÑOL' },
   { code: 'fr', label: 'FRANÇAIS' },
-  { code: 'zh', label: '??' },
-  { code: 'ja', label: '???' },
-  { code: 'ko', label: '???' },
+  { code: 'zh', label: '\u4e2d\u6587' },
+  { code: 'ja', label: '\u65e5\u672c\u8a9e' },
+  { code: 'ko', label: '\ud55c\uad6d\uc5b4' },
 ] as const;
 
 const MICRO_TONES: Record<string, number> = {
@@ -80,11 +80,11 @@ const StarfieldCanvas = () => (
   <Canvas
     style={{ position: 'fixed', inset: 0, zIndex: -1 }}
     camera={{ fov: 75, near: 0.1, far: 100 }}
-    onCreated={({ gl }) => {
+    onCreated={({ gl, scene }) => {
       gl.setClearColor(new THREE.Color('#000000'));
+      scene.fog = new THREE.FogExp2('#000000', 0.0008);
     }}
   >
-    <fog attach="fog" args={['#000000', 1, 30]} />
     <ambientLight intensity={0.1} />
     <directionalLight intensity={0.3} position={[5, 3, 5]} />
     <Starfield />
@@ -245,8 +245,8 @@ export const LinguisticPortal = () => {
 
       <canvas
         ref={shatterCanvasRef}
-        className="absolute inset-0 z-50 pointer-events-none"
-        style={{ opacity: selectedLang ? 1 : 0 }}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 100, opacity: selectedLang ? 1 : 0 }}
       />
     </div>
   );

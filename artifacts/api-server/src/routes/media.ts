@@ -8,14 +8,13 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 
-import { authenticateJWT } from '../middleware/auth';
+import { authGuard } from '../middleware/auth';
 
 const router: Router = Router();
 
-// Configure Multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
       'audio/mpeg',
@@ -40,7 +39,6 @@ const s3Client = new S3Client({
   },
 });
 
-// Utility to generate BlurHash (for images)
 async function generateBlurHash(buffer: Buffer): Promise<string | null> {
   try {
     const { data, info } = await (sharp as (input: Buffer) => sharp.Sharp)(buffer)
@@ -62,8 +60,7 @@ async function generateBlurHash(buffer: Buffer): Promise<string | null> {
   }
 }
 
-// POST /api/media/upload - S3 Upload
-router.post('/upload', authenticateJWT, upload.single('media'), async (req: Request, res: Response) => {
+router.post('/upload', authGuard, upload.single('media'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -75,7 +72,7 @@ router.post('/upload', authenticateJWT, upload.single('media'), async (req: Requ
       });
     }
 
-    const { entity_type, entity_id } = req.body; // e.g., 'tracks', 'track_id'
+    const { entity_type, entity_id } = req.body;
     if (!entity_type || !entity_id) {
       return res.status(400).json({
         success: false,
@@ -105,7 +102,6 @@ router.post('/upload', authenticateJWT, upload.single('media'), async (req: Requ
       blurhash = await generateBlurHash(req.file.buffer);
     }
 
-    // In a real scenario, you'd save this MediaAsset to your database
     const mediaAsset = {
       id: randomUUID(),
       url: fileUrl,
@@ -134,8 +130,7 @@ router.post('/upload', authenticateJWT, upload.single('media'), async (req: Requ
   }
 });
 
-// POST /api/media/staging-preview - Generate temporary preview URL and metadata
-router.post('/staging-preview', authenticateJWT, upload.single('media'), async (req: Request, res: Response) => {
+router.post('/staging-preview', authGuard, upload.single('media'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -154,18 +149,18 @@ router.post('/staging-preview', authenticateJWT, upload.single('media'), async (
 
     const temporaryKey = `staging-previews/${randomUUID()}${extname(req.file.originalname)}`;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const signedUrl = await getSignedUrl(
-      s3Client,
+      s3Client as any,
       new GetObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME || 'ace-2026-bucket',
         Key: temporaryKey,
-      }),
-      { expiresIn: 3600 } // 1 hour expiry
+      }) as any,
+      { expiresIn: 3600 }
     );
 
-    // Simulate audio duration and vibrant palette extraction
-    const audioDuration = req.file.mimetype.startsWith('audio/') ? 180 : undefined; // Mock duration
-    const vibrantPalette = req.file.mimetype.startsWith('image/') ? { VIBRANT: '#FF0000', LIGHT_VIBRANT: '#FFAAAA' } : undefined; // Mock palette
+    const audioDuration = req.file.mimetype.startsWith('audio/') ? 180 : undefined;
+    const vibrantPalette = req.file.mimetype.startsWith('image/') ? { VIBRANT: '#FF0000', LIGHT_VIBRANT: '#FFAAAA' } : undefined;
 
     return res.status(200).json({
       success: true,

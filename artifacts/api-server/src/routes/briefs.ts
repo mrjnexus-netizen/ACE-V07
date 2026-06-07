@@ -4,14 +4,14 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { db } from '../db/db';
 import { briefs } from '../db/schema';
-import { authenticateJWT } from '../middleware/auth';
+import { authGuard } from '../middleware/auth';
 
 const router: Router = Router();
 
 // GET /api/briefs - Return all briefs, newest first
 router.get(
   '/',
-  authenticateJWT,
+  authGuard,
   async (_req: Request, res: Response) => {
     try {
       const allBriefs = await db.query.briefs.findMany({

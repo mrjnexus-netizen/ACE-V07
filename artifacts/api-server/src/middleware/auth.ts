@@ -1,53 +1,76 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    username: string;
-    role: string;
-  };
-}
+import { env } from "../config/env";
+import { CustomJwtPayload } from "../types/express";
+import { AuthError, ForbiddenError } from "../utils/errors";
+import { createChildLogger } from "../utils/logger";
 
-export const getCookies = (req: Request): Record<string, string> => {
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) return {};
-  return cookieHeader.split(';').reduce((acc, cookie) => {
-    const [key, value] = cookie.trim().split('=');
-    if (key && value) {
-      acc[key] = decodeURIComponent(value);
-    }
-    return acc;
-  }, {} as Record<string, string>);
-};
+const logger = createChildLogger("AuthGuard");
 
-export const authenticateJWT = (req: Request, res: Response, next: NextFunction): void => {
-  const cookies = getCookies(req);
-  const token = cookies.accessToken || req.headers.authorization?.split(' ')[1];
+const ACCESS_TOKEN_EXPIRY = "24h";
+const REFRESH_TOKEN_EXPIRY = "30d";
 
-  if (!token) {
-    res.status(401).json({
-      success: false,
-      data: null,
-      _error: 'Access token required',
-      code: 'UNAUTHORIZED',
-      timestamp: new Date().toISOString(),
-    });
+export const authGuard = (req: Request, res: Response, next: NextFunction): void => {
+  const accessToken = req.cookies?.accessToken;
+  const refreshToken = req.cookies?.refreshToken;
+  const secret = env.JWT_SECRET;
+
+  if (!accessToken && !refreshToken) {
+    logger.warn({ requestId: req.id }, "Auth failure: No tokens provided.");
+    next(new AuthError("Authentication required."));
+    return;
   }
 
   try {
-    const secret = process.env.JWT_SECRET || 'fallback_secret_key_at_least_32_bytes_long';
-    const decoded = jwt.verify(token, secret) as { id: string; username: string; role: string };
-    (req as AuthenticatedRequest).user = decoded;
+    const decoded = jwt.verify(accessToken as string, secret) as unknown as CustomJwtPayload;
+    req.user = { id: decoded.id, username: decoded.username, role: decoded.role };
     next();
-  } catch (_error) {
-    res.status(403).json({
-      success: false,
-      data: null,
-      _error: 'Invalid or expired access token',
-      code: 'FORBIDDEN',
-      timestamp: new Date().toISOString(),
-    });
+  } catch (accessError) {
+    if (accessError instanceof jwt.TokenExpiredError && refreshToken) {
+      try {
+        const decodedRefresh = jwt.verify(refreshToken, secret) as CustomJwtPayload;
+
+        const newAccessToken = jwt.sign(
+          { id: decodedRefresh.id, username: decodedRefresh.username, role: decodedRefresh.role },
+          secret,
+          { expiresIn: ACCESS_TOKEN_EXPIRY }
+        );
+
+        const newRefreshToken = jwt.sign(
+          { id: decodedRefresh.id, username: decodedRefresh.username, role: decodedRefresh.role },
+          secret,
+          { expiresIn: REFRESH_TOKEN_EXPIRY }
+        );
+
+        const isProd = env.NODE_ENV === "production";
+
+        res.cookie("accessToken", newAccessToken, {
+          httpOnly: true,
+          secure: isProd,
+          sameSite: "strict",
+          maxAge: 24 * 60 * 60 * 1000,
+        });
+
+        res.cookie("refreshToken", newRefreshToken, {
+          httpOnly: true,
+          secure: isProd,
+          sameSite: "strict",
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+
+        req.user = { id: decodedRefresh.id, username: decodedRefresh.username, role: decodedRefresh.role };
+        logger.info({ requestId: req.id, username: decodedRefresh.username }, "Access token refreshed via refresh token.");
+        next();
+      } catch (_refreshError) {
+        logger.warn({ requestId: req.id, authFailure: "refresh_token_invalid" }, "Auth failure: Invalid or expired refresh token.");
+        next(new ForbiddenError("Invalid or expired refresh token. Please log in again."));
+      }
+    } else {
+      logger.warn({ requestId: req.id, authFailure: "access_token_invalid" }, "Auth failure: Invalid access token.");
+      next(new AuthError("Invalid access token. Please log in again."));
+    }
   }
 };
 
+export { authGuard as authenticateJWT };

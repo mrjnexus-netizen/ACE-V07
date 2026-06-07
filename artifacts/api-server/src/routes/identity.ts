@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { ComposerIdentity, MultiLingual, ApiResponse } from '../../../ace-2026/src/types';
 import { db } from '../db/db';
 import { composerIdentity, projects as projectsTable, apiKeys } from '../db/schema';
-import { authenticateJWT } from '../middleware/auth';
+import { authGuard } from '../middleware/auth';
 import { decrypt } from '../services/encryptionService';
 
 
@@ -137,7 +137,7 @@ const identityPutSchema = z.object({
 });
 
 // PUT /api/identity
-router.put('/', authenticateJWT, async (req: Request, res: Response<ApiResponse<string>>) => {
+router.put('/', authGuard, async (req: Request, res: Response<ApiResponse<string>>) => {
   try {
     const parsedBody = identityPutSchema.safeParse(req.body);
 
@@ -235,7 +235,7 @@ const translatePostSchema = z.object({
 });
 
 // POST /api/identity/translate
-router.post('/translate', authenticateJWT, async (req: Request, res: Response<ApiResponse<MultiLingual>>) => {
+router.post('/translate', authGuard, async (req: Request, res: Response<ApiResponse<MultiLingual>>) => {
   try {
     const parsedBody = translatePostSchema.safeParse(req.body);
 

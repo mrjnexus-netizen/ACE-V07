@@ -3,7 +3,7 @@ import { Router, Request, Response } from 'express';
 
 import { db } from '../db/db';
 import { tracks, pipelineJobs } from '../db/schema';
-import { authenticateJWT } from '../middleware/auth';
+import { authGuard } from '../middleware/auth';
 import { translateText } from '../services/translationService';
 
 const router: Router = Router();
@@ -39,7 +39,7 @@ export const broadcastJobStatus = (jobId: string, status: string, progress: numb
 };
 
 // POST /api/pipeline/process - Trigger pipeline
-router.post('/process', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
+router.post('/process', authGuard, async (req: Request, res: Response): Promise<void> => {
   try {
     const { audioUrl, youtubeUrl, title, genre } = req.body;
 
@@ -143,7 +143,7 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response): Pr
 });
 
 // POST /api/pipeline/approve/:jobId - Publish track
-router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
+router.post('/approve/:jobId', authGuard, async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
     const { title, narrative, genre, bpm, mood, keySignature } = req.body;
@@ -206,7 +206,7 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
 });
 
 // POST /api/pipeline/regenerate/:jobId
-router.post('/regenerate/:jobId', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
+router.post('/regenerate/:jobId', authGuard, async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
     const { field } = req.body;

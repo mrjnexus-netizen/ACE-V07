@@ -25,8 +25,9 @@ export async function addPipelineJob(jobData: Record<string, unknown>): Promise<
 export async function getJobStatus(jobId: string): Promise<{ id: string; progress: number; state: string; data: unknown } | null> {
   const job = await queue.getJob(jobId);
   if (!job) return null;
-  const state = await job.getState();
-  return { id: job.id, progress: job.progress, state, data: job.data };
+  const state: string = (await job.getState()) ?? '';
+  const progress: number = typeof job.progress === 'number' ? job.progress : 0;
+  return { id: job.id!, progress, state: state as string, data: job.data };
 }
 
 export const worker = new Worker(

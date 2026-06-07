@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { Readable } from 'stream';
 
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { eq, asc } from 'drizzle-orm';
@@ -7,7 +8,7 @@ import { Router, Request, Response } from 'express';
 
 import { db } from '../db/db';
 import { tracks } from '../db/schema';
-import { authenticateJWT } from '../middleware/auth';
+import { authGuard } from '../middleware/auth';
 
 const router: Router = Router();
 
@@ -36,7 +37,7 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/', authenticateJWT, async (req: Request, res: Response) => {
+router.post('/', authGuard, async (req: Request, res: Response) => {
   try {
     const data = req.body;
     const [newTrack] = await db.insert(tracks).values({
@@ -74,7 +75,7 @@ router.post('/', authenticateJWT, async (req: Request, res: Response) => {
   }
 });
 
-router.put('/reorder', authenticateJWT, async (req: Request, res: Response) => {
+router.put('/reorder', authGuard, async (req: Request, res: Response) => {
   try {
     const { trackIds } = req.body;
     if (!trackIds || !Array.isArray(trackIds)) {
@@ -108,7 +109,7 @@ router.put('/reorder', authenticateJWT, async (req: Request, res: Response) => {
   }
 });
 
-router.put('/:id', authenticateJWT, async (req: Request, res: Response) => {
+router.put('/:id', authGuard, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const data = req.body;
@@ -161,7 +162,7 @@ router.put('/:id', authenticateJWT, async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', authenticateJWT, async (req: Request, res: Response) => {
+router.delete('/:id', authGuard, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const deleted = await db.delete(tracks).where(eq(tracks.id, id!)).returning();
@@ -276,7 +277,7 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
         });
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      import { Readable } from 'stream'; const stream = s3Response.Body as Readable;
+      const stream = s3Response.Body as Readable;
       stream.pipe(res);
     }
   } catch (err: unknown) {

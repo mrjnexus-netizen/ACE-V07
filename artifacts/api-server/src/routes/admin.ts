@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 
-import { authenticateJWT } from '../middleware/auth';
+import { authGuard } from '../middleware/auth';
 import { requireRole } from '../middleware/roleGuard';
 
 const router: Router = Router();
@@ -8,7 +8,7 @@ const router: Router = Router();
 // GET /api/admin/queue-dashboard
 router.get(
   '/queue-dashboard',
-  authenticateJWT,
+  authGuard,
   requireRole('admin'),
   async (req: Request, res: Response) => {
     try {
