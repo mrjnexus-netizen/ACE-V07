@@ -1,151 +1,299 @@
-import React, { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useIdentity } from '../context/IdentityContext';
+import { useAudio } from '../context/AudioContext';
+import { useChromatic } from '../context/ChromaticContext';
+import { apiPost, apiGet, apiPut } from '../lib/apiClient';
+import type { ComposerIdentity, AudioTrack, PipelineJob, MultiLingual } from '../types';
 
-interface AdminDashboardProps {
-  onClose: () => void;
-  initialTab?: number;
-  requireAuth?: boolean;
-}
+// ---------- shared helpers ----------
+const emptyMultiLingual = (): MultiLingual => ({ en: '', es: '', fr: '', zh: '', ja: '', ko: '' });
+const locales = ['en', 'es', 'fr', 'zh', 'ja', 'ko'] as const;
+const localeLabels: Record<string, string> = { en: 'English', es: 'Espa\u00f1ol', fr: 'Fran\u00e7ais', zh: '\u4e2d\u6587', ja: '\u65e5\u672c\u8a9e', ko: '\ud55c\uad6d\uc5b4' };
 
-const AdminDashboard = ({ onClose, initialTab = 1 }: AdminDashboardProps) => {
-  const [activeTab, setActiveTab] = useState<number>(initialTab);
+// ---------- Tab Content Components ----------
+const TabIdentityMatrix = () => {
+  const { composerIdentity, fetchIdentity, updateIdentity } = useIdentity();
+  const [local, setLocal] = useState<ComposerIdentity | null>(null);
+  const [activeLang, setActiveLang] = useState<string>('en');
+  const [saving, setSaving] = useState(false);
 
-  const tabs = [
-    { id: 1, name: 'Tab 1: Hexa-Lingual Suite' },
-    { id: 2, name: 'Tab 2: Asset Media Manager' },
-    { id: 3, name: 'Tab 3: CMS Gateway Hub' },
-    { id: 4, name: 'Tab 4: Settings & Configuration' },
-    { id: 5, name: 'Tab 5: System Verification' },
-  ];
+  useEffect(() => { setLocal(composerIdentity); }, [composerIdentity]);
+
+  const handleFieldChange = (field: keyof ComposerIdentity, value: any) => {
+    if (!local) return;
+    setLocal({ ...local, [field]: value });
+  };
+
+  const handleMultiLingualChange = (field: keyof ComposerIdentity, lang: string, text: string) => {
+    if (!local) return;
+    const current = (local[field] as MultiLingual) || emptyMultiLingual();
+    handleFieldChange(field, { ...current, [lang]: text });
+  };
+
+  const handleSave = async () => {
+    if (!local) return;
+    setSaving(true);
+    await updateIdentity(local);
+    await fetchIdentity();
+    setSaving(false);
+  };
+
+  if (!local) return <p className="text-[var(--text-muted-color)]">Loading identity...</p>;
 
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-950 text-neutral-100 flex flex-col font-sans">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-900">
-        <h1 className="text-xl font-bold tracking-wider text-amber-500 font-mono">ACE ENGINE // ADMIN PORTAL</h1>
-        <button 
-          onClick={onClose}
-          className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded transition-colors text-sm font-mono"
-        >
-          CLOSE [ESC]
-        </button>
+    <div className="space-y-6">
+      <div className="flex gap-2 flex-wrap">
+        {locales.map(l => (
+          <button key={l} onClick={() => setActiveLang(l)}
+            className={`px-3 py-1 text-xs font-mono rounded ${activeLang === l ? 'bg-[var(--accent-color)] text-[var(--surface-color)]' : 'bg-[var(--surface3-color)] text-[var(--text-muted-color)]'}`}
+          >{localeLabels[l]}</button>
+        ))}
       </div>
 
-      {/* Main Grid */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar Tabs */}
-        <div className="w-64 bg-neutral-900/50 border-r border-neutral-800 flex flex-col p-4 space-y-2">
-          <div className="text-xs font-mono text-neutral-500 uppercase tracking-widest px-3 mb-2">Navigation</div>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full text-left px-3 py-2.5 rounded text-sm font-mono transition-all ${
-                activeTab === tab.id
-                  ? 'bg-amber-500/10 text-amber-500 border-l-2 border-amber-500 pl-4 font-semibold'
-                  : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
-              }`}
-            >
-              {tab.name}
-            </button>
-          ))}
+      {(['name','tagline','biography','studioAddress'] as (keyof ComposerIdentity)[]).map(field => (
+        <div key={field}>
+          <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1 capitalize">{field}</label>
+          <textarea
+            rows={3}
+            value={(local[field] as Record<string, string> | null)?.[activeLang] || ''}
+            onChange={e => handleMultiLingualChange(field, activeLang, e.target.value)}
+            className="w-full bg-[var(--surface3-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+          />
         </div>
+      ))}
 
-        {/* Content Panel */}
-        <div className="flex-1 p-8 overflow-y-auto bg-neutral-950">
-          <div className="max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
-              <h2 className="text-2xl font-bold font-mono text-neutral-200">{tabs.find(t => t.id === activeTab)?.name}</h2>
-              <span className="text-xs font-mono bg-neutral-800 text-amber-500 px-2 py-1 rounded">STATUS: READY</span>
-            </div>
+      {/* Social Links */}
+      <div className="grid grid-cols-2 gap-4">
+        {(['spotify','imdb','instagram','youtube'] as const).map(link => (
+          <div key={link}>
+            <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">{link}</label>
+            <input
+              type="url"
+              value={local.socialLinks?.[link] || ''}
+              onChange={e => handleFieldChange('socialLinks', { ...local.socialLinks, [link]: e.target.value })}
+              className="w-full bg-[var(--surface3-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+            />
+          </div>
+        ))}
+      </div>
 
-            {/* Tab Contents */}
-            {activeTab === 1 && (
-              <div className="space-y-4 bg-neutral-900/40 border border-neutral-800 p-6 rounded-lg">
-                <p className="text-sm text-neutral-400 leading-relaxed">
-                  Welcome to the Hexa-Lingual Suite. Here you can edit and synchronize multilingual strings across English (EN), Spanish (ES), French (FR), Chinese (ZH), Japanese (JA), and Korean (KO).
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-neutral-900 border border-neutral-800 rounded">
-                    <span className="text-xs text-amber-500 font-mono">ACTIVE LOCALES</span>
-                    <p className="text-lg font-bold mt-1">6 Active Locales</p>
-                  </div>
-                  <div className="p-4 bg-neutral-900 border border-neutral-800 rounded">
-                    <span className="text-xs text-amber-500 font-mono">SYNC STATUS</span>
-                    <p className="text-lg font-bold mt-1">Fully Synchronized</p>
-                  </div>
-                </div>
-              </div>
-            )}
+      <button onClick={handleSave} disabled={saving}
+        className="px-4 py-2 bg-[var(--accent-color)] text-[var(--surface-color)] rounded font-semibold disabled:opacity-50"
+      >{saving ? 'Saving...' : 'Save Identity'}</button>
+    </div>
+  );
+};
 
-            {activeTab === 2 && (
-              <div className="space-y-4 bg-neutral-900/40 border border-neutral-800 p-6 rounded-lg">
-                <p className="text-sm text-neutral-400 leading-relaxed">
-                  Decoupled Asset Media Manager. Manage visual media assets, including album artwork, video loops, and secondary graphic representations.
-                </p>
-                <div className="border-2 border-dashed border-neutral-800 rounded-lg p-12 text-center hover:border-amber-500/50 transition-colors cursor-pointer">
-                  <p className="text-sm text-neutral-400">Drag & drop asset media files here, or click to upload</p>
-                  <p className="text-xs text-neutral-600 mt-2">Supports JPG, PNG, MP4 up to 50MB</p>
-                </div>
-              </div>
-            )}
+const TabMediaPipeline = () => {
+  const { tracks, fetchTracks } = useIdentity();
+  const { audioState, playTrack } = useAudio();
+  const [file, setFile] = useState<File | null>(null);
+  const [pipelineJob, setPipelineJob] = useState<PipelineJob | null>(null);
+  const [narratives, setNarratives] = useState<MultiLingual>(emptyMultiLingual());
 
-            {activeTab === 3 && (
-              <div className="space-y-4 bg-neutral-900/40 border border-neutral-800 p-6 rounded-lg">
-                <p className="text-sm text-neutral-400 leading-relaxed">
-                  Dynamic CMS API Gatekeeper Hub. Configure database entities, dynamic routes, and microservice bindings.
-                </p>
-                <div className="bg-neutral-900 border border-neutral-800 p-4 rounded font-mono text-xs text-neutral-400">
-                  <div className="flex justify-between py-1 border-b border-neutral-800">
-                    <span>GET /api/identity</span>
-                    <span className="text-emerald-500">200 OK</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-neutral-800">
-                    <span>PUT /api/identity</span>
-                    <span className="text-emerald-500">200 OK</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span>POST /api/pipeline/process</span>
-                    <span className="text-amber-500">PENDING</span>
-                  </div>
-                </div>
-              </div>
-            )}
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.[0]) setFile(e.dataTransfer.files[0]);
+  };
 
-            {activeTab === 4 && (
-              <div className="space-y-4 bg-neutral-900/40 border border-neutral-800 p-6 rounded-lg">
-                <p className="text-sm text-neutral-400 leading-relaxed">
-                  Configure critical system keys, service credentials, external integrations, and behavior overrides.
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-mono text-neutral-400 mb-1">API Key 1</label>
-                    <input type="password" value="••••••••••••••••••••••••" readOnly className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm text-neutral-300 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-mono text-neutral-400 mb-1">API Key 2</label>
-                    <input type="password" value="••••••••••••••••••••••••" readOnly className="w-full bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm text-neutral-300 focus:outline-none" />
-                  </div>
-                </div>
-              </div>
-            )}
+  const startPipeline = async () => {
+    // placeholder � real implementation sends file to POST /api/pipeline/process
+    const mockJob: PipelineJob = { id: crypto.randomUUID(), status: 'uploading', progress: 0, audioMetadata: null, generatedArtUrl: null, generatedNarrative: null, errorMessage: null };
+    setPipelineJob(mockJob);
+    // Simulate progress
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 10;
+      if (progress > 100) { clearInterval(interval); setPipelineJob(prev => prev ? { ...prev, status: 'awaiting_approval', progress: 100 } : null); }
+      else setPipelineJob(prev => prev ? { ...prev, progress } : null);
+    }, 500);
+  };
 
-            {activeTab === 5 && (
-              <div className="space-y-4 bg-neutral-900/40 border border-neutral-800 p-6 rounded-lg">
-                <p className="text-sm text-neutral-400 leading-relaxed">
-                  System Diagnostics & Document Verification Assistant. Verify structural compliance across essential media files and documents.
-                </p>
-                <div className="p-4 bg-neutral-900/80 border border-neutral-800 rounded space-y-2 font-mono text-xs text-neutral-400">
-                  <p className="flex items-center text-emerald-400">✓ Database status: Connected</p>
-                  <p className="flex items-center text-emerald-400">✓ Environment configurations: Loaded</p>
-                  <p className="flex items-center text-amber-400">⚠ Storage volume: 84% Capacity</p>
-                </div>
-              </div>
-            )}
+  return (
+    <div className="space-y-6">
+      <div onDrop={handleFileDrop} onDragOver={e => e.preventDefault()}
+        className="border-2 border-dashed border-[var(--border-color)] rounded-lg p-12 text-center hover:border-[var(--accent-color)] transition-colors cursor-pointer"
+      >
+        <p className="text-sm text-[var(--text-muted-color)]">Drop .mp3 / .wav or YouTube URL here</p>
+        <input type="file" accept="audio/*" onChange={e => setFile(e.target.files?.[0] || null)} className="mt-4 text-xs" />
+      </div>
+      {file && (
+        <button onClick={startPipeline} className="px-4 py-2 bg-[var(--accent-color)] text-[var(--surface-color)] rounded">Process {file.name}</button>
+      )}
+      {pipelineJob && (
+        <div className="bg-[var(--surface2-color)] p-4 rounded">
+          <p className="font-mono text-sm">Status: {pipelineJob.status} ({pipelineJob.progress}%)</p>
+          <div className="w-full bg-[var(--surface3-color)] h-2 rounded mt-2">
+            <div className="bg-[var(--accent-color)] h-2 rounded" style={{ width: `${pipelineJob.progress}%` }} />
           </div>
         </div>
+      )}
+      <div>
+        <h3 className="font-display text-lg mb-2">Playlist</h3>
+        {tracks.filter(t => t.isLive).map(track => (
+          <div key={track.id} className="flex items-center justify-between p-2 border-b border-[var(--border-color)]">
+            <span className="text-sm">{track.title?.en || 'Untitled'}</span>
+            <button onClick={() => playTrack(track)} className="text-[var(--accent-color)] text-xs">Play</button>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
-export default AdminDashboard;
+const TabGatekeeperHub = () => {
+  const [keys, setKeys] = useState({ AI_IMAGE_GENERATION_KEY: '', LLM_NARRATIVE_API_KEY: '', YOUTUBE_API_DATA_V3: '' });
+  const [show, setShow] = useState<Record<string, boolean>>({});
+
+  const toggleShow = (key: string) => setShow(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const handleTest = async (keyName: string) => {
+    // POST /api/keys/test
+    await apiPost('/api/keys/test', { keyName });
+  };
+
+  const handleSave = async (keyName: string) => {
+    // POST /api/keys
+    await apiPost('/api/keys', { keyName, value: keys[keyName as keyof typeof keys] });
+  };
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(keys).map(([keyName, value]) => (
+        <div key={keyName}>
+          <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">{keyName}</label>
+          <div className="flex gap-2">
+            <input type={show[keyName] ? 'text' : 'password'} value={value}
+              onChange={e => setKeys(prev => ({ ...prev, [keyName]: e.target.value }))}
+              className="flex-1 bg-[var(--surface3-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+            />
+            <button onClick={() => toggleShow(keyName)} className="px-2 py-1 text-xs bg-[var(--surface3-color)] rounded">{show[keyName] ? 'Hide' : 'Show'}</button>
+            <button onClick={() => handleTest(keyName)} className="px-2 py-1 text-xs bg-[var(--surface3-color)] rounded">Test</button>
+            <button onClick={() => handleSave(keyName)} className="px-2 py-1 text-xs bg-[var(--accent-color)] text-[var(--surface-color)] rounded">Save</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const TabStagingEngine = () => {
+  const { composerIdentity, updateIdentity } = useIdentity();
+  const [editMode, setEditMode] = useState(false);
+  const [draft, setDraft] = useState<ComposerIdentity | null>(null);
+  const { themeId, switchTheme } = useChromatic();
+
+  useEffect(() => { if (composerIdentity) setDraft(composerIdentity); }, [composerIdentity]);
+
+  const handlePublish = async () => {
+    if (!draft) return;
+    await updateIdentity(draft);
+    setEditMode(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-4 items-center">
+        <button onClick={() => setEditMode(!editMode)}
+          className={`px-4 py-2 rounded ${editMode ? 'bg-[var(--accent-color)] text-[var(--surface-color)]' : 'bg-[var(--surface3-color)]'}`}
+        >{editMode ? 'Editing' : 'Live Mode'}</button>
+        {editMode && <button onClick={handlePublish} className="px-4 py-2 bg-green-600 text-white rounded">Publish</button>}
+      </div>
+      <div className="flex gap-4">
+        {(['onyx','cyber','minimal'] as const).map(t => (
+          <button key={t} onClick={() => switchTheme(t)}
+            className={`px-3 py-1 text-xs rounded ${themeId === t ? 'bg-[var(--accent-color)]' : 'bg-[var(--surface3-color)]'}`}
+          >{t}</button>
+        ))}
+      </div>
+      {editMode && draft && (
+        <div className="p-4 border border-dashed border-[var(--accent-color)] rounded">
+          <p className="text-xs text-[var(--text-muted-color)]">Editing mode � changes not live until published.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TabDocumentAssistant = () => {
+  const [file, setFile] = useState<File | null>(null);
+  const [checklist, setChecklist] = useState<{ category: string; items: string[] }[]>([]);
+
+  const handleAnalyze = async () => {
+    // Simulate AI extraction
+    setChecklist([
+      { category: 'Timecodes', items: ['00:00-01:30', '01:30-03:00'] },
+      { category: 'Revisions', items: ['Mix adjustment', 'Mastering'] },
+    ]);
+  };
+
+  return (
+    <div className="space-y-4">
+      <input type="file" accept=".pdf,.txt,.eml" onChange={e => setFile(e.target.files?.[0] || null)} />
+      {file && <button onClick={handleAnalyze} className="px-4 py-2 bg-[var(--accent-color)] text-[var(--surface-color)] rounded">Analyze</button>}
+      {checklist.length > 0 && (
+        <div className="space-y-2">
+          {checklist.map((group, i) => (
+            <div key={i}>
+              <h4 className="font-semibold text-sm">{group.category}</h4>
+              <ul className="list-disc pl-5 text-xs text-[var(--text-muted-color)]">
+                {group.items.map((item, j) => <li key={j}>{item}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------- Main Dashboard Component ----------
+export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: () => void; initialTab?: number }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const tabs = [
+    { id: 1, label: 'Identity Matrix' },
+    { id: 2, label: 'Media Pipeline' },
+    { id: 3, label: 'Gatekeeper Hub' },
+    { id: 4, label: 'Staging Engine' },
+    { id: 5, label: 'Document Assistant' },
+  ];
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex flex-col font-sans"
+      style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
+    >
+      <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+        <h1 className="text-lg font-mono tracking-wider" style={{ color: 'var(--accent-color)' }}>ACE ADMIN</h1>
+        <button onClick={onClose} className="px-4 py-2 bg-[var(--surface3-color)] rounded text-sm">Close</button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-56 border-r p-4 space-y-2" style={{ borderColor: 'var(--border-color)' }}>
+          {tabs.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`w-full text-left px-3 py-2 rounded text-sm font-mono transition-all ${
+                activeTab === tab.id
+                  ? 'bg-[var(--accent-color)] text-[var(--surface-color)]'
+                  : 'hover:bg-[var(--surface3-color)]'
+              }`}
+            >{tab.label}</button>
+          ))}
+        </div>
+
+        <div className="flex-1 p-6 overflow-y-auto">
+          <AnimatePresence mode="wait">
+            <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              {activeTab === 1 && <TabIdentityMatrix />}
+              {activeTab === 2 && <TabMediaPipeline />}
+              {activeTab === 3 && <TabGatekeeperHub />}
+              {activeTab === 4 && <TabStagingEngine />}
+              {activeTab === 5 && <TabDocumentAssistant />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
