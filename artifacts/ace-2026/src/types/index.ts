@@ -1,3 +1,10 @@
+// ============================================================
+// ACE-2026 — Canonical Type Definitions
+// Source of truth for ALL shared TypeScript interfaces.
+// Every field matches Blueprint Section 8 exactly.
+// Zero 'any' types. All nullables explicit.
+// ============================================================
+
 export type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
 export type ThemeId = 'onyx' | 'cyber' | 'minimal';
 
@@ -6,6 +13,10 @@ export interface ThemeConfig {
   variables: Record<string, string>;
 }
 
+// ------------------------------------------------------------------
+// Multilingual text — every user-facing text field uses this shape.
+// Blueprint LAW 3: no text field may be limited to one language.
+// ------------------------------------------------------------------
 export interface MultiLingual {
   en: string;
   es: string;
@@ -15,6 +26,9 @@ export interface MultiLingual {
   ko: string;
 }
 
+// ------------------------------------------------------------------
+// Vibrant colour palette extracted from cover art images
+// ------------------------------------------------------------------
 export interface VibrantPalette {
   vibrant: string;
   muted: string;
@@ -24,6 +38,9 @@ export interface VibrantPalette {
   lightMuted: string;
 }
 
+// ------------------------------------------------------------------
+// Media asset — always null-safe; blurHash enables placeholder UI
+// ------------------------------------------------------------------
 export interface MediaAsset {
   url: string;
   blurHash: string;
@@ -34,6 +51,9 @@ export interface MediaAsset {
   vibrantPalette: VibrantPalette | null;
 }
 
+// ------------------------------------------------------------------
+// Social links — all nullable; UI hides missing links gracefully
+// ------------------------------------------------------------------
 export interface SocialLinks {
   spotify: string | null;
   imdb: string | null;
@@ -41,6 +61,9 @@ export interface SocialLinks {
   youtube: string | null;
 }
 
+// ------------------------------------------------------------------
+// Project — portfolio item in the Spatial Scroll timeline
+// ------------------------------------------------------------------
 export interface Project {
   id: string;
   title: MultiLingual;
@@ -50,6 +73,10 @@ export interface Project {
   coverImage: MediaAsset | null;
 }
 
+// ------------------------------------------------------------------
+// ComposerIdentity — Blueprint LAW 2: ALL fields null at launch.
+// Admin injects via CMS. UI renders gracefully with null values.
+// ------------------------------------------------------------------
 export interface ComposerIdentity {
   id: string | null;
   name: MultiLingual | null;
@@ -64,6 +91,9 @@ export interface ComposerIdentity {
   projects: Project[] | null;
 }
 
+// ------------------------------------------------------------------
+// Audio track — single portfolio music piece
+// ------------------------------------------------------------------
 export interface AudioTrack {
   id: string;
   title: MultiLingual;
@@ -79,6 +109,10 @@ export interface AudioTrack {
   createdAt: string;
 }
 
+// ------------------------------------------------------------------
+// AudioState — global singleton state managed by AudioContext
+// Blueprint Section 9: player is purely presentational, never owns state
+// ------------------------------------------------------------------
 export interface AudioState {
   isPlaying: boolean;
   currentTrack: AudioTrack | null;
@@ -93,6 +127,9 @@ export interface AudioState {
   currentIndex: number;
 }
 
+// ------------------------------------------------------------------
+// AI Media Pipeline — state machine statuses
+// ------------------------------------------------------------------
 export type PipelineStatus =
   | 'idle'
   | 'uploading'
@@ -124,6 +161,9 @@ export interface PipelineJob {
   errorMessage: string | null;
 }
 
+// ------------------------------------------------------------------
+// Standard API response envelope — matches backend exactly
+// ------------------------------------------------------------------
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;

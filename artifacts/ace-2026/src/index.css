@@ -1,36 +1,177 @@
-@import "tailwindcss";
+﻿/* ============================================================
+   ACE-2026 — Global Styles
+   Blueprint LAW (Section 21): Zero horizontal overflow at all
+   breakpoints. Zero inline styles in TSX. All colours from CSS vars.
+   Blueprint Section 6: CSS variables injected by ChromaticContext.
+   ============================================================ */
 
-/* Global resets and styles matching PROMPT 061 exactly */
-*, *::before, *::after {
+/* ------------------------------------------------------------------
+   Box model reset
+   ------------------------------------------------------------------ */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+/* ------------------------------------------------------------------
+   Root — CRITICAL: overflow-x hidden enforces Blueprint LAW
+   (zero horizontal scroll at 375 / 768 / 1440 px)
+   ------------------------------------------------------------------ */
 html {
   overflow-x: hidden;
   scroll-behavior: smooth;
+  /* dvh units everywhere — Blueprint iOS requirement */
+  height: 100dvh;
 }
 
 body {
   overflow-x: hidden;
+  min-height: 100dvh;
   background-color: var(--surface-color);
   color: var(--text-color);
-  transition: background-color 0.6s ease, color 0.6s ease;
+  font-family: var(--font-body, "'EB Garamond', Georgia, serif");
+  line-height: var(--line-height-base, 1.7);
+  letter-spacing: var(--letter-spacing-base, 0.08em);
+  /* Prevent iOS font size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  /* Smooth font rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
+/* ------------------------------------------------------------------
+   Cursor — MagneticCursor replaces OS pointer on desktop
+   ------------------------------------------------------------------ */
+@media (pointer: fine) {
+  body {
+    cursor: none;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Selection — themed
+   ------------------------------------------------------------------ */
 ::selection {
   background-color: var(--accent-color);
   color: var(--surface-color);
 }
 
+/* ------------------------------------------------------------------
+   Focus — accessible indicator, Blueprint Section 21
+   ------------------------------------------------------------------ */
 :focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
 
+/* Remove default focus ring (replaced by :focus-visible above) */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ------------------------------------------------------------------
+   Scrollbar — themed, minimal
+   ------------------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface2-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-color);
+}
+
+/* ------------------------------------------------------------------
+   Skip navigation — visible on focus, Blueprint accessibility
+   ------------------------------------------------------------------ */
+.skip-nav {
+  position: absolute;
+  top: -100%;
+  inset-inline-start: 1rem;
+  z-index: 10001;
+  padding: 0.5rem 1rem;
+  background: var(--accent-color);
+  color: var(--surface-color);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  border-radius: 0 0 4px 4px;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+
+.skip-nav:focus {
+  top: 0;
+}
+
+/* ------------------------------------------------------------------
+   Typography base — all text uses CSS vars, no hardcoded values
+   ------------------------------------------------------------------ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  line-height: 1.15;
+  color: var(--text-color);
+}
+
+p {
+  line-height: var(--line-height-base);
+}
+
+a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------------------------
+   Images — default behaviour
+   ------------------------------------------------------------------ */
+img {
+  max-inline-size: 100%;
+  display: block;
+}
+
+/* ------------------------------------------------------------------
+   Form elements — prevent iOS zoom (min 16px), Blueprint requirement
+   ------------------------------------------------------------------ */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: max(1rem, 16px); /* iOS zoom prevention */
+  color: var(--text-color);
+  background: transparent;
+  border: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------
+   Reduced motion — Blueprint Section 21
+   All non-essential animations disabled when user prefers
+   ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -38,26 +179,69 @@ body {
   }
 }
 
-.skip-nav {
+/* ------------------------------------------------------------------
+   CJK typography — Blueprint Section 21
+   Applied via data-locale attribute set by ChromaticContext
+   ------------------------------------------------------------------ */
+[data-locale="ko"] {
+  word-break: keep-all;
+}
+
+[data-locale="zh"] {
+  overflow-wrap: break-word;
+}
+
+[data-locale="ja"] {
+  line-break: strict;
+  font-feature-settings: "palt" 1;
+  overflow-wrap: break-word;
+}
+
+[data-locale="zh"],
+[data-locale="ja"],
+[data-locale="ko"] {
+  text-align: start; /* never justify for CJK */
+}
+
+/* ------------------------------------------------------------------
+   DEMO MODE badge — Blueprint Section 36
+   ------------------------------------------------------------------ */
+.demo-badge {
+  position: fixed;
+  inset-block-start: 1rem;
+  inset-inline-end: 1rem;
+  z-index: 10000;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  background: var(--surface2-color);
+  color: var(--accent-color);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------
+   Utility: visually-hidden (accessibility)
+   ------------------------------------------------------------------ */
+.sr-only {
   position: absolute;
-  left: -10000px;
-  top: auto;
   width: 1px;
   height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.skip-nav:focus {
-  position: static;
-  width: auto;
-  height: auto;
-  background: var(--surface-color);
-  color: var(--accent-color);
-  padding: 1rem;
-  z-index: 100000;
-}
-
-/* Hide third‑party injected iframes that lack title from accessibility tree */
-iframe:not([title]):not([aria-label]) {
-  display: none !important;
+/* ------------------------------------------------------------------
+   React root — full height
+   ------------------------------------------------------------------ */
+#root {
+  min-height: 100dvh;
+  isolation: isolate;
 }

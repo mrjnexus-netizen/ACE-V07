@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+﻿import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 type ThemeId = 'onyx' | 'cyber' | 'minimal';
 type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
@@ -81,46 +81,42 @@ const THEME_VARIABLES: Record<ThemeId, Record<string, string>> = {
   },
 };
 
+// Apply theme synchronously before React renders — prevents flash
+function applyThemeSync(theme: ThemeId): void {
+  const vars = THEME_VARIABLES[theme];
+  const root = document.documentElement;
+  Object.entries(vars).forEach(([key, value]) => {
+    root.style.setProperty(key, value);
+  });
+  root.setAttribute('data-theme', theme);
+}
+
+// Run immediately on module load
+const _storedTheme = localStorage.getItem('ace-theme') as ThemeId | null;
+const _validThemes: ThemeId[] = ['onyx', 'cyber', 'minimal'];
+const _initialTheme: ThemeId = (_storedTheme && _validThemes.includes(_storedTheme))
+  ? _storedTheme
+  : (['onyx', 'cyber', 'minimal'] as ThemeId[])[Math.floor(Math.random() * 3)];
+applyThemeSync(_initialTheme);
+if (!_storedTheme) localStorage.setItem('ace-theme', _initialTheme);
+
 const ChromaticContext = createContext<ChromaticContextType | undefined>(undefined);
 
 export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
-  const [themeId, setThemeId] = useState<ThemeId>('onyx');
-
-  useEffect(() => {
-    const stored = localStorage.getItem('ace-theme') as ThemeId | null;
-    if (stored && ['onyx', 'cyber', 'minimal'].includes(stored)) {
-      setThemeId(stored);
-    } else {
-      const random = Math.random();
-      const defaultTheme: ThemeId = random < 0.33 ? 'onyx' : random < 0.66 ? 'cyber' : 'minimal';
-      setThemeId(defaultTheme);
-    }
-  }, []);
-
-  const applyTheme = useCallback((theme: ThemeId) => {
-    const vars = THEME_VARIABLES[theme];
-    const root = document.documentElement;
-
-    // Cross-fade: set opacity to 0, apply vars, then fade in
-    root.style.transition = 'opacity 600ms ease';
-    root.style.opacity = '0';
-
-    setTimeout(() => {
-      Object.entries(vars).forEach(([key, value]) => {
-        root.style.setProperty(key, value);
-      });
-      root.setAttribute('data-theme', theme);
-      root.style.opacity = '1';
-    }, 50);
-  }, []);
-
-  useEffect(() => {
-    applyTheme(themeId);
-  }, [themeId, applyTheme]);
+  const [themeId, setThemeId] = useState<ThemeId>(_initialTheme);
 
   const switchTheme = useCallback((theme: ThemeId) => {
-    setThemeId(theme);
-    localStorage.setItem('ace-theme', theme);
+    const root = document.documentElement;
+    root.style.transition = 'opacity 600ms ease';
+    root.style.opacity = '0';
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        applyThemeSync(theme);
+        setThemeId(theme);
+        localStorage.setItem('ace-theme', theme);
+        root.style.opacity = '1';
+      }, 300);
+    });
   }, []);
 
   return (
