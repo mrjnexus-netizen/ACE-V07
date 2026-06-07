@@ -1,124 +1,142 @@
-import Vibrant from "node-vibrant";
+import type { VibrantPalette } from '../types';
 
-export interface VibrantPalette {
-  vibrant?: string | undefined;
-  muted?: string | undefined;
-  darkVibrant?: string | undefined;
-  darkMuted?: string | undefined;
-  lightVibrant?: string | undefined;
-  lightMuted?: string | undefined;
-}
-
-type ThemeId = "ONYX" | "MINIMAL" | "CYBER";
-
-// Helper to convert hex to HSL
-const hexToHsl = (hex: string): { h: number; s: number; l: number } => {
-  let r = parseInt(hex.slice(1, 3), 16) / 255;
-  let g = parseInt(hex.slice(3, 5), 16) / 255;
-  let b = parseInt(hex.slice(5, 7), 16) / 255;
-
+function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return null;
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   let h = 0;
   let s = 0;
   const l = (max + min) / 2;
-
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r:
-        h = (g - b) / d + (g < b ? 6 : 0);
-        break;
-      case g:
-        h = (b - r) / d + 2;
-        break;
-      case b:
-        h = (r - g) / d + 4;
-        break;
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
     }
-    h /= 6;
+    h = (h / 6) * 360;
   }
+  return { h, s, l };
+}
 
-  return { h: h * 360, s: s * 100, l: l * 100 };
-};
-
-// Helper to convert HSL to hex
-const hslToHex = (h: number, s: number, l: number): string => {
-  s /= 100;
-  l /= 100;
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) =>
-    l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  
-  const toHex = (x: number) => {
-    const hex = Math.round(x * 255).toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
+function hslToHex(h: number, s: number, l: number): string {
+  const hNorm = h / 360;
+  const hue2rgb = (p: number, q: number, t: number): number => {
+    let tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
   };
-  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
-};
+  let r: number, g: number, b: number;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, hNorm + 1 / 3);
+    g = hue2rgb(p, q, hNorm);
+    b = hue2rgb(p, q, hNorm - 1 / 3);
+  }
+  const toHex = (x: number) => Math.round(x * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
 
-export const extractPalette = async (
-  imageUrl: string
-): Promise<VibrantPalette | null> => {
-  try {
-    const palette = await Vibrant.from(imageUrl).getPalette();
-    return {
-      vibrant: palette.Vibrant?.getHex(),
-      muted: palette.Muted?.getHex(),
-      darkVibrant: palette.DarkVibrant?.getHex(),
-      darkMuted: palette.DarkMuted?.getHex(),
-      lightVibrant: palette.LightVibrant?.getHex(),
-      lightMuted: palette.LightMuted?.getHex(),
+function resolveClash(extracted: string, themeAccent: string): string {
+  const extHsl = hexToHsl(extracted);
+  const accHsl = hexToHsl(themeAccent);
+  if (!extHsl || !accHsl) return extracted;
+  const diff = Math.abs(extHsl.h - accHsl.h);
+  const angleDiff = Math.min(diff, 360 - diff);
+  if (angleDiff < 30) {
+    return hslToHex(extHsl.h, extHsl.s * 0.4, extHsl.l);
+  }
+  return extracted;
+}
+
+async function sampleDominantColor(imageUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0, 32, 32);
+        const data = ctx.getImageData(0, 0, 32, 32).data;
+        let rSum = 0, gSum = 0, bSum = 0, count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const a = data[i + 3];
+          if ((a ?? 0) > 128) {
+            rSum += data[i] ?? 0;
+            gSum += data[i + 1] ?? 0;
+            bSum += data[i + 2] ?? 0;
+            count++;
+          }
+        }
+        if (count === 0) { resolve(null); return; }
+        const toHex = (v: number) => Math.round(v / count).toString(16).padStart(2, '0');
+        resolve(`#${toHex(rSum)}${toHex(gSum)}${toHex(bSum)}`);
+      } catch {
+        resolve(null);
+      }
     };
-  } catch (error) {
+    img.onerror = () => resolve(null);
+    img.src = imageUrl;
+  });
+}
+
+export async function extractPalette(imageUrl: string): Promise<VibrantPalette | null> {
+  if (!imageUrl) return null;
+
+  const themeAccent =
+    getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim() || '#D4AF37';
+
+  try {
+    const VibrantLib = (window as unknown as Record<string, unknown>).Vibrant as
+      | { from: (src: string) => { getPalette: () => Promise<Record<string, { hex: string } | null>> } }
+      | undefined;
+
+    if (VibrantLib) {
+      const palette = await VibrantLib.from(imageUrl).getPalette();
+      const get = (key: string): string => {
+        const swatch = palette[key];
+        if (!swatch) return themeAccent;
+        return resolveClash(swatch.hex, themeAccent);
+      };
+      return {
+        vibrant: get('Vibrant'),
+        muted: get('Muted'),
+        darkVibrant: get('DarkVibrant'),
+        darkMuted: get('DarkMuted'),
+        lightVibrant: get('LightVibrant'),
+        lightMuted: get('LightMuted'),
+      };
+    }
+
+    const dominant = await sampleDominantColor(imageUrl);
+    if (!dominant) return null;
+    const safe = resolveClash(dominant, themeAccent);
+    return {
+      vibrant: safe,
+      muted: safe,
+      darkVibrant: safe,
+      darkMuted: safe,
+      lightVibrant: safe,
+      lightMuted: safe,
+    };
+  } catch (err) {
+    console.warn('[vibrantExtractor] Failed to extract palette:', err);
     return null;
   }
-};
-
-export const checkColorClash = (
-  extractedHex: string,
-  themeAccentHex: string
-): boolean => {
-  try {
-    const hslExtracted = hexToHsl(extractedHex);
-    const hslTheme = hexToHsl(themeAccentHex);
-    const hueDiff = Math.abs(hslExtracted.h - hslTheme.h);
-    const wrappedHueDiff = Math.min(hueDiff, 360 - hueDiff);
-    return wrappedHueDiff < 30;
-  } catch {
-    return false;
-  }
-};
-
-export const applyDynamicAccent = (
-  palette: VibrantPalette | null,
-  themeId: ThemeId
-): void => {
-  const root = document.documentElement;
-
-  if (!palette || !palette.vibrant) {
-    root.style.removeProperty("--dynamic-accent");
-    return;
-  }
-
-  // Define fallback theme accents
-  const themeAccents: Record<ThemeId, string> = {
-    ONYX: "#007bff",
-    MINIMAL: "#007bff",
-    CYBER: "#00ffff",
-  };
-
-  const themeAccent = themeAccents[themeId] || "#007bff";
-  let colorToApply = palette.vibrant;
-
-  if (checkColorClash(colorToApply, themeAccent)) {
-    // On clash: desaturate extracted color before applying as --dynamic-accent
-    const hsl = hexToHsl(colorToApply);
-    const desaturatedHex = hslToHex(hsl.h, Math.max(0, hsl.s - 40), hsl.l);
-    colorToApply = desaturatedHex;
-  }
-
-  root.style.setProperty("--dynamic-accent", colorToApply);
-};
+}

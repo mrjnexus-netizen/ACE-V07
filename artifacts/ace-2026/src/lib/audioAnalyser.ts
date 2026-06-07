@@ -1,44 +1,51 @@
-export const createAnalyserNode = (ctx: AudioContext, fftSize: number): AnalyserNode => {
-  const node = ctx.createAnalyser();
-  node.smoothingTimeConstant = 0.85;
-  node.fftSize = fftSize;
-  return node;
-};
+export interface FrequencyBands {
+  bassLevel: number;
+  midLevel: number;
+  highLevel: number;
+}
 
-export const getFrequencyBands = (
-  node: AnalyserNode
-): { bassLevel: number; midLevel: number; highLevel: number } => {
-  const bufferLength = node.frequencyBinCount;
+export function createAnalyserNode(
+  audioContext: AudioContext,
+  fftSize?: number
+): AnalyserNode {
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = fftSize ?? (window.innerWidth < 768 ? 512 : 2048);
+  analyser.smoothingTimeConstant = 0.85;
+  return analyser;
+}
+
+export function getFrequencyBands(analyserNode: AnalyserNode): FrequencyBands {
+  const bufferLength = analyserNode.frequencyBinCount;
   const dataArray = new Uint8Array(bufferLength);
-  node.getByteFrequencyData(dataArray);
+  analyserNode.getByteFrequencyData(dataArray);
 
-  // Helper to calculate average normalized to 0-1
-  const getAverage = (start: number, end: number) => {
-    if (bufferLength === 0) return 0;
-    const startIndex = Math.min(start, bufferLength - 1);
-    const endIndex = Math.min(end, bufferLength);
-    if (startIndex >= endIndex) return 0;
+  const bassEnd = Math.min(10, bufferLength);
+  const midEnd = Math.min(100, bufferLength);
+  const highEnd = Math.min(512, bufferLength);
 
-    let sum = 0;
-    for (let i = startIndex; i < endIndex; i++) {
-      sum += dataArray[i] ?? 0;
-    }
-    return sum / (endIndex - startIndex) / 255;
+  let bassSum = 0;
+  for (let i = 0; i < bassEnd; i++) bassSum += (dataArray[i] ?? 0);
+  const bassLevel = bassEnd > 0 ? bassSum / (bassEnd * 255) : 0;
+
+  let midSum = 0;
+  for (let i = bassEnd; i < midEnd; i++) midSum += (dataArray[i] ?? 0);
+  const midCount = midEnd - bassEnd;
+  const midLevel = midCount > 0 ? midSum / (midCount * 255) : 0;
+
+  let highSum = 0;
+  for (let i = midEnd; i < highEnd; i++) highSum += (dataArray[i] ?? 0);
+  const highCount = highEnd - midEnd;
+  const highLevel = highCount > 0 ? highSum / (highCount * 255) : 0;
+
+  return {
+    bassLevel: Math.min(1, Math.max(0, bassLevel)),
+    midLevel: Math.min(1, Math.max(0, midLevel)),
+    highLevel: Math.min(1, Math.max(0, highLevel)),
   };
+}
 
-  // Bass: indices 0-10
-  const bassLevel = getAverage(0, 11);
-  // Mid: indices 10-100
-  const midLevel = getAverage(10, 101);
-  // High: indices 100-512
-  const highLevel = getAverage(100, 513);
-
-  return { bassLevel, midLevel, highLevel };
-};
-
-export const getTimeDomainData = (node: AnalyserNode): Float32Array => {
-  const bufferLength = node.fftSize;
-  const dataArray = new Float32Array(bufferLength);
-  node.getFloatTimeDomainData(dataArray);
+export function getTimeDomainData(analyserNode: AnalyserNode): Float32Array {
+  const dataArray = new Float32Array(analyserNode.fftSize);
+  analyserNode.getFloatTimeDomainData(dataArray);
   return dataArray;
-};
+}

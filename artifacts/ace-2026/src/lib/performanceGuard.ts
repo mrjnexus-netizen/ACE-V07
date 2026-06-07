@@ -1,81 +1,76 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from 'react';
 
-type HardwareTier = "high" | "medium" | "low";
+export interface PerformanceProfile {
+  isLowEnd: boolean;
+  particleCount: number;
+  enableEffects: boolean;
+}
 
-export const detectHardwareTier = (): HardwareTier => {
-  const concurrency = navigator.hardwareConcurrency || 0;
-  const deviceMemory = (navigator as any).deviceMemory || 0;
+const LOW_PARTICLE_COUNT = 500;
+const NORMAL_PARTICLE_COUNT_MOBILE = 2000;
+const NORMAL_PARTICLE_COUNT_TABLET = 4000;
+const NORMAL_PARTICLE_COUNT_DESKTOP = 8000;
+const FPS_CHECK_INTERVAL_MS = 3000;
+const FPS_THRESHOLD = 30;
 
-  if (concurrency >= 8) {
-    return "high";
-  } else if (concurrency >= 4) {
-    return "medium";
-  } else {
-    if (deviceMemory < 4) {
-      return "low";
-    }
-    return "low";
-  }
-};
+function getDefaultParticleCount(isLowEnd: boolean): number {
+  if (isLowEnd) return LOW_PARTICLE_COUNT;
+  const w = window.innerWidth;
+  if (w < 768) return NORMAL_PARTICLE_COUNT_MOBILE;
+  if (w < 1024) return NORMAL_PARTICLE_COUNT_TABLET;
+  return NORMAL_PARTICLE_COUNT_DESKTOP;
+}
 
-const getParticleCount = (tier: HardwareTier): number => {
-  switch (tier) {
-    case "high":
-      return 8000;
-    case "medium":
-      return 4000;
-    case "low":
-      return 2000;
-  }
-};
+export function usePerformanceGuard(): PerformanceProfile {
+  const hardwareLowEnd =
+    typeof navigator !== 'undefined' && navigator.hardwareConcurrency < 4;
 
-const shouldEnableEffects = (tier: HardwareTier): boolean => {
-  return tier === "high" || tier === "medium";
-};
+  const [profile, setProfile] = useState<PerformanceProfile>({
+    isLowEnd: hardwareLowEnd,
+    particleCount: getDefaultParticleCount(hardwareLowEnd),
+    enableEffects: !hardwareLowEnd,
+  });
 
-export const usePerformanceGuard = () => {
-  const [tier, setTier] = useState<HardwareTier>(detectHardwareTier());
-  const [particleCount, setParticleCount] = useState<number>(
-    getParticleCount(tier)
-  );
-  const [enableEffects, setEnableEffects] = useState<boolean>(
-    shouldEnableEffects(tier)
-  );
-  const [enableBloom, setEnableBloom] = useState<boolean>(enableEffects); // Assuming enableBloom is tied to enableEffects initially
+  const frameCountRef = useRef(0);
+  const lastCheckRef = useRef(performance.now());
+  const animRef = useRef<number>(0);
+  const consecutiveLowFpsRef = useRef(0);
 
   useEffect(() => {
-    let frameTimes: number[] = [];
-    let lastFrameTime = performance.now();
+    if (profile.isLowEnd) return;
 
-    const monitorFps = () => {
+    const monitor = () => {
+      frameCountRef.current++;
       const now = performance.now();
-      const deltaTime = now - lastFrameTime;
-      lastFrameTime = now;
+      const elapsed = now - lastCheckRef.current;
 
-      frameTimes.push(1000 / deltaTime);
-      frameTimes = frameTimes.slice(-180); // Keep last 3 seconds (60fps * 3s)
+      if (elapsed >= FPS_CHECK_INTERVAL_MS) {
+        const fps = (frameCountRef.current / elapsed) * 1000;
+        frameCountRef.current = 0;
+        lastCheckRef.current = now;
 
-      const avgFps = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
-
-      if (avgFps < 30 && tier !== "low") {
-        setTier("low");
-        setParticleCount(getParticleCount("low"));
-        setEnableEffects(shouldEnableEffects("low"));
-        setEnableBloom(false); // Disable bloom on low tier
-        document.documentElement.style.setProperty("backdrop-filter", "none");
-        // Disable scan lines - specific implementation would depend on how scan lines are rendered
-        // Use CSS dissolve instead of 3D shatter - specific implementation would depend on how these are rendered
+        if (fps < FPS_THRESHOLD) {
+          consecutiveLowFpsRef.current++;
+          if (consecutiveLowFpsRef.current >= 3) {
+            setProfile({
+              isLowEnd: true,
+              particleCount: LOW_PARTICLE_COUNT,
+              enableEffects: false,
+            });
+            cancelAnimationFrame(animRef.current);
+            return;
+          }
+        } else {
+          consecutiveLowFpsRef.current = 0;
+        }
       }
 
-      requestAnimationFrame(monitorFps);
+      animRef.current = requestAnimationFrame(monitor);
     };
 
-    // We need to check if window is defined to avoid issues during SSR
-    if (typeof window !== 'undefined') {
-      requestAnimationFrame(monitorFps);
-    }
+    animRef.current = requestAnimationFrame(monitor);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [profile.isLowEnd]);
 
-  }, [tier]);
-
-  return { tier, particleCount, enableEffects, enableBloom };
-};
+  return profile;
+}

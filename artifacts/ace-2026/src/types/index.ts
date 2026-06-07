@@ -1,3 +1,11 @@
+export type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
+export type ThemeId = 'onyx' | 'cyber' | 'minimal';
+
+export interface ThemeConfig {
+  id: ThemeId;
+  variables: Record<string, string>;
+}
+
 export interface MultiLingual {
   en: string;
   es: string;
@@ -5,16 +13,6 @@ export interface MultiLingual {
   zh: string;
   ja: string;
   ko: string;
-}
-
-export interface MediaAsset {
-  url: string;
-  blurHash: string;
-  width: number;
-  height: number;
-  format: 'webp' | 'jpg' | 'png';
-  dominantColors: string[];
-  vibrantPalette: VibrantPalette | null;
 }
 
 export interface VibrantPalette {
@@ -26,18 +24,14 @@ export interface VibrantPalette {
   lightMuted: string;
 }
 
-export interface ComposerIdentity {
-  id: string | null;
-  name: MultiLingual | null;
-  tagline: MultiLingual | null;
-  biography: MultiLingual | null;
-  awards: MultiLingual[] | null;
-  studioAddress: MultiLingual | null;
-  portrait: MediaAsset | null;
-  logo: MediaAsset | null;
-  heroVideo: string | null;
-  socialLinks: SocialLinks | null;
-  projects: Project[] | null;
+export interface MediaAsset {
+  url: string;
+  blurHash: string;
+  width: number;
+  height: number;
+  format: 'webp' | 'jpg' | 'png';
+  dominantColors: string[];
+  vibrantPalette: VibrantPalette | null;
 }
 
 export interface SocialLinks {
@@ -56,6 +50,20 @@ export interface Project {
   coverImage: MediaAsset | null;
 }
 
+export interface ComposerIdentity {
+  id: string | null;
+  name: MultiLingual | null;
+  tagline: MultiLingual | null;
+  biography: MultiLingual | null;
+  awards: MultiLingual[] | null;
+  studioAddress: MultiLingual | null;
+  portrait: MediaAsset | null;
+  logo: MediaAsset | null;
+  heroVideo: string | null;
+  socialLinks: SocialLinks | null;
+  projects: Project[] | null;
+}
+
 export interface AudioTrack {
   id: string;
   title: MultiLingual;
@@ -69,7 +77,6 @@ export interface AudioTrack {
   sortOrder: number;
   isLive: boolean;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface AudioState {
@@ -98,6 +105,15 @@ export type PipelineStatus =
   | 'complete'
   | 'error';
 
+export interface AudioMetadata {
+  dominantInstrument: string;
+  bpm: number;
+  mood: string;
+  keySignature: string;
+  duration: number;
+  title: string | null;
+}
+
 export interface PipelineJob {
   id: string;
   status: PipelineStatus;
@@ -106,24 +122,6 @@ export interface PipelineJob {
   generatedArtUrl: string | null;
   generatedNarrative: MultiLingual | null;
   errorMessage: string | null;
-}
-
-export interface AudioMetadata {
-  dominantInstrument: string | null;
-  bpm: number | null;
-  mood: string | null;
-  keySignature: string | null;
-  duration: number;
-  title: string | null;
-}
-
-export type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
-
-export type ThemeId = 'onyx' | 'cyber' | 'minimal';
-
-export interface ThemeConfig {
-  id: ThemeId;
-  variables: Record<string, string>;
 }
 
 export interface ApiResponse<T> {

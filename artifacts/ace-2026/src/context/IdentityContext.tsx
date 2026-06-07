@@ -7,7 +7,7 @@ interface IdentityContextType {
   identity: ComposerIdentity | null;   // alias
   tracks: AudioTrack[];
   playlist: AudioTrack[];              // alias
-  locale: Locale;
+  locale: Locale | null;
   setLocale: (locale: Locale) => void;
   loading: boolean;
   fetchIdentity: () => Promise<void>;
@@ -20,7 +20,7 @@ const IdentityContext = createContext<IdentityContextType | undefined>(undefined
 export const IdentityProvider = ({ children }: { children: ReactNode }) => {
   const [composerIdentity, setComposerIdentity] = useState<ComposerIdentity | null>(null);
   const [tracks, setTracks] = useState<AudioTrack[]>([]);
-  const [locale, setLocale] = useState<Locale>('en');
+  const [locale, setLocale] = useState<Locale | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchIdentity = useCallback(async () => {

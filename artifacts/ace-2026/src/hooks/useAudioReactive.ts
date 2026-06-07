@@ -10,9 +10,8 @@ export interface AudioReactiveData {
 }
 
 export function useAudioReactive(): AudioReactiveData {
-  const audio = useAudio();
-  // Support both useAudio().analyserNode and useAudio().audioState.analyserNode
-  const analyserNode = (audio as any).analyserNode || audio?.audioState?.analyserNode || null;
+  const { audioState } = useAudio();
+  const analyserNode = audioState.analyserNode;
 
   const [data, setData] = useState<AudioReactiveData>({
     bassLevel: 0,
@@ -37,25 +36,16 @@ export function useAudioReactive(): AudioReactiveData {
     const update = () => {
       const bands = getFrequencyBands(analyserNode);
       const timeDomain = getTimeDomainData(analyserNode);
-
-      setData({
-        ...bands,
-        timeDomainData: timeDomain,
-      });
-
+      setData({ ...bands, timeDomainData: timeDomain });
       rAFRef.current = requestAnimationFrame(update);
     };
 
     update();
 
     return () => {
-      if (rAFRef.current !== null) {
-        cancelAnimationFrame(rAFRef.current);
-      }
+      if (rAFRef.current !== null) cancelAnimationFrame(rAFRef.current);
     };
   }, [analyserNode]);
 
   return data;
 }
-
-export default useAudioReactive;
