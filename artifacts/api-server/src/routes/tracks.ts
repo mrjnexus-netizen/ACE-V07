@@ -276,7 +276,7 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
         });
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stream = s3Response.Body as any;
+      import { Readable } from 'stream'; const stream = s3Response.Body as Readable;
       stream.pipe(res);
     }
   } catch (err: unknown) {

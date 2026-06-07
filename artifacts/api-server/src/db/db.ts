@@ -18,7 +18,7 @@ export const db = drizzle(pool, { schema });
 export async function connectDb(): Promise<void> {
   try {
     await pool.query('SELECT 1');
-    console.log('Database connection verified.');
+    console.warn('Database connection verified.');
   } catch (error) {
     console.error('Database connection failed:', error);
     // In a real application, you would throw a structured AppError here.

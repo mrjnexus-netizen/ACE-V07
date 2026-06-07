@@ -27,7 +27,7 @@ const upload = multer({
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new (Error as any)('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.') as any, false);
+      (cb as (err: Error | null, accept: boolean) => void)(new Error('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.'), false);
     }
   },
 });
@@ -43,7 +43,7 @@ const s3Client = new S3Client({
 // Utility to generate BlurHash (for images)
 async function generateBlurHash(buffer: Buffer): Promise<string | null> {
   try {
-    const { data, info } = await (sharp as any)(buffer)
+    const { data, info } = await (sharp as (input: Buffer) => sharp.Sharp)(buffer)
       .raw()
       .ensureAlpha()
       .toBuffer({ resolveWithObject: true });
@@ -122,12 +122,12 @@ router.post('/upload', authenticateJWT, upload.single('media'), async (req: Requ
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (err: unknown) { const error = err as Error;
-    console.error('Error uploading media:', error);
+  } catch (err: unknown) {
+    console.error('Error uploading media:', err);
     return res.status(500).json({
       success: false,
       data: null,
-      error: error.message || 'Failed to upload media',
+      error: (err as Error).message || 'Failed to upload media',
       code: 'SERVER_ERROR',
       timestamp: new Date().toISOString(),
     });
@@ -159,7 +159,7 @@ router.post('/staging-preview', authenticateJWT, upload.single('media'), async (
       new GetObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME || 'ace-2026-bucket',
         Key: temporaryKey,
-      }) as any,
+      }),
       { expiresIn: 3600 } // 1 hour expiry
     );
 
@@ -179,12 +179,12 @@ router.post('/staging-preview', authenticateJWT, upload.single('media'), async (
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (err: unknown) { const error = err as Error;
-    console.error('Error generating staging preview:', error);
+  } catch (err: unknown) {
+    console.error('Error generating staging preview:', err);
     return res.status(500).json({
       success: false,
       data: null,
-      error: error.message || 'Failed to generate staging preview',
+      error: (err as Error).message || 'Failed to generate staging preview',
       code: 'SERVER_ERROR',
       timestamp: new Date().toISOString(),
     });

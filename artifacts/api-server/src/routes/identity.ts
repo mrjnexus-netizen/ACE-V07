@@ -179,7 +179,7 @@ router.put('/', authenticateJWT, async (req: Request, res: Response<ApiResponse<
           name: updateData.name !== undefined ? updateData.name : identity.name,
           tagline: updateData.tagline !== undefined ? updateData.tagline : identity.tagline,
           biography: updateData.biography !== undefined ? updateData.biography : identity.biography,
-          awards: updateData.awards !== undefined ? updateData.awards as any[] : identity.awards as any[],
+          awards: updateData.awards !== undefined ? updateData.awards as unknown[] : identity.awards as unknown[],
           studioAddress: updateData.studioAddress !== undefined ? updateData.studioAddress : identity.studioAddress,
           portraitUrl: updateData.portraitUrl !== undefined ? updateData.portraitUrl : identity.portraitUrl,
           portraitBlur: updateData.portraitBlur !== undefined ? updateData.portraitBlur : identity.portraitBlur,

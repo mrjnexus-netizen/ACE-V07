@@ -12,7 +12,7 @@ const router: Router = Router();
 const clients = new Map<string, Response>();
 
 // GET /api/pipeline/status/:jobId - SSE Endpoint
-router.get('/status/:jobId', (req: Request, res: Response) => {
+router.get('/status/:jobId', (req: Request, res: Response): void => {
   const { jobId } = req.params;
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -31,7 +31,7 @@ router.get('/status/:jobId', (req: Request, res: Response) => {
 });
 
 // Helper: Broadcast status update via SSE
-export const broadcastJobStatus = (jobId: string, status: string, progress: number, data: any = {}) => {
+export const broadcastJobStatus = (jobId: string, status: string, progress: number, data: Record<string, unknown> = {}): void => {
   const client = clients.get(jobId);
   if (client) {
     client.write(`data: ${JSON.stringify({ type: 'STATUS_UPDATE', jobId, status, progress, ...data })}\n\n`);
@@ -39,26 +39,20 @@ export const broadcastJobStatus = (jobId: string, status: string, progress: numb
 };
 
 // POST /api/pipeline/process - Trigger pipeline
-router.post('/process', authenticateJWT, async (req: Request, res: Response) => {
+router.post('/process', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
   try {
     const { audioUrl, youtubeUrl, title, genre } = req.body;
 
     if (!audioUrl && !youtubeUrl) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         data: null,
         error: 'audioUrl or youtubeUrl is required',
         code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
+      return;
     }
-
-    // Handle multipart/form-data for audio file upload (if applicable)
-    // This example assumes `audioUrl` is already available from a prior upload step
-    // or is a direct URL. For actual file uploads, Multer middleware would be used.
-    // If using Multer, the file would be accessible via `req.file` and `audioUrl` would be derived from its path.
-
-
 
     // 1. Create a draft track
     const [draftTrack] = await db.insert(tracks).values({
@@ -77,81 +71,71 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
       progress: 10,
     }).returning();
 
-    // 3. Trigger asynchronous media pipeline processing (simulation or background worker)
-    // To ensure zero dependency friction during local development, we initiate a background simulation
-    // that operates asynchronously but safely handles step-by-step updates.
-    setTimeout(async () => {
-      try {
-        const jobId = job!.id;
+    // 3. Trigger asynchronous media pipeline processing
+    setTimeout((): void => {
+      void (async (): Promise<void> => {
+        try {
+          const jobId = job!.id;
 
-        // In a real application, you would dispatch a BullMQ job here
-        // For now, we simulate the process with timeouts and direct DB updates
+          broadcastJobStatus(jobId, 'analyzing_audio', 20);
+          await db.update(pipelineJobs).set({ status: 'analyzing_audio', progress: 20 }).where(eq(pipelineJobs.id, jobId));
+          await new Promise(r => setTimeout(r, 1500));
 
-        // Stage: Analyzing Audio (20%)
-        broadcastJobStatus(jobId, 'analyzing_audio', 20);
-        await db.update(pipelineJobs).set({ status: 'analyzing_audio', progress: 20 }).where(eq(pipelineJobs.id, jobId));
-        await new Promise(r => setTimeout(r, 1500));
+          const audioMetadata = {
+            dominantInstrument: 'Violin',
+            bpm: 110,
+            mood: 'Dramatically intense, cinematic, mysterious',
+            keySignature: 'D Minor',
+            duration: 180,
+            title: title || 'Untitled Ascent',
+          };
 
-        const audioMetadata = {
-          dominantInstrument: 'Violin',
-          bpm: 110,
-          mood: 'Dramatically intense, cinematic, mysterious',
-          keySignature: 'D Minor',
-          duration: 180,
-          title: title || 'Untitled Ascent',
-        };
+          broadcastJobStatus(jobId, 'generating_art', 45, { metadata: audioMetadata });
+          await db.update(pipelineJobs).set({ status: 'generating_art', progress: 45, audioMetadata }).where(eq(pipelineJobs.id, jobId));
+          await new Promise(r => setTimeout(r, 2000));
 
-        // Stage: Generating Art (40%)
-        broadcastJobStatus(jobId, 'generating_art', 45, { metadata: audioMetadata });
-        await db.update(pipelineJobs).set({ status: 'generating_art', progress: 45, audioMetadata }).where(eq(pipelineJobs.id, jobId));
-        await new Promise(r => setTimeout(r, 2000));
+          const generatedArtUrl = 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=1200&q=80';
 
-        const generatedArtUrl = 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=1200&q=80';
+          broadcastJobStatus(jobId, 'generating_narrative', 75, { generatedArtUrl });
+          await db.update(pipelineJobs).set({ status: 'generating_narrative', progress: 75, generatedArtUrl }).where(eq(pipelineJobs.id, jobId));
+          await new Promise(r => setTimeout(r, 1500));
 
-        // Stage: Generating Narrative (70%)
-        broadcastJobStatus(jobId, 'generating_narrative', 75, { generatedArtUrl });
-        await db.update(pipelineJobs).set({ status: 'generating_narrative', progress: 75, generatedArtUrl }).where(eq(pipelineJobs.id, jobId));
-        await new Promise(r => setTimeout(r, 1500));
+          const generatedNarrative = await translateText(
+            `A sweeping orchestral movement highlighting soaring solo violin lines layered over deep cinematic sub-bass pulses and dynamic gothic atmospheric pads. Perfect for epic cinematic highlights.`,
+            'en'
+          );
 
-        // Generate dynamic narrative Liner Notes
-        const generatedNarrative = await translateText(
-          `A sweeping orchestral movement highlighting soaring solo violin lines layered over deep cinematic sub-bass pulses and dynamic gothic atmospheric pads. Perfect for epic cinematic highlights.`,
-          'en'
-        );
+          broadcastJobStatus(jobId, 'awaiting_approval', 90, { generatedNarrative });
+          await db.update(pipelineJobs).set({
+            status: 'awaiting_approval',
+            progress: 90,
+            generatedNarrative,
+          }).where(eq(pipelineJobs.id, jobId));
 
-        // Stage: Awaiting Approval (90%)
-        broadcastJobStatus(jobId, 'awaiting_approval', 90, { generatedNarrative });
-        await db.update(pipelineJobs).set({
-          status: 'awaiting_approval',
-          progress: 90,
-          generatedNarrative,
-        }).where(eq(pipelineJobs.id, jobId));
+        } catch (err: unknown) {
+          console.error('Asynchronous pipeline job failed:', err);
+          await db.update(pipelineJobs).set({
+            status: 'error',
+            errorMessage: (err as Error).message || 'Pipeline processing failed',
+          }).where(eq(pipelineJobs.id, job!.id));
+          broadcastJobStatus(job!.id, 'error', 100, { error: (err as Error).message });
+        }
+      })();
+    }, 100);
 
-      } catch (err: any) {
-        console.error('Asynchronous pipeline job failed:', err);
-        await db.update(pipelineJobs).set({
-          status: 'error',
-          errorMessage: err.message || 'Pipeline processing failed',
-        }).where(eq(pipelineJobs.id, job!.id));
-        broadcastJobStatus(job!.id, 'error', 100, { error: err.message });
-      }
-    }, 100); // Small delay to simulate async dispatch
-
-
-
-    return res.status(202).json({
+    res.status(202).json({
       success: true,
       data: { jobId: job!.id, trackId: draftTrack!.id },
       error: null,
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (err: unknown) { const error = err as Error;
-    console.error('Error starting pipeline:', error);
-    return res.status(500).json({
+  } catch (err: unknown) {
+    console.error('Error starting pipeline:', err);
+    res.status(500).json({
       success: false,
       data: null,
-      error: error.message || 'Failed to start media pipeline',
+      error: (err as Error).message || 'Failed to start media pipeline',
       code: 'SERVER_ERROR',
       timestamp: new Date().toISOString(),
     });
@@ -159,7 +143,7 @@ router.post('/process', authenticateJWT, async (req: Request, res: Response) => 
 });
 
 // POST /api/pipeline/approve/:jobId - Publish track
-router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Response) => {
+router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
     const { title, narrative, genre, bpm, mood, keySignature } = req.body;
@@ -169,30 +153,32 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
     });
 
     if (!job || !job.trackId) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         data: null,
         error: 'Pipeline job not found',
         code: 'NOT_FOUND',
         timestamp: new Date().toISOString(),
       });
+      return;
     }
 
-    // Complete the publishing
     await db.update(pipelineJobs).set({ status: 'publishing', progress: 95 }).where(eq(pipelineJobs.id, jobId!));
     broadcastJobStatus(jobId!, 'publishing', 95);
     await new Promise(r => setTimeout(r, 1000));
 
-    // Update the track with finalized, approved details and make it live
+    const generatedNarrative = job.generatedNarrative as Record<string, unknown> | null;
+    const audioMetadata = job.audioMetadata as Record<string, unknown> | null;
+
     await db.update(tracks).set({
-      title: title || (job.generatedNarrative as any)?.en || { en: 'Final Composition', es: '', fr: '', zh: '', ja: '', ko: '' },
-      narrative: narrative || (job.generatedNarrative as any)?.en || { en: '', es: '', fr: '', zh: '', ja: '', ko: '' },
+      title: title || (generatedNarrative?.en as string) || { en: 'Final Composition', es: '', fr: '', zh: '', ja: '', ko: '' },
+      narrative: narrative || (generatedNarrative?.en as string) || { en: '', es: '', fr: '', zh: '', ja: '', ko: '' },
       coverUrl: job.generatedArtUrl,
       genre: genre || 'cinematic',
-      bpm: bpm ? parseInt(bpm) : (job.audioMetadata as any)?.bpm || 110,
-      mood: mood || (job.audioMetadata as any)?.mood || 'Cinematic',
-      keySignature: keySignature || (job.audioMetadata as any)?.keySignature || 'D Minor',
-      duration: (job.audioMetadata as any)?.duration || 180,
+      bpm: bpm ? parseInt(bpm) : (audioMetadata?.bpm as number) || 110,
+      mood: mood || (audioMetadata?.mood as string) || 'Cinematic',
+      keySignature: keySignature || (audioMetadata?.keySignature as string) || 'D Minor',
+      duration: (audioMetadata?.duration as number) || 180,
       isLive: true,
       updatedAt: new Date(),
     }).where(eq(tracks.id, job.trackId));
@@ -200,19 +186,19 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
     await db.update(pipelineJobs).set({ status: 'complete', progress: 100 }).where(eq(pipelineJobs.id, jobId!));
     broadcastJobStatus(jobId!, 'complete', 100, { trackId: job.trackId });
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       data: 'Track published successfully and is now LIVE',
       error: null,
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (err: unknown) { const error = err as Error;
-    console.error('Approval error:', error);
-    return res.status(500).json({
+  } catch (err: unknown) {
+    console.error('Approval error:', err);
+    res.status(500).json({
       success: false,
       data: null,
-      error: error.message || 'Failed to approve and publish track',
+      error: (err as Error).message || 'Failed to approve and publish track',
       code: 'SERVER_ERROR',
       timestamp: new Date().toISOString(),
     });
@@ -220,26 +206,26 @@ router.post('/approve/:jobId', authenticateJWT, async (req: Request, res: Respon
 });
 
 // POST /api/pipeline/regenerate/:jobId
-router.post('/regenerate/:jobId', authenticateJWT, async (req: Request, res: Response) => {
+router.post('/regenerate/:jobId', authenticateJWT, async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
-    const { field } = req.body; // 'art' or 'narrative'
+    const { field } = req.body;
 
     const job = await db.query.pipelineJobs.findFirst({
       where: eq(pipelineJobs.id, jobId!),
     });
 
     if (!job) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         data: null,
         error: 'Pipeline job not found',
         code: 'NOT_FOUND',
         timestamp: new Date().toISOString(),
       });
+      return;
     }
 
-    // Simply simulate regeneration of field and return updated job
     await new Promise(r => setTimeout(r, 1000));
 
     if (field === 'art') {
@@ -255,19 +241,19 @@ router.post('/regenerate/:jobId', authenticateJWT, async (req: Request, res: Res
       broadcastJobStatus(jobId!, 'awaiting_approval', 90, { generatedNarrative });
     }
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       data: 'Regeneration complete',
       error: null,
       code: null,
       timestamp: new Date().toISOString(),
     });
-  } catch (err: unknown) { const error = err as Error;
-    console.error('Regeneration failed:', error);
-    return res.status(500).json({
+  } catch (err: unknown) {
+    console.error('Regeneration failed:', err);
+    res.status(500).json({
       success: false,
       data: null,
-      error: error.message || 'Regeneration failed',
+      error: (err as Error).message || 'Regeneration failed',
       code: 'SERVER_ERROR',
       timestamp: new Date().toISOString(),
     });

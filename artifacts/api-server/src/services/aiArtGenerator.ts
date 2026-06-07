@@ -21,7 +21,7 @@ export interface AudioMetadata {
   mood?: string;
   keySignature?: string;
   duration?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MediaAsset {
@@ -32,7 +32,7 @@ export interface MediaAsset {
   size: number;
   blurhash: string | null;
   dominantColors: string[];
-  vibrantPalette: any;
+  vibrantPalette: Record<string, string | null> | null;
 }
 
 // Initialize S3 Client
@@ -77,7 +77,7 @@ async function retryWithBackoff<T>(
   attempts: number = 3,
   delay: number = 1000
 ): Promise<T> {
-  let lastError: any;
+  let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
       return await fn();

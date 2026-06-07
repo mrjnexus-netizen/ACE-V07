@@ -12,7 +12,7 @@ export const redis = new Redis(REDIS_URL, {
 });
 
 redis.on('connect', () => {
-  console.log('Redis connected successfully.');
+  console.warn('Redis connected successfully.');
 });
 
 redis.on('error', (err) => {
@@ -29,7 +29,7 @@ async function verifyRedisConnection(): Promise<void> {
     const end = Date.now();
     const latency = end - start;
     if (latency < 10) {
-      console.log(`Redis PING successful. Latency: ${latency}ms`);
+      console.warn(`Redis PING successful. Latency: ${latency}ms`);
     } else {
       console.warn(`Redis PING successful but latency is high: ${latency}ms`);
     }

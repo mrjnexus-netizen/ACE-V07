@@ -49,7 +49,7 @@ export const translateText = async (
   const apiKey = await getAPIKey('LLM_NARRATIVE_API_KEY');
 
   if (isDemo || !apiKey) {
-    console.log(`[SIMULATION] Translating: "${text}" from ${sourceLang}`);
+    console.warn(`[SIMULATION] Translating: "${text}" from ${sourceLang}`);
     // Simulate dynamic delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 

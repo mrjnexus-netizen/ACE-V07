@@ -11,7 +11,7 @@ export const errorMiddleware = (
   req: Request,
   res: Response,
   _next: NextFunction
-) => {
+): void => {
   let error = err; // Use let to reassign error if it's not an AppError
 
   // Check if the error is an operational error (AppError instance)

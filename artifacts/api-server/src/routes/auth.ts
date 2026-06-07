@@ -19,7 +19,7 @@ const logger = createChildLogger("AuthRoutes");
 const ACCESS_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24h
 const REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30d
 
-const getJwtSecret = () => env.JWT_SECRET;
+const getJwtSecret = (): string => env.JWT_SECRET;
 
 // Zod schema for login validation
 const loginSchema = z.object({
@@ -28,7 +28,7 @@ const loginSchema = z.object({
 });
 
 // POST /api/auth/login
-router.post("/login", authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
+router.post("/login", authRateLimiter, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { username, password } = loginSchema.parse(req.body);
 
@@ -37,7 +37,8 @@ router.post("/login", authRateLimiter, async (req: Request, res: Response, next:
     });
 
     if (!admin) {
-      return sendError(res, "Invalid credentials", "INVALID_CREDENTIALS", 401);
+      sendError(res, "Invalid credentials", "INVALID_CREDENTIALS", 401);
+      return;
     }
 
     // Check lockout state
@@ -45,7 +46,8 @@ router.post("/login", authRateLimiter, async (req: Request, res: Response, next:
       const remainingMinutes = Math.ceil(
         (new Date(admin.lockedUntil).getTime() - Date.now()) / (60 * 1000)
       );
-      return sendError(res, `Account is locked. Please try again in ${remainingMinutes} minutes.`, "LOCKED_OUT", 403);
+      sendError(res, `Account is locked. Please try again in ${remainingMinutes} minutes.`, "LOCKED_OUT", 403);
+      return;
     }
 
     const isMatch = await bcrypt.compare(password, admin.passwordHash);
@@ -71,7 +73,8 @@ router.post("/login", authRateLimiter, async (req: Request, res: Response, next:
         ? "Too many failed attempts. Account locked for 15 minutes."
         : `Invalid credentials. ${5 - currentFailures} attempts remaining.`;
 
-      return sendError(res, errorMsg, currentFailures >= 5 ? "LOCKED_OUT" : "INVALID_CREDENTIALS", 401);
+      sendError(res, errorMsg, currentFailures >= 5 ? "LOCKED_OUT" : "INVALID_CREDENTIALS", 401);
+      return;
     }
 
     // Success! Reset failure count and update lastLogin
@@ -109,10 +112,11 @@ router.post("/login", authRateLimiter, async (req: Request, res: Response, next:
     });
 
     logger.info({ requestId: req.id, username: admin.username }, "Admin user logged in successfully.");
-    return sendSuccess(res, { username: admin.username }, 200);
+    sendSuccess(res, { username: admin.username }, 200);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return sendError(res, error.errors?.[0]?.message || "Validation error", "VALIDATION_ERROR", 400);
+      sendError(res, error.errors?.[0]?.message || "Validation error", "VALIDATION_ERROR", 400);
+      return;
     }
     next(error); // Pass to global error handler
   }

@@ -21,12 +21,12 @@ export const getCookies = (req: Request): Record<string, string> => {
   }, {} as Record<string, string>);
 };
 
-export const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
+export const authenticateJWT = (req: Request, res: Response, next: NextFunction): void => {
   const cookies = getCookies(req);
   const token = cookies.accessToken || req.headers.authorization?.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
       data: null,
       _error: 'Access token required',
@@ -41,7 +41,7 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
     (req as AuthenticatedRequest).user = decoded;
     next();
   } catch (_error) {
-    return res.status(403).json({
+    res.status(403).json({
       success: false,
       data: null,
       _error: 'Invalid or expired access token',

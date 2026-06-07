@@ -5,43 +5,37 @@ import { db } from '../db/db';
 import { redis } from '../db/redis';
 import { pipelineJobs } from '../db/schema';
 
-
-// Redis connection share
 const connection = redis;
 
-// 1. Create the Queue named 'ace-pipeline'
 export const queue = new Queue('ace-pipeline', {
   connection,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
       type: 'exponential',
-      delay: 1000, // 1s, 2s, 4s backoff per AI Resilience
+      delay: 1000,
     },
   },
 });
 
-// Helper functions required for export
-export async function addPipelineJob(jobData: any) {
+export async function addPipelineJob(jobData: Record<string, unknown>): Promise<Job> {
   return await queue.add('process-pipeline', jobData);
 }
 
-export async function getJobStatus(jobId: string) {
+export async function getJobStatus(jobId: string): Promise<{ id: string; progress: number; state: string; data: unknown } | null> {
   const job = await queue.getJob(jobId);
   if (!job) return null;
-  const counts = await job.getState();
-  return { id: job.id, progress: job.progress, state: counts, data: job.data };
+  const state = await job.getState();
+  return { id: job.id, progress: job.progress, state, data: job.data };
 }
 
-// 2. Define Worker with Concurrency of 2
 export const worker = new Worker(
   'ace-pipeline',
-  async (job: Job) => {
-    const { trackId: _trackId, jobId } = job.data;
+  async (job: Job): Promise<void> => {
+    const { trackId: _trackId, jobId } = job.data as { trackId: string; jobId: string };
 
     try {
-      // Step progress update helper
-      const updateProgress = async (prog: number) => {
+      const updateProgress = async (prog: number): Promise<void> => {
         await job.updateProgress(prog);
         await db
           .update(pipelineJobs)
@@ -51,21 +45,17 @@ export const worker = new Worker(
 
       await updateProgress(10);
 
-      // Concurrently execute pipeline stages safely via Promise.allSettled
-      const analysisPromise = async () => {
-        // Mock audio analysis step
+      const analysisPromise = async (): Promise<{ dominantInstrument: string; bpm: number; mood: string; keySignature: string; duration: number }> => {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         return { dominantInstrument: 'Piano', bpm: 120, mood: 'Peaceful', keySignature: 'C Major', duration: 150 };
       };
 
-      const artPromise = async () => {
-        // Mock art generation step
+      const artPromise = async (): Promise<{ generatedArtUrl: string }> => {
         await new Promise((resolve) => setTimeout(resolve, 1500));
         return { generatedArtUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745' };
       };
 
-      const narrativePromise = async () => {
-        // Mock narrative generation step
+      const narrativePromise = async (): Promise<{ generatedNarrative: { en: string } }> => {
         await new Promise((resolve) => setTimeout(resolve, 1200));
         return { generatedNarrative: { en: 'A peaceful, serene piano composition.' } };
       };
@@ -80,7 +70,6 @@ export const worker = new Worker(
       const artResult = results[1].status === 'fulfilled' ? results[1].value : null;
       const narrativeResult = results[2].status === 'fulfilled' ? results[2].value : null;
 
-      // Update database with success
       await db
         .update(pipelineJobs)
         .set({
@@ -92,16 +81,16 @@ export const worker = new Worker(
         })
         .where(eq(pipelineJobs.id, jobId));
 
-    } catch (err: unknown) { const error = err as Error;
-      console.error(`Pipeline job ${job.id} failed:`, error);
+    } catch (err: unknown) {
+      console.error(`Pipeline job ${job.id} failed:`, err);
       await db
         .update(pipelineJobs)
         .set({
           status: 'error',
-          errorMessage: error.message || 'Unknown processing error',
+          errorMessage: (err as Error).message || 'Unknown processing error',
         })
         .where(eq(pipelineJobs.id, jobId));
-      throw error;
+      throw err;
     }
   },
   {
@@ -110,9 +99,8 @@ export const worker = new Worker(
   }
 );
 
-// 3. Graceful Shutdown handlers
-const shutdown = async () => {
-  console.log('Shutting down BullMQ queue and workers gracefully...');
+const shutdown = async (): Promise<void> => {
+  console.warn('Shutting down BullMQ queue and workers gracefully...');
   await queue.close();
   await worker.close();
 };

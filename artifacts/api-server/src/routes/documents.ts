@@ -12,6 +12,19 @@ import { authenticateJWT } from '../middleware/auth';
 
 const router: Router = Router();
 
+interface Checklist {
+  timecodes?: string[];
+  revisions?: string[];
+  deliverables?: string[];
+  deadlines?: string[];
+}
+
+interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
+
 // Configure Multer for memory storage for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -24,7 +37,7 @@ const upload = multer({
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new (Error as any)('Invalid file type. Only PDF and text files are allowed.') as any, false);
+      (cb as (err: Error | null, accept: boolean) => void)(new Error('Invalid file type. Only PDF and text files are allowed.'), false);
     }
   },
 });
@@ -51,7 +64,7 @@ async function extractTextFromPdf(_buffer: Buffer): Promise<string> {
 }
 
 // Utility to generate structured checklist via GPT-4o
-async function generateChecklist(text: string): Promise<any> {
+async function generateChecklist(text: string): Promise<Checklist | null> {
   const openai = await getOpenAIClient();
   if (!openai) return null;
 
@@ -66,18 +79,18 @@ async function generateChecklist(text: string): Promise<any> {
 
   const content = completion.choices[0]?.message?.content;
   if (content) {
-    return JSON.parse(content);
+    return JSON.parse(content) as Checklist;
   }
   return null;
 }
 
 // Utility to generate PDF from checklist
-async function generatePdfFromChecklist(checklist: any): Promise<Buffer> {
+async function generatePdfFromChecklist(checklist: Checklist): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new pdfkit();
-    const buffers: any[] = [];
+    const buffers: Buffer[] = [];
 
-    doc.on('data', (chunk) => buffers.push(chunk));
+    doc.on('data', (chunk: Buffer) => buffers.push(chunk));
     doc.on('end', () => {
       resolve(Buffer.concat(buffers));
     });
@@ -111,7 +124,7 @@ async function generatePdfFromChecklist(checklist: any): Promise<Buffer> {
 }
 
 // Utility to send email
-async function sendEmail(to: string, subject: string, text: string, html: string, attachments?: any[]): Promise<void> {
+async function sendEmail(to: string, subject: string, text: string, html: string, attachments?: EmailAttachment[]): Promise<void> {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),
@@ -183,12 +196,12 @@ router.post(
         code: null,
         timestamp: new Date().toISOString(),
       });
-    } catch (err: unknown) { const error = err as Error;
-      console.error('Error analyzing document:', error);
+    } catch (err: unknown) {
+      console.error('Error analyzing document:', err);
       return res.status(500).json({
         success: false,
         data: null,
-        error: error.message || 'Failed to analyze document',
+        error: (err as Error).message || 'Failed to analyze document',
         code: 'SERVER_ERROR',
         timestamp: new Date().toISOString(),
       });
@@ -214,17 +227,17 @@ router.post(
         });
       }
 
-      const pdfBuffer = await generatePdfFromChecklist(checklist);
+      const pdfBuffer = await generatePdfFromChecklist(checklist as Checklist);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="project-checklist-${uuidv4()}.pdf"`);
       return res.send(pdfBuffer);
-    } catch (err: unknown) { const error = err as Error;
-      console.error('Error exporting document:', error);
+    } catch (err: unknown) {
+      console.error('Error exporting document:', err);
       return res.status(500).json({
         success: false,
         data: null,
-        error: error.message || 'Failed to export document',
+        error: (err as Error).message || 'Failed to export document',
         code: 'SERVER_ERROR',
         timestamp: new Date().toISOString(),
       });
@@ -251,10 +264,10 @@ router.post(
       }
 
       let htmlContent = body || '';
-      const attachments: any[] = [];
+      const attachments: EmailAttachment[] = [];
 
       if (checklist) {
-        const pdfBuffer = await generatePdfFromChecklist(checklist);
+        const pdfBuffer = await generatePdfFromChecklist(checklist as Checklist);
         attachments.push({
           filename: `project-checklist-${uuidv4()}.pdf`,
           content: pdfBuffer,
@@ -273,12 +286,12 @@ router.post(
         code: null,
         timestamp: new Date().toISOString(),
       });
-    } catch (err: unknown) { const error = err as Error;
-      console.error('Error sending email:', error);
+    } catch (err: unknown) {
+      console.error('Error sending email:', err);
       return res.status(500).json({
         success: false,
         data: null,
-        error: error.message || 'Failed to send email',
+        error: (err as Error).message || 'Failed to send email',
         code: 'SERVER_ERROR',
         timestamp: new Date().toISOString(),
       });

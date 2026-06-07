@@ -9,7 +9,6 @@ import { redis } from "./db/redis"; // For graceful shutdown
 import { errorMiddleware } from "./middleware/errorMiddleware";
 import { globalRateLimiter } from "./middleware/rateLimiter";
 import { requestTracer } from "./middleware/requestTracer";
-
 // Import routes
 import authRoutes from "./routes/auth";
 import briefsRoutes from "./routes/briefs";
@@ -73,7 +72,7 @@ app.use("/api/health", healthRoutes);
 app.use(errorMiddleware);
 
 // Handle unhandled promise rejections and uncaught exceptions
-process.on("unhandledRejection", (reason: Error | any, promise: Promise<any>) => {
+process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
   logger.error({ reason, promise }, "Unhandled Rejection caught");
   // Application should ideally restart here in a controlled environment (e.g., PM2, Kubernetes)
   // For now, we will exit to ensure the process doesn\'t continue in a bad state.

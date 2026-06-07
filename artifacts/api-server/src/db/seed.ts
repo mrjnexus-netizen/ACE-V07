@@ -14,7 +14,7 @@ const logger = pino({
   },
 });
 
-const seed = async () => {
+const seed = async (): Promise<void> => {
   logger.info("Starting database seeding...");
 
   // Seed Admin User
@@ -57,7 +57,8 @@ const seed = async () => {
   logger.info("Database seeding complete.");
 };
 
-seed().catch((err) => {
-  logger.error("Database seeding failed:", err);
+seed().catch((err: unknown) => {
+  const error = err as Error;
+  logger.error("Database seeding failed:", error);
   process.exit(1);
 });

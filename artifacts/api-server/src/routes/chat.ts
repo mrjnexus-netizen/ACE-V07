@@ -56,7 +56,7 @@ router.post(
         limit: 5,
       });
 
-      const tracksContext = availableTracks.map(t => `ID: ${t.id}, Title: ${(t.title as any)?.en || ''}, Genre: ${t.genre}, Mood: ${t.mood}`).join('\n');
+      const tracksContext = availableTracks.map(t => `ID: ${t.id}, Title: ${(t.title as Record<string, string>)?.en || ''}, Genre: ${t.genre}, Mood: ${t.mood}`).join('\n');
 
       const completion = await openai.chat.completions.create({
         messages: [
@@ -71,7 +71,7 @@ router.post(
       // Simple heuristic for track recommendation (can be improved)
       let trackRecommendationId: string | undefined;
       for (const track of availableTracks) {
-        const titleEn = (track.title as any)?.en;
+        const titleEn = (track.title as Record<string, string>)?.en;
         if (titleEn && reply.includes(titleEn)) {
           trackRecommendationId = track.id;
           break;
@@ -85,12 +85,12 @@ router.post(
         code: null,
         timestamp: new Date().toISOString(),
       });
-    } catch (err: unknown) { const error = err as Error;
-      console.error('Error in chat endpoint:', error);
+    } catch (err: unknown) {
+      console.error('Error in chat endpoint:', err);
       return res.status(500).json({
         success: false,
         data: null,
-        error: error.message || 'Failed to get AI response',
+        error: (err as Error).message || 'Failed to get AI response',
         code: 'SERVER_ERROR',
         timestamp: new Date().toISOString(),
       });
