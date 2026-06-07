@@ -1,0 +1,20 @@
+{
+  "name": "ACE-2026 — Autonomous Composer Ecosystem",
+  "short_name": "ACE-2026",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#080808",
+  "background_color": "#080808",
+  "icons": [
+    {
+      "src": "/assets/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
