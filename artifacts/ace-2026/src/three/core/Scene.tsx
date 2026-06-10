@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { ReactNode, Suspense } from 'react';
 import { Spinner } from '../../components/Spinner';
+import PostProcessing from './PostProcessing';
 
 interface SceneProps {
   children?: ReactNode;
@@ -27,6 +28,7 @@ const Scene = ({ children }: SceneProps) => {
         <pointLight intensity={0.5} position={[-3, 3, 3]} />
         <OrbitControls dampingFactor={0.05} enableDamping enablePan={true} enableZoom={true} />
         {children}
+        <PostProcessing />
       </Canvas>
     </Suspense>
   );

@@ -1,0 +1,114 @@
+diff --git a/artifacts/ace-2026/package.json b/artifacts/ace-2026/package.json
+index 5736922..535deb3 100644
+--- a/artifacts/ace-2026/package.json
++++ b/artifacts/ace-2026/package.json
+@@ -17,6 +17,7 @@
+     "@dnd-kit/sortable": "8.0.0",
+     "@react-three/drei": "9.115.0",
+     "@react-three/fiber": "8.17.10",
++    "@react-three/postprocessing": "2.19.1",
+     "@studio-freight/lenis": "1.0.42",
+     "blurhash": "2.0.5",
+     "clsx": "2.1.1",
+diff --git a/artifacts/ace-2026/src/context/AudioContext.tsx b/artifacts/ace-2026/src/context/AudioContext.tsx
+index 8078696..ae818e5 100644
+--- a/artifacts/ace-2026/src/context/AudioContext.tsx
++++ b/artifacts/ace-2026/src/context/AudioContext.tsx
+@@ -27,26 +27,17 @@ import {
+   type ReactNode,
+ } from 'react';
+ import type { AudioState, AudioTrack, VibrantPalette } from '../types';
++import { extractPalette } from '../lib/vibrantExtractor';
+ 
+ // ------------------------------------------------------------------
+-// Vibrant.js — dynamic import to keep initial bundle small
++// Palette extraction - delegates to the shared, dependency-free
++// extractor in lib/vibrantExtractor.ts. That module uses a global
++// window.Vibrant when present and otherwise falls back to a canvas
++// dominant-color sampler, so no missing 'vibrant'/'node-vibrant'
++// module is imported and color-clash prevention is applied there.
+ // ------------------------------------------------------------------
+ async function extractVibrantPalette(imageUrl: string): Promise<VibrantPalette | null> {
+-  try {
+-    const { default: Vibrant } = await import('vibrant');
+-    const palette = await Vibrant.from(imageUrl).getPalette();
+-    if (!palette) return null;
+-    return {
+-      vibrant:      palette.Vibrant?.hex      ?? '#888888',
+-      muted:        palette.Muted?.hex        ?? '#666666',
+-      darkVibrant:  palette.DarkVibrant?.hex  ?? '#333333',
+-      darkMuted:    palette.DarkMuted?.hex    ?? '#222222',
+-      lightVibrant: palette.LightVibrant?.hex ?? '#aaaaaa',
+-      lightMuted:   palette.LightMuted?.hex   ?? '#999999',
+-    };
+-  } catch {
+-    return null;
+-  }
++  return extractPalette(imageUrl);
+ }
+ 
+ // ------------------------------------------------------------------
+diff --git a/artifacts/ace-2026/src/three/core/PostProcessing.tsx b/artifacts/ace-2026/src/three/core/PostProcessing.tsx
+index 280cefa..459bf12 100644
+--- a/artifacts/ace-2026/src/three/core/PostProcessing.tsx
++++ b/artifacts/ace-2026/src/three/core/PostProcessing.tsx
+@@ -1,4 +1,6 @@
++import { useMemo } from 'react';
+ import { EffectComposer, Bloom, ChromaticAberration, Vignette } from '@react-three/postprocessing';
++import { Vector2 } from 'three';
+ import { useChromatic } from '../../context/ChromaticContext';
+ 
+ const PostProcessing = () => {
+@@ -8,11 +10,30 @@ const PostProcessing = () => {
+   const isOnyx = themeId === 'onyx';
+   const isMinimal = themeId === 'minimal';
+ 
++  // ChromaticAberration expects a THREE.Vector2 offset, not a tuple.
++  // Memoized so a new Vector2 is not allocated on every render.
++  const caOffset = useMemo(() => new Vector2(0.002, 0.002), []);
++
+   if (isMinimal) return null;
+ 
+   const effects: React.ReactElement[] = [];
+-  effects.push(<Bloom key="bloom" intensity={isCyber ? 1.2 : 0.2} luminanceThreshold={0.8} luminanceSmoothing={0.9} />);
+-  if (isCyber) effects.push(<ChromaticAberration key="ca" offset={[0.002, 0.002]} />);
++  effects.push(
++    <Bloom
++      key="bloom"
++      intensity={isCyber ? 1.2 : 0.2}
++      luminanceThreshold={0.8}
++      luminanceSmoothing={0.9}
++    />,
++  );
++  if (isCyber)
++    effects.push(
++      <ChromaticAberration
++        key="ca"
++        offset={caOffset}
++        radialModulation={false}
++        modulationOffset={0}
++      />,
++    );
+   if (isOnyx) effects.push(<Vignette key="vig" eskil={false} offset={0.1} darkness={1.1} />);
+ 
+   return <EffectComposer>{effects}</EffectComposer>;
+diff --git a/artifacts/ace-2026/src/three/core/Scene.tsx b/artifacts/ace-2026/src/three/core/Scene.tsx
+index db20005..e3a7f51 100644
+--- a/artifacts/ace-2026/src/three/core/Scene.tsx
++++ b/artifacts/ace-2026/src/three/core/Scene.tsx
+@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
+ import { OrbitControls } from '@react-three/drei';
+ import { ReactNode, Suspense } from 'react';
+ import { Spinner } from '../../components/Spinner';
++import PostProcessing from './PostProcessing';
+ 
+ interface SceneProps {
+   children?: ReactNode;
+@@ -27,6 +28,7 @@ const Scene = ({ children }: SceneProps) => {
+         <pointLight intensity={0.5} position={[-3, 3, 3]} />
+         <OrbitControls dampingFactor={0.05} enableDamping enablePan={true} enableZoom={true} />
+         {children}
++        <PostProcessing />
+       </Canvas>
+     </Suspense>
+   );

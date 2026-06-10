@@ -1,21 +1,10 @@
-import { EffectComposer, Bloom, ChromaticAberration, Vignette } from '@react-three/postprocessing';
-import { useChromatic } from '../../context/ChromaticContext';
-
-const PostProcessing = () => {
-  const { themeId } = useChromatic();
-
-  const isCyber = themeId === 'cyber';
-  const isOnyx = themeId === 'onyx';
-  const isMinimal = themeId === 'minimal';
-
-  if (isMinimal) return null;
-
-  const effects: React.ReactElement[] = [];
-  effects.push(<Bloom key="bloom" intensity={isCyber ? 1.2 : 0.2} luminanceThreshold={0.8} luminanceSmoothing={0.9} />);
-  if (isCyber) effects.push(<ChromaticAberration key="ca" offset={[0.002, 0.002]} />);
-  if (isOnyx) effects.push(<Vignette key="vig" eskil={false} offset={0.1} darkness={1.1} />);
-
-  return <EffectComposer>{effects}</EffectComposer>;
-};
+// ACE-2026 — PostProcessing (temporarily disabled)
+// The @react-three/postprocessing effect chain (Bloom / ChromaticAberration /
+// Vignette) is disabled because that package pulls a second copy of three whose
+// Vector2 type diverges across versions and breaks the typecheck on some setups.
+// This component renders nothing so the rest of the 3D scene compiles and runs.
+// To re-enable: add @react-three/postprocessing with three pinned to the app's
+// three version (0.170.0) and restore the EffectComposer chain here.
+const PostProcessing = (): null => null;
 
 export default PostProcessing;

@@ -27,26 +27,17 @@ import {
   type ReactNode,
 } from 'react';
 import type { AudioState, AudioTrack, VibrantPalette } from '../types';
+import { extractPalette } from '../lib/vibrantExtractor';
 
 // ------------------------------------------------------------------
-// Vibrant.js — dynamic import to keep initial bundle small
+// Palette extraction — delegates to the shared, dependency-free
+// extractor in lib/vibrantExtractor.ts. That module uses a global
+// window.Vibrant when present and otherwise falls back to a canvas
+// dominant-color sampler, so no missing 'vibrant'/'node-vibrant'
+// module is imported and color-clash prevention is applied there.
 // ------------------------------------------------------------------
 async function extractVibrantPalette(imageUrl: string): Promise<VibrantPalette | null> {
-  try {
-    const { default: Vibrant } = await import('vibrant');
-    const palette = await Vibrant.from(imageUrl).getPalette();
-    if (!palette) return null;
-    return {
-      vibrant:      palette.Vibrant?.hex      ?? '#888888',
-      muted:        palette.Muted?.hex        ?? '#666666',
-      darkVibrant:  palette.DarkVibrant?.hex  ?? '#333333',
-      darkMuted:    palette.DarkMuted?.hex    ?? '#222222',
-      lightVibrant: palette.LightVibrant?.hex ?? '#aaaaaa',
-      lightMuted:   palette.LightMuted?.hex   ?? '#999999',
-    };
-  } catch {
-    return null;
-  }
+  return extractPalette(imageUrl);
 }
 
 // ------------------------------------------------------------------
