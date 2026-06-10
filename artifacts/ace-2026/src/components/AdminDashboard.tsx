@@ -98,7 +98,7 @@ const TabMediaPipeline = () => {
   };
 
   const startPipeline = async () => {
-    // placeholder – real implementation sends file to POST /api/pipeline/process
+    // placeholder â€“ real implementation sends file to POST /api/pipeline/process
     const mockJob: PipelineJob = { id: crypto.randomUUID(), status: 'uploading', progress: 0, audioMetadata: null, generatedArtUrl: null, generatedNarrative: null, errorMessage: null };
     setPipelineJob(mockJob);
     // Simulate progress
@@ -209,7 +209,7 @@ const TabStagingEngine = () => {
       </div>
       {editMode && draft && (
         <div className="p-4 border border-dashed border-[var(--accent-color)] rounded">
-          <p className="text-xs text-[var(--text-muted-color)]">Editing mode – changes not live until published.</p>
+          <p className="text-xs text-[var(--text-muted-color)]">Editing mode â€“ changes not live until published.</p>
         </div>
       )}
     </div>

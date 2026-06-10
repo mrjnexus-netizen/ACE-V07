@@ -1,37 +1,14 @@
-name: Zero-Downtime Deployment CI/CD
+name: CI - Build & Verify
 
 on:
   push:
+    branches: [ main ]
+  pull_request:
     branches: [ main ]
 
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_DB: ace_db
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7.2-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout Repository
@@ -73,26 +50,3 @@ jobs:
 
       - name: Build All Workspaces
         run: pnpm run build
-
-      - name: Wait for PostgreSQL Healthy
-        run: |
-          for i in {1..30}; do
-            pg_isready -h localhost -p 5432 && break
-            echo "Waiting for PostgreSQL..."
-            sleep 1
-          done
-
-      - name: Run Database Migrations
-        run: pnpm --filter @workspace/api-server run db:migrate
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ace_db
-
-      - name: Deploy to Production
-        run: |
-          echo "Deploying ACE-2026 to production..."
-          docker-compose up -d --build
-          echo "Reloading Nginx..."
-          docker-compose exec -T api nginx -s reload
-
-      - name: Post-Deployment Health Check
-        run: bash scripts/health-check.sh

@@ -35,7 +35,7 @@ export default function MainApp() {
 
   return (
     <div className="min-h-screen relative" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>
-      {/* Hero Section — Grid Layout Engine (3 random variants) */}
+      {/* Hero Section â€” Grid Layout Engine (3 random variants) */}
       <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <GridLayoutEngine />

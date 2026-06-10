@@ -1,0 +1,82 @@
+# Production deployment — runs ONLY when triggered manually from the
+# GitHub "Actions" tab (workflow_dispatch). It is intentionally NOT run on
+# every push, because it requires a real production server / Docker host.
+# When you have a real domain + server, configure the runner/secrets and
+# launch this workflow manually.
+name: Deploy to Production (manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: ace_db
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.11.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+
+      - name: Install pnpm 9.12.3
+        uses: pnpm/action-setup@v3
+        with:
+          version: '9.12.3'
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build All Workspaces
+        run: pnpm run build
+
+      - name: Wait for PostgreSQL Healthy
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 && break
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+
+      - name: Run Database Migrations
+        run: pnpm --filter @workspace/api-server run db:migrate
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ace_db
+
+      - name: Deploy to Production
+        run: |
+          echo "Deploying ACE-2026 to production..."
+          docker compose up -d --build
+          echo "Reloading Nginx..."
+          docker compose exec -T api nginx -s reload
+
+      - name: Post-Deployment Health Check
+        run: bash scripts/health-check.sh

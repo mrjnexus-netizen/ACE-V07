@@ -5,8 +5,8 @@ import { useIdentity } from '../context/IdentityContext';
 
 const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'ENGLISH' },
-  { code: 'es', label: 'ESPAÑOL' },
-  { code: 'fr', label: 'FRANÇAIS' },
+  { code: 'es', label: 'ESPAÃ‘OL' },
+  { code: 'fr', label: 'FRANÃ‡AIS' },
   { code: 'zh', label: '\u4e2d\u6587' },
   { code: 'ja', label: '\u65e5\u672c\u8a9e' },
   { code: 'ko', label: '\ud55c\uad6d\uc5b4' },

@@ -12,6 +12,7 @@
     "dev:api": "pnpm --filter @workspace/api-server run dev",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
     "build": "pnpm -r run build",
     "db:migrate": "pnpm --filter @workspace/api-server run db:migrate",
     "db:seed": "pnpm --filter @workspace/api-server run db:seed",
