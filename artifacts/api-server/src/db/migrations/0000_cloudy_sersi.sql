@@ -28,30 +28,30 @@ CREATE TABLE IF NOT EXISTS "briefs" (
 	"media_type" text,
 	"deadline" text,
 	"emotional_direction" text,
-	"raw_conversation" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"raw_conversation" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"is_read" boolean DEFAULT false,
 	"created_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "composer_identity" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"name" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
-	"tagline" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
-	"biography" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"name" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"tagline" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"biography" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"awards" jsonb[],
-	"studio_address" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"studio_address" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"portrait_url" text,
 	"portrait_blur" text,
 	"logo_url" text,
 	"hero_video_url" text,
-	"social_links" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"social_links" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "pipeline_jobs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"track_id" uuid,
-	"status" text DEFAULT \'idle\' NOT NULL,
+	"status" text DEFAULT 'idle' NOT NULL,
 	"progress" integer DEFAULT 0,
 	"audio_metadata" jsonb,
 	"generated_art_url" text,
@@ -64,10 +64,10 @@ CREATE TABLE IF NOT EXISTS "pipeline_jobs" (
 CREATE TABLE IF NOT EXISTS "projects" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"composer_id" uuid,
-	"title" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"title" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"type" text NOT NULL,
 	"year" integer,
-	"description" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"description" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"cover_url" text,
 	"cover_blur" text,
 	"created_at" timestamp with time zone DEFAULT now(),
@@ -78,19 +78,19 @@ CREATE TABLE IF NOT EXISTS "staging_drafts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"entity_type" text NOT NULL,
 	"entity_id" uuid,
-	"draft_data" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"draft_data" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"created_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now()
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "tracks" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"title" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
-	"narrative" jsonb DEFAULT \'{}\'::jsonb NOT NULL,
+	"title" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"narrative" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"audio_url" text,
 	"cover_url" text,
 	"cover_blur" text,
-	"dominant_colors" text[] DEFAULT \'{}\'::text[] NOT NULL,
+	"dominant_colors" text[] DEFAULT '{}'::text[] NOT NULL,
 	"vibrant_palette" jsonb,
 	"genre" text,
 	"bpm" integer,
