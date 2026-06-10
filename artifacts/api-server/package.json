@@ -19,7 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-s3": "3.0.0",
+    "@aws-sdk/client-s3": "3.1059.0",
     "@aws-sdk/s3-request-presigner": "3.1059.0",
     "@types/nodemailer": "8.0.0",
     "@types/pdfkit": "0.17.6",

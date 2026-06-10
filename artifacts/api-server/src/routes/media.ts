@@ -149,13 +149,12 @@ router.post('/staging-preview', authGuard, upload.single('media'), async (req: R
 
     const temporaryKey = `staging-previews/${randomUUID()}${extname(req.file.originalname)}`;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const signedUrl = await getSignedUrl(
-      s3Client as any,
+      s3Client,
       new GetObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME || 'ace-2026-bucket',
         Key: temporaryKey,
-      }) as any,
+      }),
       { expiresIn: 3600 }
     );
 
