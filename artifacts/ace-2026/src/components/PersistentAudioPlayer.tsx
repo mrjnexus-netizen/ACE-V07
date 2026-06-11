@@ -1,7 +1,20 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useAudio } from '../context/AudioContext';
 import { useIdentity } from '../context/IdentityContext';
 import WaveformRenderer from './WaveformRenderer';
+
+// Inline SVG icons (no emoji / no unicode glyphs — they corrupt across encodings)
+const Icon = ({ d, size = 18 }: { d: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+const PLAY = 'M8 5v14l11-7z';
+const PAUSE = 'M6 5h4v14H6zM14 5h4v14h-4z';
+const PREV = 'M6 6h2v12H6zm3.5 6l8.5 6V6z';
+const NEXT = 'M16 6h2v12h-2zM6 18l8.5-6L6 6z';
+const VOL = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4z';
+const MUTE = 'M3 9v6h4l5 5V4L7 9H3zm13 0l5 6m0-6l-5 6';
 
 export default function PersistentAudioPlayer() {
   const { audioState, resumeTrack, pauseTrack, seekTrack, setVolume, setMuted, nextTrack, prevTrack } = useAudio();
@@ -13,7 +26,7 @@ export default function PersistentAudioPlayer() {
 
   if (!currentTrack) return null;
 
-  const handlePlayPause = () => { if (isPlaying) pauseTrack(); else resumeTrack(); };
+  const handlePlayPause = () => { if (isPlaying) pauseTrack(); else void resumeTrack(); };
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     seekTrack(((e.clientX - rect.left) / rect.width) * duration);
@@ -36,31 +49,31 @@ export default function PersistentAudioPlayer() {
         </div>
         <div className="min-w-0"><p className="text-sm font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-xs truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}{bpm ? ` | ${bpm}` : ''}</p></div>
         <div className="flex-1 h-10 cursor-pointer" onClick={handleProgressClick}><WaveformRenderer /><div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--text-muted-color)' }}><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div>
-        <div className="flex items-center gap-4">
-          <button onClick={prevTrack} className="hover:text-[var(--accent-color)]" aria-label="Previous">?</button>
-          <button onClick={handlePlayPause} className="w-10 h-10 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}>{isPlaying ? '?' : '??'}</button>
-          <button onClick={nextTrack} className="hover:text-[var(--accent-color)]" aria-label="Next">?</button>
+        <div className="flex items-center gap-4" style={{ color: 'var(--text-color)' }}>
+          <button onClick={prevTrack} className="hover:text-[var(--accent-color)]" aria-label="Previous track"><Icon d={PREV} /></button>
+          <button onClick={handlePlayPause} className="w-10 h-10 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }} aria-label={isPlaying ? 'Pause' : 'Play'}><Icon d={isPlaying ? PAUSE : PLAY} size={20} /></button>
+          <button onClick={nextTrack} className="hover:text-[var(--accent-color)]" aria-label="Next track"><Icon d={NEXT} /></button>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setMuted(!isMuted)} className="hover:text-[var(--accent-color)]">{isMuted ? '??' : '??'}</button>
-          <input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="w-20 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} />
+        <div className="flex items-center gap-2" style={{ color: 'var(--text-color)' }}>
+          <button onClick={() => setMuted(!isMuted)} className="hover:text-[var(--accent-color)]" aria-label={isMuted ? 'Unmute' : 'Mute'}><Icon d={isMuted ? MUTE : VOL} /></button>
+          <input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="w-20 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label="Volume" />
         </div>
       </div>
-      <div className="flex md:hidden flex-col h-full">
+      <div className="flex md:hidden flex-col h-full" style={{ color: 'var(--text-color)' }}>
         <div className="flex items-center px-3 py-1 gap-3">
           <div className="w-[36px] h-[36px] rounded overflow-hidden bg-[var(--surface3-color)] flex-shrink-0">
             {coverUrl && <img src={coverUrl} alt={title} className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} onLoad={() => setImageLoaded(true)} />}
             {!imageLoaded && <div className="w-full h-full bg-[var(--accent-color)] opacity-10" />}
           </div>
           <div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-[10px] truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}</p></div>
-          <button onClick={handlePlayPause} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}>{isPlaying ? '?' : '??'}</button>
+          <button onClick={handlePlayPause} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }} aria-label={isPlaying ? 'Pause' : 'Play'}><Icon d={isPlaying ? PAUSE : PLAY} size={16} /></button>
         </div>
         {mobileExpanded && (
           <div className="flex flex-col px-3 pb-2 gap-2">
             <div className="h-10 cursor-pointer" onClick={handleProgressClick}><WaveformRenderer /></div>
             <div className="flex items-center justify-between">
-              <div className="flex gap-2"><button onClick={prevTrack}>?</button><button onClick={nextTrack}>?</button></div>
-              <div className="flex items-center gap-2"><button onClick={() => setMuted(!isMuted)}>{isMuted ? '??' : '??'}</button><input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="w-16 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} /></div>
+              <div className="flex gap-3"><button onClick={prevTrack} aria-label="Previous track"><Icon d={PREV} /></button><button onClick={nextTrack} aria-label="Next track"><Icon d={NEXT} /></button></div>
+              <div className="flex items-center gap-2"><button onClick={() => setMuted(!isMuted)} aria-label={isMuted ? 'Unmute' : 'Mute'}><Icon d={isMuted ? MUTE : VOL} /></button><input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="w-16 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label="Volume" /></div>
             </div>
           </div>
         )}

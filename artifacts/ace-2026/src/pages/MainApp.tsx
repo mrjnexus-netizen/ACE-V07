@@ -8,6 +8,7 @@ const LinguisticPortal = lazy(() => import('../components/LinguisticPortal'));
 const GridLayoutEngine = lazy(() => import('../components/GridLayoutEngine'));
 const DoubleExposurePortrait = lazy(() => import('../components/DoubleExposurePortrait'));
 const SpatialScrollEngine = lazy(() => import('../components/SpatialScrollEngine'));
+const Discography = lazy(() => import('../components/Discography'));
 const PersistentAudioPlayer = lazy(() => import('../components/PersistentAudioPlayer'));
 const ExecutiveStudioBot = lazy(() => import('../components/ExecutiveStudioBot'));
 const MagneticCursor = lazy(() => import('../components/MagneticCursor'));
@@ -53,6 +54,13 @@ export default function MainApp() {
       <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <SpatialScrollEngine />
+        </Suspense>
+      </ErrorBoundary>
+
+      {/* Discography (Section 03 - tracks grid + click to play) */}
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          <Discography />
         </Suspense>
       </ErrorBoundary>
 
