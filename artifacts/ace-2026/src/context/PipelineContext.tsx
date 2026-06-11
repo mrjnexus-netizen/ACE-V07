@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect } from 'react';
-import { PipelineJob, PipelineStatus, ApiResponse } from '../types';
+import { PipelineJob, PipelineStatus } from '../types';
 import { apiPost } from '../lib/apiClient';
 
 interface PipelineContextType {
@@ -50,19 +50,28 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         errorMessage: null,
       });
 
-      let resData: ApiResponse<{ jobId: string; trackId: string }>;
+      let processBody: { audioUrl?: string; youtubeUrl?: string };
 
       if (input.file) {
-        const formData = new FormData();
-        formData.append('audioFile', input.file);
-        resData = await apiPost<ApiResponse<{ jobId: string; trackId: string }>>('/api/pipeline/process', formData);
+        // Step 1: upload the audio to S3 via the media route, which returns a URL.
+        const form = new FormData();
+        form.append('media', input.file);
+        form.append('entity_type', 'track-audio');
+        form.append('entity_id', crypto.randomUUID());
+        const uploaded = await apiPost<{ url: string }>('/api/media/upload', form);
+        if (!uploaded?.url) throw new Error('Upload did not return a URL');
+        setCurrentJob((prev) => prev ? { ...prev, progress: 5 } : null);
+        processBody = { audioUrl: uploaded.url };
       } else if (input.youtubeUrl) {
-        resData = await apiPost<ApiResponse<{ jobId: string; trackId: string }>>('/api/pipeline/process', { youtubeUrl: input.youtubeUrl });
+        processBody = { youtubeUrl: input.youtubeUrl };
       } else {
         throw new Error('Either file or youtubeUrl must be provided.');
       }
 
-      const jobId = resData.data?.jobId;
+      // Step 2: start the pipeline. apiPost already unwraps the ApiResponse envelope,
+      // so the resolved value IS the data object ({ jobId, trackId }).
+      const started = await apiPost<{ jobId: string; trackId: string }>('/api/pipeline/process', processBody);
+      const jobId = started?.jobId;
       if (!jobId) throw new Error('No jobId returned from pipeline');
 
       setCurrentJob((prev) => prev ? { ...prev, id: jobId, progress: 10 } : null);
@@ -116,7 +125,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
 
   const approvePipeline = useCallback(async (jobId: string) => {
     try {
-      await apiPost<ApiResponse<null>>(`/api/pipeline/approve/${jobId}`, {});
+      await apiPost(`/api/pipeline/approve/${jobId}`, {});
       setCurrentJob((prev) => prev ? { ...prev, status: 'publishing' } : null);
     } catch (err: unknown) {
       const error = err as Error;

@@ -4,7 +4,8 @@ import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
 import { apiPost, apiGet, apiPut } from '../lib/apiClient';
-import type { ComposerIdentity, AudioTrack, PipelineJob, MultiLingual } from '../types';
+import { usePipeline } from '../context/PipelineContext';
+import type { ComposerIdentity, AudioTrack, MultiLingual } from '../types';
 
 // ---------- shared helpers ----------
 const emptyMultiLingual = (): MultiLingual => ({ en: '', es: '', fr: '', zh: '', ja: '', ko: '' });
@@ -88,26 +89,13 @@ const TabIdentityMatrix = () => {
 const TabMediaPipeline = () => {
   const { tracks, fetchTracks } = useIdentity();
   const { audioState, playTrack } = useAudio();
+  const { currentJob, startPipeline, approvePipeline, resetJob } = usePipeline();
   const [file, setFile] = useState<File | null>(null);
-  const [pipelineJob, setPipelineJob] = useState<PipelineJob | null>(null);
   const [narratives, setNarratives] = useState<MultiLingual>(emptyMultiLingual());
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files?.[0]) setFile(e.dataTransfer.files[0]);
-  };
-
-  const startPipeline = async () => {
-    // placeholder - real implementation sends file to POST /api/pipeline/process
-    const mockJob: PipelineJob = { id: crypto.randomUUID(), status: 'uploading', progress: 0, audioMetadata: null, generatedArtUrl: null, generatedNarrative: null, errorMessage: null };
-    setPipelineJob(mockJob);
-    // Simulate progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
-      if (progress > 100) { clearInterval(interval); setPipelineJob(prev => prev ? { ...prev, status: 'awaiting_approval', progress: 100 } : null); }
-      else setPipelineJob(prev => prev ? { ...prev, progress } : null);
-    }, 500);
   };
 
   return (
@@ -119,14 +107,21 @@ const TabMediaPipeline = () => {
         <input type="file" accept="audio/*" onChange={e => setFile(e.target.files?.[0] || null)} className="mt-4 text-xs" />
       </div>
       {file && (
-        <button onClick={startPipeline} className="px-4 py-2 bg-[var(--accent-color)] text-[var(--surface-color)] rounded">Process {file.name}</button>
+        <button onClick={() => { if (file) void startPipeline({ file }); }} className="px-4 py-2 bg-[var(--accent-color)] text-[var(--surface-color)] rounded">Process {file.name}</button>
       )}
-      {pipelineJob && (
-        <div className="bg-[var(--surface2-color)] p-4 rounded">
-          <p className="font-mono text-sm">Status: {pipelineJob.status} ({pipelineJob.progress}%)</p>
-          <div className="w-full bg-[var(--surface3-color)] h-2 rounded mt-2">
-            <div className="bg-[var(--accent-color)] h-2 rounded" style={{ width: `${pipelineJob.progress}%` }} />
+      {currentJob && (
+        <div className="bg-[var(--surface2-color)] p-4 rounded space-y-2">
+          <p className="font-mono text-sm">Status: {currentJob.status} ({currentJob.progress}%)</p>
+          <div className="w-full bg-[var(--surface3-color)] h-2 rounded">
+            <div className="bg-[var(--accent-color)] h-2 rounded transition-all" style={{ width: `${currentJob.progress}%` }} />
           </div>
+          {currentJob.errorMessage && <p className="text-xs text-red-400">{currentJob.errorMessage}</p>}
+          {currentJob.status === 'awaiting_approval' && (
+            <button onClick={() => { void approvePipeline(currentJob.id); }} className="px-3 py-1 text-xs bg-green-600 text-white rounded">Approve &amp; Publish</button>
+          )}
+          {(currentJob.status === 'complete' || currentJob.status === 'error') && (
+            <button onClick={() => { resetJob(); setFile(null); void fetchTracks(); }} className="px-3 py-1 text-xs bg-[var(--surface3-color)] rounded">Reset</button>
+          )}
         </div>
       )}
       <div>
