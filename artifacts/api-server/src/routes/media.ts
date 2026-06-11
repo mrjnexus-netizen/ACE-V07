@@ -7,10 +7,18 @@ import { encode } from 'blurhash';
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
+import { z } from 'zod';
 
 import { authGuard } from '../middleware/auth';
 
 const router: Router = Router();
+
+// POST body validation (security checklist: all routes Zod-validated).
+// Guards malformed input only; downstream keeps using req.body unchanged.
+const uploadBodySchema = z.object({
+  entity_type: z.string().min(1, 'entity_type is required'),
+  entity_id: z.string().min(1, 'entity_id is required'),
+}).passthrough();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -72,16 +80,17 @@ router.post('/upload', authGuard, upload.single('media'), async (req: Request, r
       });
     }
 
-    const { entity_type, entity_id } = req.body;
-    if (!entity_type || !entity_id) {
+    const parsedBody = uploadBodySchema.safeParse(req.body);
+    if (!parsedBody.success) {
       return res.status(400).json({
         success: false,
         data: null,
-        error: 'entity_type and entity_id are required',
+        error: parsedBody.error.issues[0]?.message ?? 'entity_type and entity_id are required',
         code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
     }
+    const { entity_type, entity_id } = req.body;
 
     const fileExtension = extname(req.file.originalname);
     const fileName = `${entity_type}/${entity_id}/${randomUUID()}${fileExtension}`;

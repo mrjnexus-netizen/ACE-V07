@@ -5,12 +5,37 @@ import { Readable } from 'stream';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { eq, asc } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 
 import { db } from '../db/db';
 import { tracks } from '../db/schema';
 import { authGuard } from '../middleware/auth';
 
 const router: Router = Router();
+
+// POST/PUT body validation (security checklist: all routes Zod-validated).
+// Deliberately permissive (passthrough, all-optional) so no valid CMS payload is
+// rejected; downstream keeps using req.body so existing coercion is unchanged.
+const trackWriteSchema = z.object({
+  title: z.union([z.record(z.unknown()), z.string()]).optional(),
+  narrative: z.union([z.record(z.unknown()), z.string()]).optional(),
+  audioUrl: z.string().nullish(),
+  coverUrl: z.string().nullish(),
+  coverBlur: z.string().nullish(),
+  dominantColors: z.array(z.unknown()).optional(),
+  vibrantPalette: z.record(z.unknown()).nullish(),
+  genre: z.string().nullish(),
+  bpm: z.union([z.string(), z.number()]).nullish(),
+  mood: z.string().nullish(),
+  keySignature: z.string().nullish(),
+  duration: z.union([z.string(), z.number()]).nullish(),
+  sortOrder: z.union([z.string(), z.number()]).nullish(),
+  isLive: z.boolean().optional(),
+}).passthrough();
+
+const reorderSchema = z.object({
+  trackIds: z.array(z.string()).min(1, 'trackIds array is required'),
+}).passthrough();
 
 router.get('/', async (_req: Request, res: Response) => {
   try {
@@ -39,6 +64,16 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.post('/', authGuard, async (req: Request, res: Response) => {
   try {
+    const parsed = trackWriteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? 'Invalid track payload',
+        code: 'VALIDATION_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+    }
     const data = req.body;
     const [newTrack] = await db.insert(tracks).values({
       title: data.title,
@@ -77,16 +112,17 @@ router.post('/', authGuard, async (req: Request, res: Response) => {
 
 router.put('/reorder', authGuard, async (req: Request, res: Response) => {
   try {
-    const { trackIds } = req.body;
-    if (!trackIds || !Array.isArray(trackIds)) {
+    const parsed = reorderSchema.safeParse(req.body);
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
         data: null,
-        error: 'trackIds array is required',
+        error: parsed.error.issues[0]?.message ?? 'trackIds array is required',
         code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
     }
+    const { trackIds } = req.body;
     for (let i = 0; i < trackIds.length; i++) {
       await db.update(tracks).set({ sortOrder: i }).where(eq(tracks.id, trackIds[i]));
     }
@@ -112,6 +148,16 @@ router.put('/reorder', authGuard, async (req: Request, res: Response) => {
 router.put('/:id', authGuard, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const parsed = trackWriteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? 'Invalid track payload',
+        code: 'VALIDATION_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+    }
     const data = req.body;
     const updatePayload: Record<string, unknown> = {
       title: data.title,

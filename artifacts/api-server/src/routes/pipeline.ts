@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 
 import { db } from '../db/db';
 import { tracks, pipelineJobs } from '../db/schema';
@@ -9,6 +10,30 @@ import { analyzeAudio } from '../services/audioAnalyser';
 import { translateText } from '../services/translationService';
 
 const router: Router = Router();
+
+// POST body validation (security checklist: all routes Zod-validated).
+// Guards malformed input only; downstream keeps using req.body unchanged.
+const processSchema = z.object({
+  audioUrl: z.string().min(1).optional(),
+  youtubeUrl: z.string().min(1).optional(),
+  title: z.string().nullish(),
+  genre: z.string().nullish(),
+}).passthrough().refine((d) => Boolean(d.audioUrl || d.youtubeUrl), {
+  message: 'audioUrl or youtubeUrl is required',
+});
+
+const approveSchema = z.object({
+  title: z.unknown().optional(),
+  narrative: z.unknown().optional(),
+  genre: z.string().nullish(),
+  bpm: z.union([z.string(), z.number()]).nullish(),
+  mood: z.string().nullish(),
+  keySignature: z.string().nullish(),
+}).passthrough();
+
+const regenerateSchema = z.object({
+  field: z.string().nullish(),
+}).passthrough();
 
 // Store active SSE clients
 const clients = new Map<string, Response>();
@@ -43,18 +68,18 @@ export const broadcastJobStatus = (jobId: string, status: string, progress: numb
 // POST /api/pipeline/process - Trigger pipeline
 router.post('/process', authGuard, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { audioUrl, youtubeUrl, title, genre } = req.body;
-
-    if (!audioUrl && !youtubeUrl) {
+    const parsed = processSchema.safeParse(req.body);
+    if (!parsed.success) {
       res.status(400).json({
         success: false,
         data: null,
-        error: 'audioUrl or youtubeUrl is required',
+        error: parsed.error.issues[0]?.message ?? 'audioUrl or youtubeUrl is required',
         code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
       return;
     }
+    const { audioUrl, title, genre } = req.body;
 
     // 1. Create a draft track
     const [draftTrack] = await db.insert(tracks).values({
@@ -161,6 +186,17 @@ router.post('/process', authGuard, async (req: Request, res: Response): Promise<
 router.post('/approve/:jobId', authGuard, async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
+    const parsed = approveSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? 'Invalid payload',
+        code: 'VALIDATION_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
     const { title, narrative, genre, bpm, mood, keySignature } = req.body;
 
     const job = await db.query.pipelineJobs.findFirst({
@@ -224,6 +260,17 @@ router.post('/approve/:jobId', authGuard, async (req: Request, res: Response): P
 router.post('/regenerate/:jobId', authGuard, async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
+    const parsed = regenerateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        success: false,
+        data: null,
+        error: parsed.error.issues[0]?.message ?? 'Invalid payload',
+        code: 'VALIDATION_ERROR',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
     const { field } = req.body;
 
     const job = await db.query.pipelineJobs.findFirst({
