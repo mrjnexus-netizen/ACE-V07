@@ -98,7 +98,7 @@ const TabMediaPipeline = () => {
   };
 
   const startPipeline = async () => {
-    // placeholder – real implementation sends file to POST /api/pipeline/process
+    // placeholder - real implementation sends file to POST /api/pipeline/process
     const mockJob: PipelineJob = { id: crypto.randomUUID(), status: 'uploading', progress: 0, audioMetadata: null, generatedArtUrl: null, generatedNarrative: null, errorMessage: null };
     setPipelineJob(mockJob);
     // Simulate progress
@@ -209,7 +209,7 @@ const TabStagingEngine = () => {
       </div>
       {editMode && draft && (
         <div className="p-4 border border-dashed border-[var(--accent-color)] rounded">
-          <p className="text-xs text-[var(--text-muted-color)]">Editing mode – changes not live until published.</p>
+          <p className="text-xs text-[var(--text-muted-color)]">Editing mode - changes not live until published.</p>
         </div>
       )}
     </div>
@@ -219,19 +219,57 @@ const TabStagingEngine = () => {
 const TabDocumentAssistant = () => {
   const [file, setFile] = useState<File | null>(null);
   const [checklist, setChecklist] = useState<{ category: string; items: string[] }[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
-    // Simulate AI extraction
-    setChecklist([
-      { category: 'Timecodes', items: ['00:00-01:30', '01:30-03:00'] },
-      { category: 'Revisions', items: ['Mix adjustment', 'Mastering'] },
-    ]);
+    if (!file || analyzing) return;
+    setAnalyzing(true);
+    setNotice(null);
+    setChecklist([]);
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      const data = await apiPost<{
+        timecodes?: unknown[];
+        revisions?: unknown[];
+        deliverables?: unknown[];
+        deadlines?: unknown[];
+        degraded?: boolean;
+        message?: string;
+      } | null>('/api/documents/analyze', formData);
+
+      if (!data) {
+        setNotice('Document analysis is unavailable in demo mode.');
+        return;
+      }
+
+      const toItems = (v: unknown[] | undefined): string[] =>
+        Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) : [];
+
+      const groups = [
+        { category: 'Timecodes', items: toItems(data.timecodes) },
+        { category: 'Revisions', items: toItems(data.revisions) },
+        { category: 'Deliverables', items: toItems(data.deliverables) },
+        { category: 'Deadlines', items: toItems(data.deadlines) },
+      ].filter((g) => g.items.length > 0);
+
+      setChecklist(groups);
+      if (data.degraded || groups.length === 0) {
+        setNotice(data.message ?? 'No items extracted. Configure LLM_NARRATIVE_API_KEY for AI analysis.');
+      }
+    } catch {
+      setNotice('Could not analyze the document. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <input type="file" accept=".pdf,.txt,.eml" onChange={e => setFile(e.target.files?.[0] || null)} />
-      {file && <button onClick={handleAnalyze} className="px-4 py-2 bg-[var(--accent-color)] text-[var(--surface-color)] rounded">Analyze</button>}
+      <input type="file" accept=".pdf,.txt,.eml" onChange={e => { setFile(e.target.files?.[0] || null); setChecklist([]); setNotice(null); }} />
+      {file && <button onClick={handleAnalyze} disabled={analyzing} className="px-4 py-2 bg-[var(--accent-color)] text-[var(--surface-color)] rounded disabled:opacity-50">{analyzing ? 'Analyzing...' : 'Analyze'}</button>}
+      {notice && <p className="text-xs text-[var(--text-muted-color)]">{notice}</p>}
       {checklist.length > 0 && (
         <div className="space-y-2">
           {checklist.map((group, i) => (
