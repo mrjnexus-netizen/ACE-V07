@@ -134,7 +134,7 @@ const identityPutSchema = z.object({
       }).nullable(),
     }).nullable(),
   })).nullable(),
-});
+}).partial();
 
 // PUT /api/identity
 router.put('/', authGuard, async (req: Request, res: Response<ApiResponse<string>>) => {
