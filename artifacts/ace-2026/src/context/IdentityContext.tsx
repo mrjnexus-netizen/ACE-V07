@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { apiGet, apiPut } from '../lib/apiClient';
 import type { ComposerIdentity, AudioTrack, Locale } from '../types';
 
@@ -49,6 +49,13 @@ export const IdentityProvider = ({ children }: { children: ReactNode }) => {
       console.error('Update failed', err);
     }
   }, []);
+
+  // Load real composer identity + tracks once on app mount so visitors see
+  // the live content from the API instead of empty/placeholder values.
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([fetchIdentity(), fetchTracks()]).finally(() => setLoading(false));
+  }, [fetchIdentity, fetchTracks]);
 
   return (
     <IdentityContext.Provider
