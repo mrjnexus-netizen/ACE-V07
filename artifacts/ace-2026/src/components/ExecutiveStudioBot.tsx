@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
-import type { AudioTrack } from '../types';
+import { apiPost } from '../lib/apiClient';
 
 interface ChatMessage {
   role: 'bot' | 'user';
@@ -11,22 +11,35 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface ChatApiResponse {
+  reply: string;
+  trackRecommendation?: string | null;
+  degraded?: boolean;
+}
+
+// Brief questions, in the exact order the backend brief fields expect:
+// [0] mediaType  [1] emotionalDirection  [2] budgetRange  [3] deadline
 const BRIEF_QUESTIONS = [
-  "What type of media? (film / game / animation / documentary / commercial)",
-  "What emotional direction? (3 keywords)",
+  'What type of media? (film / game / animation / documentary / commercial)',
+  'What emotional direction? (3 keywords)',
   "What's your budget range? (below $5k / $5k-$25k / $25k-$100k / above $100k)",
-  "When's your deadline?"
+  "When's your deadline?",
 ];
+
+const LOCAL_FALLBACK =
+  'I can\u2019t reach the studio service right now, but you can still start a project \u2014 just type "brief" and I\u2019ll collect the details.';
 
 export default function ExecutiveStudioBot() {
   const { locale, tracks } = useIdentity();
-  const { audioState, playTrack } = useAudio();
+  const { playTrack } = useAudio();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([{
-    role: 'bot',
-    text: "Hello! I'm the ACE Studio Manager. How can I assist you today?",
-    timestamp: new Date().toISOString()
-  }]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: 'bot',
+      text: "Hello! I'm the ACE Studio Manager. How can I assist you today?",
+      timestamp: new Date().toISOString(),
+    },
+  ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [collectingBrief, setCollectingBrief] = useState(false);
@@ -40,63 +53,124 @@ export default function ExecutiveStudioBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isLoading) return;
-    const userMsg: ChatMessage = { role: 'user', text, timestamp: new Date().toISOString() };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setIsLoading(true);
-    try {
-      const botResponse = generateBotResponse(text, tracks, safeLocale);
-      setMessages(prev => [...prev, botResponse]);
-    } catch {
-      setMessages(prev => [...prev, {
-        role: 'bot',
-        text: "I apologize, I'm having trouble connecting. Please try again.",
-        timestamp: new Date().toISOString()
-      }]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading, tracks, safeLocale]);
+  // --- Real chat: POST /api/chat with message + conversation history ---
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading) return;
+      const userMsg: ChatMessage = { role: 'user', text, timestamp: new Date().toISOString() };
+      // Last 20 turns (incl. this one) for backend context.
+      const history = [...messages, userMsg].slice(-20).map((m) => ({ role: m.role, text: m.text }));
+      setMessages((prev) => [...prev, userMsg]);
+      setInput('');
+      setIsLoading(true);
+      try {
+        const data = await apiPost<ChatApiResponse | null>('/api/chat', { message: text, history });
+        const reply = data?.reply?.trim();
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'bot',
+            text: reply && reply.length > 0 ? reply : LOCAL_FALLBACK,
+            trackId: data?.trackRecommendation ?? undefined,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      } catch {
+        // Graceful degradation: network/demo failure never breaks the UI.
+        setMessages((prev) => [
+          ...prev,
+          { role: 'bot', text: LOCAL_FALLBACK, timestamp: new Date().toISOString() },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, messages],
+  );
+
+  // --- Persist a completed brief: POST /api/briefs (no key required) ---
+  const submitBrief = useCallback(
+    async (collected: string[], conversation: ChatMessage[]): Promise<boolean> => {
+      try {
+        await apiPost<{ id: string }>('/api/briefs', {
+          locale: safeLocale,
+          mediaType: collected[0] ?? null,
+          emotionalDirection: collected[1] ?? null,
+          budgetRange: collected[2] ?? null,
+          deadline: collected[3] ?? null,
+          rawConversation: conversation.map((m) => ({ role: m.role, text: m.text, timestamp: m.timestamp })),
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [safeLocale],
+  );
+
+  const handleBriefCollection = useCallback(
+    (answer: string) => {
+      const newBriefData = [...briefData, answer];
+      setBriefData(newBriefData);
+
+      if (briefStep < BRIEF_QUESTIONS.length - 1) {
+        const nextStep = briefStep + 1;
+        setBriefStep(nextStep);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'user', text: answer, timestamp: new Date().toISOString() },
+          { role: 'bot', text: BRIEF_QUESTIONS[nextStep]!, timestamp: new Date().toISOString() },
+        ]);
+        setInput('');
+        return;
+      }
+
+      // Final answer collected -> persist to backend.
+      setCollectingBrief(false);
+      setBriefStep(0);
+      setBriefData([]);
+      setInput('');
+
+      const userAnswer: ChatMessage = { role: 'user', text: answer, timestamp: new Date().toISOString() };
+      const conversation = [...messages, userAnswer];
+      setMessages((prev) => [...prev, userAnswer]);
+
+      const summary = `Type: ${newBriefData[0] ?? '-'}\nDirection: ${newBriefData[1] ?? '-'}\nBudget: ${newBriefData[2] ?? '-'}\nDeadline: ${newBriefData[3] ?? '-'}`;
+
+      void submitBrief(newBriefData, conversation).then((ok) => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'bot',
+            text: ok
+              ? `Brief submitted \u2014 the studio will be in touch.\n${summary}`
+              : `I couldn\u2019t reach the studio service to file your brief. Please try again shortly.\n${summary}`,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      });
+    },
+    [briefData, briefStep, messages, submitBrief],
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!input.trim()) return;
     if (collectingBrief) {
       handleBriefCollection(input);
     } else if (input.toLowerCase().includes('brief') || input.toLowerCase().includes('project')) {
       setCollectingBrief(true);
       setBriefStep(0);
       setBriefData([]);
-      const firstQuestion = BRIEF_QUESTIONS[0]!;
-      setMessages(prev => [...prev, { role: 'bot', text: firstQuestion, timestamp: new Date().toISOString() }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', text: input, timestamp: new Date().toISOString() },
+        { role: 'bot', text: BRIEF_QUESTIONS[0]!, timestamp: new Date().toISOString() },
+      ]);
       setInput('');
     } else {
-      sendMessage(input);
+      void sendMessage(input);
     }
-  };
-
-  const handleBriefCollection = (answer: string) => {
-    const newBriefData = [...briefData, answer];
-    setBriefData(newBriefData);
-    if (briefStep < BRIEF_QUESTIONS.length - 1) {
-      const nextStep = briefStep + 1;
-      setBriefStep(nextStep);
-      setMessages(prev => [...prev,
-        { role: 'user', text: answer, timestamp: new Date().toISOString() },
-        { role: 'bot', text: BRIEF_QUESTIONS[nextStep]!, timestamp: new Date().toISOString() }
-      ]);
-    } else {
-      setCollectingBrief(false);
-      setBriefStep(0);
-      setBriefData([]);
-      const confirmation = `Brief submitted!\nType: ${newBriefData[0]}\nDirection: ${newBriefData[1]}\nBudget: ${newBriefData[2]}\nDeadline: ${newBriefData[3]}`;
-      setMessages(prev => [...prev,
-        { role: 'user', text: answer, timestamp: new Date().toISOString() },
-        { role: 'bot', text: confirmation, timestamp: new Date().toISOString() }
-      ]);
-    }
-    setInput('');
   };
 
   return (
@@ -107,7 +181,7 @@ export default function ExecutiveStudioBot() {
         style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}
         aria-label="Studio Bot"
       >
-        ??
+        {'\uD83D\uDCAC'}
       </button>
       <AnimatePresence>
         {isOpen && (
@@ -121,43 +195,55 @@ export default function ExecutiveStudioBot() {
               background: 'rgba(var(--surface-rgb), 0.85)',
               backdropFilter: 'blur(40px) saturate(200%)',
               WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-              borderColor: 'var(--border-color)'
+              borderColor: 'var(--border-color)',
             }}
           >
             <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--border-color)' }}>
               <span className="font-mono text-sm" style={{ color: 'var(--text-color)' }}>Studio Bot</span>
-              <button onClick={() => setIsOpen(false)} className="text-[var(--text-muted-color)] hover:text-[var(--accent-color)]">?</button>
+              <button
+                onClick={() => setIsOpen(false)}
+                aria-label="Close"
+                className="text-[var(--text-muted-color)] hover:text-[var(--accent-color)]"
+              >
+                {'\u2715'}
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className="max-w-[80%] rounded-lg p-3 text-sm"
-                    style={msg.role === 'user'
-                      ? { backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }
-                      : { backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)' }
+                  <div
+                    className="max-w-[80%] rounded-lg p-3 text-sm whitespace-pre-line"
+                    style={
+                      msg.role === 'user'
+                        ? { backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }
+                        : { backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)' }
                     }
                   >
                     <p>{msg.text}</p>
                     {msg.trackId && (
                       <button
                         onClick={() => {
-                          const track = tracks.find(t => t.id === msg.trackId);
+                          const track = tracks.find((t) => t.id === msg.trackId);
                           if (track) playTrack(track);
                         }}
                         className="mt-2 text-xs underline"
                         style={{ color: 'var(--accent-color)' }}
-                      >? Play Track</button>
+                      >
+                        {'\u25B6 Play Track'}
+                      </button>
                     )}
-                    <span className="block text-[10px] mt-1 opacity-50">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                    <span className="block text-[10px] mt-1 opacity-50">
+                      {new Date(msg.timestamp).toLocaleTimeString()}
+                    </span>
                   </div>
                 </div>
               ))}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="rounded-lg p-3 text-sm flex gap-1" style={{ backgroundColor: 'var(--surface3-color)' }}>
-                    <span className="animate-bounce">?</span>
-                    <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>?</span>
-                    <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>?</span>
+                    <span className="animate-bounce">{'\u2022'}</span>
+                    <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>{'\u2022'}</span>
+                    <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>{'\u2022'}</span>
                   </div>
                 </div>
               )}
@@ -173,37 +259,18 @@ export default function ExecutiveStudioBot() {
                 style={{ backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
                 disabled={isLoading}
               />
-              <button type="submit" disabled={isLoading || !input.trim()}
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim()}
                 className="px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40"
                 style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}
-              >Send</button>
+              >
+                Send
+              </button>
             </form>
           </motion.div>
         )}
       </AnimatePresence>
     </>
   );
-}
-
-function generateBotResponse(text: string, tracks: AudioTrack[], locale: string): ChatMessage {
-  const lowerText = text.toLowerCase();
-  if (lowerText.includes('track') || lowerText.includes('music') || lowerText.includes('play')) {
-    if (tracks.length > 0) {
-      const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]!;
-      const title = (randomTrack.title as unknown as Record<string, string>)[locale] || randomTrack.title?.en || 'this track';
-      return { role: 'bot', text: `I recommend "${title}". You can listen to it directly here.`, trackId: randomTrack.id, timestamp: new Date().toISOString() };
-    }
-    return { role: 'bot', text: "No tracks are available yet. Please check back later.", timestamp: new Date().toISOString() };
-  }
-  if (lowerText.includes('brief') || lowerText.includes('project')) {
-    return { role: 'bot', text: "I'd be happy to help you create a project brief! Let me ask you a few questions.", timestamp: new Date().toISOString() };
-  }
-  const responses = [
-    "I'd be happy to assist you with that.",
-    "Let me know how I can help with your project.",
-    "Feel free to ask about our tracks or submit a project brief!",
-    "I'm here to help with any questions about ACE's portfolio."
-  ];
-  const randomResponse = responses[Math.floor(Math.random() * responses.length)]!;
-  return { role: 'bot', text: randomResponse, timestamp: new Date().toISOString() };
 }
