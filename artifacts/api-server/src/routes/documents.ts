@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/db';
 import { apiKeys } from '../db/schema';
 import { authGuard } from '../middleware/auth';
+import { decrypt } from '../services/encryptionService';
 
 const router: Router = Router();
 
@@ -42,18 +43,27 @@ const upload = multer({
   },
 });
 
-// Utility to get OpenAI API key
+// Retrieves and decrypts the LLM key at runtime (Stage-5 convention).
+// Returns null when absent/inactive/undecryptable, or in demo mode â€” never throws.
 async function getOpenAIClient(): Promise<OpenAI | null> {
-  const openAIKeyRecord = await db.query.apiKeys.findFirst({
-    where: eq(apiKeys.keyName, 'openai_api_key'),
-  });
+  try {
+    if (process.env.DEMO_MODE === 'true') return null;
 
-  if (!openAIKeyRecord || !openAIKeyRecord.encryptedValue) {
-    console.error('OpenAI API key not configured');
+    const keyRecord = await db.query.apiKeys.findFirst({
+      where: eq(apiKeys.keyName, 'LLM_NARRATIVE_API_KEY'),
+    });
+    if (!keyRecord || !keyRecord.isActive) return null;
+
+    const apiKey = decrypt({
+      encryptedValue: keyRecord.encryptedValue,
+      iv: keyRecord.iv,
+      authTag: keyRecord.authTag,
+    });
+    return new OpenAI({ apiKey });
+  } catch (err) {
+    console.error('[documents] Failed to load/decrypt LLM key:', err);
     return null;
   }
-  // Assume key is decrypted
-  return new OpenAI({ apiKey: openAIKeyRecord.encryptedValue });
 }
 
 // Utility to extract text from PDF (requires a library like pdf-parse)
@@ -68,20 +78,23 @@ async function generateChecklist(text: string): Promise<Checklist | null> {
   const openai = await getOpenAIClient();
   if (!openai) return null;
 
-  const completion = await openai.chat.completions.create({
-    messages: [
-      { role: 'system', content: 'You are an AI assistant that extracts structured checklist items from project documents.' },
-      { role: 'user', content: `Analyze the following document and extract timecodes, revisions, deliverables, and deadlines. Return as JSON.\n\nDocument: ${text}` },
-    ],
-    model: 'gpt-4o',
-    response_format: { type: 'json_object' },
-  });
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [
+        { role: 'system', content: 'You are an AI assistant that extracts structured checklist items from project documents.' },
+        { role: 'user', content: `Analyze the following document and extract timecodes, revisions, deliverables, and deadlines. Return as JSON.\n\nDocument: ${text}` },
+      ],
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+    });
 
-  const content = completion.choices[0]?.message?.content;
-  if (content) {
+    const content = completion.choices[0]?.message?.content;
+    if (!content) return null;
     return JSON.parse(content) as Checklist;
+  } catch (err) {
+    console.error('[documents] Checklist generation failed:', err);
+    return null;
   }
-  return null;
 }
 
 // Utility to generate PDF from checklist
@@ -179,12 +192,20 @@ router.post(
 
       const checklist = await generateChecklist(documentText);
 
+      // Graceful degradation: missing LLM key (or AI unavailable) must NOT 500.
       if (!checklist) {
-        return res.status(500).json({
-          success: false,
-          data: null,
-          error: 'Failed to generate checklist from document',
-          code: 'AI_ERROR',
+        return res.status(200).json({
+          success: true,
+          data: {
+            timecodes: [],
+            revisions: [],
+            deliverables: [],
+            deadlines: [],
+            degraded: true,
+            message: 'AI document analysis is unavailable until an LLM key (LLM_NARRATIVE_API_KEY) is configured in the Admin Dashboard.',
+          },
+          error: null,
+          code: null,
           timestamp: new Date().toISOString(),
         });
       }
