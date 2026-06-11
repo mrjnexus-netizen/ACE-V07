@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { encode } from 'blurhash';
-import { createCanvas, loadImage } from 'canvas';
 import { eq } from 'drizzle-orm';
-import Vibrant from 'node-vibrant';
 import { OpenAI } from 'openai';
-import sharp from 'sharp';
 
 import { env } from '../config/env';
 import { db } from '../db/db';
@@ -104,6 +100,14 @@ export async function generateAIArt(
 ): Promise<MediaAsset | null> {
   try {
     return await retryWithBackoff(async () => {
+      // Lazy-load the heavy native image libraries only when art is actually
+      // generated. This keeps the server booting even if these native modules
+      // are unavailable on a given host; the feature simply degrades to null.
+      const { createCanvas, loadImage } = await import('canvas');
+      const sharp = (await import('sharp')).default;
+      const Vibrant = (await import('node-vibrant')).default;
+      const { encode } = await import('blurhash');
+
       // 1. Load API Key at runtime
       const apiKey = await getAIImageGenerationKey();
       if (!apiKey) {

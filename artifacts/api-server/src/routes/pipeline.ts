@@ -4,6 +4,8 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db/db';
 import { tracks, pipelineJobs } from '../db/schema';
 import { authGuard } from '../middleware/auth';
+import { generateAIArt } from '../services/aiArtGenerator';
+import { analyzeAudio } from '../services/audioAnalyser';
 import { translateText } from '../services/translationService';
 
 const router: Router = Router();
@@ -77,34 +79,47 @@ router.post('/process', authGuard, async (req: Request, res: Response): Promise<
         try {
           const jobId = job!.id;
 
+          // 1. Analyze the uploaded audio for real metadata (null-first if the
+          //    file cannot be reached; never fabricates values).
           broadcastJobStatus(jobId, 'analyzing_audio', 20);
-          await db.update(pipelineJobs).set({ status: 'analyzing_audio', progress: 20 }).where(eq(pipelineJobs.id, jobId));
-          await new Promise(r => setTimeout(r, 1500));
+          const audioMetadata = await analyzeAudio(audioUrl);
+          await db.update(pipelineJobs).set({ status: 'analyzing_audio', progress: 20, audioMetadata }).where(eq(pipelineJobs.id, jobId));
 
-          const audioMetadata = {
-            dominantInstrument: 'Violin',
-            bpm: 110,
-            mood: 'Dramatically intense, cinematic, mysterious',
-            keySignature: 'D Minor',
-            duration: 180,
-            title: title || 'Untitled Ascent',
-          };
-
+          // 2. Generate cover art (DALL-E 3) and narrative (GPT-4o) in parallel.
+          //    allSettled => one failing never aborts the other. Both services
+          //    load their key from the database and degrade gracefully (art ->
+          //    null, narrative -> simulation) when no key is configured yet.
           broadcastJobStatus(jobId, 'generating_art', 45, { metadata: audioMetadata });
-          await db.update(pipelineJobs).set({ status: 'generating_art', progress: 45, audioMetadata }).where(eq(pipelineJobs.id, jobId));
-          await new Promise(r => setTimeout(r, 2000));
+          const narrativeSource = `A ${audioMetadata.genre ?? genre ?? 'cinematic'} piece` +
+            `${audioMetadata.title ? ` titled "${audioMetadata.title}"` : ''}` +
+            `${audioMetadata.bpm ? ` at ${audioMetadata.bpm} BPM` : ''}. ` +
+            `Evocative, modern, emotionally resonant.`;
 
-          const generatedArtUrl = 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=1200&q=80';
+          const [artResult, narrativeResult] = await Promise.allSettled([
+            generateAIArt(draftTrack!.id, audioMetadata as Parameters<typeof generateAIArt>[1], 'Cinematic Warmth'),
+            translateText(narrativeSource, 'en'),
+          ]);
+
+          const art = artResult.status === 'fulfilled' ? artResult.value : null;
+          const generatedArtUrl = art?.url ?? null;
+          const generatedNarrative = narrativeResult.status === 'fulfilled'
+            ? narrativeResult.value
+            : { en: '', es: '', fr: '', zh: '', ja: '', ko: '' };
+
+          // Persist the generated cover onto the track when art succeeded.
+          if (art) {
+            await db.update(tracks).set({
+              coverUrl: art.url,
+              coverBlur: art.blurhash,
+              dominantColors: art.dominantColors,
+              vibrantPalette: art.vibrantPalette,
+            }).where(eq(tracks.id, draftTrack!.id));
+          }
 
           broadcastJobStatus(jobId, 'generating_narrative', 75, { generatedArtUrl });
           await db.update(pipelineJobs).set({ status: 'generating_narrative', progress: 75, generatedArtUrl }).where(eq(pipelineJobs.id, jobId));
-          await new Promise(r => setTimeout(r, 1500));
 
-          const generatedNarrative = await translateText(
-            `A sweeping orchestral movement highlighting soaring solo violin lines layered over deep cinematic sub-bass pulses and dynamic gothic atmospheric pads. Perfect for epic cinematic highlights.`,
-            'en'
-          );
-
+          // 3. Human approval gate (admin approves before it goes live).
           broadcastJobStatus(jobId, 'awaiting_approval', 90, { generatedNarrative });
           await db.update(pipelineJobs).set({
             status: 'awaiting_approval',
