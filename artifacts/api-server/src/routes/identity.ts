@@ -256,11 +256,12 @@ router.post('/translate', authGuard, async (req: Request, res: Response<ApiRespo
     });
 
     if (!apiKeyRecord || !apiKeyRecord.isActive) {
-      return res.status(500).json({
+      // Missing/inactive key is a configuration precondition, not a server fault.
+      return res.status(503).json({
         success: false,
         data: null,
-        error: 'LLM_NARRATIVE_API_KEY not configured or not active.',
-        code: 'API_KEY_ERROR',
+        error: 'AI translation is unavailable. Configure LLM_NARRATIVE_API_KEY in the Admin Dashboard.',
+        code: 'AI_KEY_REQUIRED',
         timestamp: new Date().toISOString(),
       });
     }

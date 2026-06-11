@@ -1,12 +1,23 @@
 import { desc } from 'drizzle-orm';
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 
 import { db } from '../db/db';
 import { briefs } from '../db/schema';
 import { authGuard } from '../middleware/auth';
 
 const router: Router = Router();
+
+// POST body validation (security checklist: all routes Zod-validated)
+const createBriefSchema = z.object({
+  locale: z.string().min(1, 'locale is required'),
+  rawConversation: z.union([z.array(z.unknown()), z.record(z.unknown())]),
+  mediaType: z.string().nullish(),
+  budgetRange: z.string().nullish(),
+  deadline: z.string().nullish(),
+  emotionalDirection: z.string().nullish(),
+});
 
 // GET /api/briefs - Return all briefs, newest first
 router.get(
@@ -41,18 +52,17 @@ router.get(
 // POST /api/briefs - Create new brief record (NO auth)
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { locale, mediaType, budgetRange, deadline, emotionalDirection, rawConversation } = req.body;
-
-    // Basic validation
-    if (!locale || !rawConversation) {
+    const parsed = createBriefSchema.safeParse(req.body);
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
         data: null,
-        error: 'Locale and rawConversation are required',
+        error: parsed.error.issues[0]?.message ?? 'Invalid brief payload',
         code: 'VALIDATION_ERROR',
         timestamp: new Date().toISOString(),
       });
     }
+    const { locale, mediaType, budgetRange, deadline, emotionalDirection, rawConversation } = parsed.data;
 
     const [newBrief] = await db.insert(briefs).values({
       id: uuidv4(),
