@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 type ThemeId = 'onyx' | 'cyber' | 'minimal';
 type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
@@ -81,7 +81,7 @@ const THEME_VARIABLES: Record<ThemeId, Record<string, string>> = {
   },
 };
 
-// Apply theme synchronously before React renders — prevents flash
+// Apply theme synchronously before React renders - prevents flash
 function applyThemeSync(theme: ThemeId): void {
   const vars = THEME_VARIABLES[theme];
   const root = document.documentElement;
@@ -96,7 +96,7 @@ const _storedTheme = localStorage.getItem('ace-theme') as ThemeId | null;
 const _validThemes: ThemeId[] = ['onyx', 'cyber', 'minimal'];
 const _initialTheme: ThemeId = (_storedTheme && _validThemes.includes(_storedTheme))
   ? _storedTheme
-  : (['onyx', 'cyber', 'minimal'] as ThemeId[])[Math.floor(Math.random() * 3)];
+  : 'onyx';
 applyThemeSync(_initialTheme);
 if (!_storedTheme) localStorage.setItem('ace-theme', _initialTheme);
 

@@ -1,0 +1,169 @@
+import "dotenv/config";
+import { eq } from "drizzle-orm";
+import pino from "pino";
+
+import { db } from "./db";
+import { composerIdentity, tracks } from "./schema";
+
+const logger = pino({
+  transport: {
+    target: "pino-pretty",
+    options: {
+      colorize: true,
+    },
+  },
+});
+
+type Localized = Record<string, string>;
+
+// Same text across all six supported locales (placeholder until real translations).
+const all = (text: string): Localized => ({
+  en: text,
+  es: text,
+  fr: text,
+  zh: text,
+  ja: text,
+  ko: text,
+});
+
+const seedContent = async (): Promise<void> => {
+  logger.info("Seeding sample content...");
+
+  // 1) Composer identity: fill the empty handoff defaults with real sample content.
+  const identityValues = {
+    name: all("Yahya"),
+    tagline: all("Composer of cinematic worlds"),
+    biography: all(
+      "Yahya is an international composer crafting orchestral and electronic scores for film, games, and immersive media. His work fuses classical depth with modern texture, building emotional arcs that move between intimate stillness and full-spectrum intensity."
+    ),
+    awards: [
+      "Best Original Score - Aurora Film Festival 2024",
+      "Sound of the Year - Nominee 2023",
+    ],
+    studioAddress: all("Studio A / Remote worldwide"),
+    socialLinks: {
+      spotify: "https://open.spotify.com/",
+      imdb: "https://www.imdb.com/",
+      instagram: "https://www.instagram.com/",
+      youtube: "https://www.youtube.com/",
+    },
+  };
+
+  const existingIdentity = await db.query.composerIdentity.findFirst();
+  if (existingIdentity) {
+    await db
+      .update(composerIdentity)
+      .set(identityValues)
+      .where(eq(composerIdentity.id, existingIdentity.id));
+    logger.info("Composer identity updated with sample content.");
+  } else {
+    await db.insert(composerIdentity).values(identityValues);
+    logger.info("Composer identity inserted.");
+  }
+
+  // 2) Sample tracks: only seed if the table is empty (idempotent).
+  const existingTracks = await db.query.tracks.findMany();
+  if (existingTracks.length > 0) {
+    logger.info(
+      `Tracks already exist (${existingTracks.length}), skipping track seed.`
+    );
+  } else {
+    const sampleTracks = [
+      {
+        title: all("Aurora Borealis"),
+        narrative: all(
+          "A slow bloom of strings beneath a shifting electronic sky - light folding over light."
+        ),
+        genre: "Orchestral",
+        mood: "Ethereal",
+        bpm: 72,
+        keySignature: "D major",
+        duration: 268,
+        sortOrder: 1,
+        isLive: true,
+        dominantColors: ["#D4AF37", "#0F0F0F", "#888880"],
+      },
+      {
+        title: all("Crimson Tide"),
+        narrative: all(
+          "Low brass and pulsing percussion drive a relentless current toward an inevitable horizon."
+        ),
+        genre: "Cinematic",
+        mood: "Tense",
+        bpm: 120,
+        keySignature: "C minor",
+        duration: 214,
+        sortOrder: 2,
+        isLive: true,
+        dominantColors: ["#B8960C", "#1A1A1A", "#F5F5F0"],
+      },
+      {
+        title: all("Silent Cartography"),
+        narrative: all(
+          "Sparse piano maps an empty landscape; every note is a coordinate in the quiet."
+        ),
+        genre: "Ambient",
+        mood: "Contemplative",
+        bpm: 60,
+        keySignature: "A minor",
+        duration: 322,
+        sortOrder: 3,
+        isLive: true,
+        dominantColors: ["#242424", "#D4AF37", "#444440"],
+      },
+      {
+        title: all("The Last Algorithm"),
+        narrative: all(
+          "Orchestra and synthesis collide - a machine learning how to feel, one phrase at a time."
+        ),
+        genre: "Electronic-Orchestral",
+        mood: "Driving",
+        bpm: 134,
+        keySignature: "E minor",
+        duration: 241,
+        sortOrder: 4,
+        isLive: true,
+        dominantColors: ["#D4AF37", "#080808", "#B8960C"],
+      },
+      {
+        title: all("Lacrimosa Reborn"),
+        narrative: all(
+          "A choir rises from silence, reshaping an old lament into something luminous and new."
+        ),
+        genre: "Choral",
+        mood: "Sorrowful",
+        bpm: 66,
+        keySignature: "F minor",
+        duration: 297,
+        sortOrder: 5,
+        isLive: true,
+        dominantColors: ["#F5F5F0", "#2A2A2A", "#D4AF37"],
+      },
+      {
+        title: all("Neon Monsoon"),
+        narrative: all(
+          "Warm analog synths fall like rain over a city that only exists after midnight."
+        ),
+        genre: "Synthwave",
+        mood: "Nostalgic",
+        bpm: 100,
+        keySignature: "G minor",
+        duration: 233,
+        sortOrder: 6,
+        isLive: true,
+        dominantColors: ["#B8960C", "#0F0F0F", "#888880"],
+      },
+    ];
+
+    await db.insert(tracks).values(sampleTracks);
+    logger.info(`Seeded ${sampleTracks.length} sample tracks.`);
+  }
+
+  logger.info("Sample content seeding complete.");
+};
+
+seedContent().catch((err: unknown) => {
+  const error = err as Error;
+  logger.error("Content seeding failed:", error);
+  process.exit(1);
+});

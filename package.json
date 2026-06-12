@@ -16,6 +16,7 @@
     "build": "pnpm -r run build",
     "db:migrate": "pnpm --filter @workspace/api-server run db:migrate",
     "db:seed": "pnpm --filter @workspace/api-server run db:seed",
+    "db:seed-content": "pnpm --filter @workspace/api-server run db:seed-content",
     "db:studio": "pnpm --filter @workspace/api-server run db:studio",
     "test:e2e": "pnpm --filter @workspace/ace-2026 run test:e2e"
   },
