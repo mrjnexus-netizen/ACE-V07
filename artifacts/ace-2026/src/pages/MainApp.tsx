@@ -5,6 +5,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Lazy-loaded components for code splitting
 const LinguisticPortal = lazy(() => import('../components/LinguisticPortal'));
+const AudioReactiveMesh = lazy(() => import('../components/AudioReactiveMesh'));
 const GridLayoutEngine = lazy(() => import('../components/GridLayoutEngine'));
 const DoubleExposurePortrait = lazy(() => import('../components/DoubleExposurePortrait'));
 const SpatialScrollEngine = lazy(() => import('../components/SpatialScrollEngine'));
@@ -36,7 +37,16 @@ export default function MainApp() {
 
   return (
     <div className="min-h-screen relative" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>
-      {/* Hero Section — Grid Layout Engine (3 random variants) */}
+      {/* Opening Section - Audio Reactive 3D Mesh (Part XVII centerpiece) */}
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          <section className="relative w-full h-screen overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
+            <AudioReactiveMesh />
+          </section>
+        </Suspense>
+      </ErrorBoundary>
+
+      {/* Hero Section - Grid Layout Engine (3 random variants) */}
       <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <GridLayoutEngine />
