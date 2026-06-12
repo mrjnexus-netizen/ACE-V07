@@ -255,3 +255,106 @@ button {
   min-height: 100dvh;
   isolation: isolate;
 }
+/* ============================================================
+   ACE-2026 v7 - CINEMATIC LAYER (additive)
+   Layered color model (base + language world + genre soul),
+   motion tokens, film grain + vignette, fluid editorial type,
+   premium scrollbar, animated links, scroll reveals.
+   All overrides intentional; no existing rule removed.
+   ============================================================ */
+
+/* Motion + mesh token fallbacks (ChromaticContext injects live values). */
+:root {
+  --ease-cine: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-fluid: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-v6: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --dur-fast: 450ms;
+  --dur-base: 800ms;
+  --dur-slow: 1200ms;
+  --mesh-color: var(--accent2-color, #F3D77E);
+}
+
+/* Fluid editorial type scale for bare headings.
+   Tailwind text-* utility classes keep higher specificity and still win. */
+h1 { font-size: clamp(2.75rem, 7vw, 7rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.04; }
+h2 { font-size: clamp(2rem, 4.5vw, 4rem); font-weight: 600; letter-spacing: -0.015em; line-height: 1.08; }
+h3 { font-size: clamp(1.4rem, 2.6vw, 2.25rem); letter-spacing: -0.01em; line-height: 1.15; }
+h4 { font-size: clamp(1.15rem, 1.8vw, 1.6rem); line-height: 1.2; }
+
+/* Premium scrollbar (overrides the 4px base rule above). */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--accent2-color), var(--accent-color));
+  border-radius: 8px;
+  border: 2px solid var(--surface-color);
+}
+
+/* Animated link underline (replaces crude text-decoration on hover). */
+a:not(.skip-nav):not(.no-underline) {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  transition: background-size var(--dur-fast) var(--ease-cine);
+}
+a:not(.skip-nav):not(.no-underline):hover {
+  text-decoration: none;
+  background-size: 100% 1px;
+}
+
+/* Smooth cinematic easing on all interactive elements. */
+button, a, [role="button"], [data-cursor] {
+  transition: color var(--dur-fast) var(--ease-cine),
+              background-color var(--dur-fast) var(--ease-cine),
+              border-color var(--dur-fast) var(--ease-cine),
+              transform var(--dur-fast) var(--ease-cine),
+              opacity var(--dur-fast) var(--ease-cine),
+              box-shadow var(--dur-fast) var(--ease-cine);
+}
+
+/* Film grain - dark themes only, never blocks input, sits below player/bot. */
+@keyframes ace-grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3%, 2%); }
+  50% { transform: translate(2%, -3%); }
+  75% { transform: translate(-2%, -2%); }
+  100% { transform: translate(0, 0); }
+}
+[data-theme="onyx"]::after,
+[data-theme="cyber"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: ace-grain 1.2s steps(4) infinite;
+}
+
+/* Cinematic vignette for depth - dark themes only. */
+[data-theme="onyx"]::before,
+[data-theme="cyber"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9996;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 46%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* Scroll reveal - progressive enhancement; content stays visible without support. */
+@keyframes ace-reveal {
+  from { opacity: 0; transform: translateY(40px); filter: blur(6px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    [data-reveal] {
+      animation: ace-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 30%;
+    }
+  }
+}

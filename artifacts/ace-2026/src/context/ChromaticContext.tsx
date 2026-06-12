@@ -1,12 +1,24 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 
 type ThemeId = 'onyx' | 'cyber' | 'minimal';
 type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
+
+interface LanguageWorld {
+  accent: string;
+  accent2: string;
+  accentRgb: string;
+  mesh: string;
+  surface?: string;
+  surfaceRgb?: string;
+}
 
 interface ChromaticContextType {
   themeId: ThemeId;
   theme: ThemeId;
   switchTheme: (theme: ThemeId) => void;
+  languageWorld: Locale | null;
+  applyLanguageWorld: (locale: Locale) => void;
+  applyGenreSoul: (genre: string | null) => void;
 }
 
 const THEME_VARIABLES: Record<ThemeId, Record<string, string>> = {
@@ -81,17 +93,70 @@ const THEME_VARIABLES: Record<ThemeId, Record<string, string>> = {
   },
 };
 
-// Apply theme synchronously before React renders - prevents flash
+// v7 motion tokens - cinematic easing + durations, injected with every theme.
+const MOTION_TOKENS: Record<string, string> = {
+  '--ease-cine': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--ease-fluid': 'cubic-bezier(0.65, 0, 0.35, 1)',
+  '--ease-v6': 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+  '--dur-fast': '450ms',
+  '--dur-base': '800ms',
+  '--dur-slow': '1200ms',
+};
+
+// v7 layered color model - Layer B: per-language color worlds.
+const LANGUAGE_WORLDS: Record<Locale, LanguageWorld> = {
+  en: { accent: '#D4AF37', accent2: '#F3D77E', accentRgb: '212, 175, 55', mesh: '#F3D77E' },
+  ja: { accent: '#3A7BFF', accent2: '#FF3B6B', accentRgb: '58, 123, 255', mesh: '#4D8BFF', surface: '#070912', surfaceRgb: '7, 9, 18' },
+  ko: { accent: '#FF4FD8', accent2: '#B07BFF', accentRgb: '255, 79, 216', mesh: '#FF6FE0', surface: '#0C0610', surfaceRgb: '12, 6, 16' },
+  zh: { accent: '#E8232B', accent2: '#FFCF6B', accentRgb: '232, 35, 43', mesh: '#FF5A4D', surface: '#0E0606', surfaceRgb: '14, 6, 6' },
+  es: { accent: '#FF7A2F', accent2: '#FFD23F', accentRgb: '255, 122, 47', mesh: '#FF9A3F', surface: '#0F0805', surfaceRgb: '15, 8, 5' },
+  fr: { accent: '#C9A66B', accent2: '#E8D9B5', accentRgb: '201, 166, 107', mesh: '#D8C290', surface: '#070810', surfaceRgb: '7, 8, 16' },
+};
+
+// v7 layered color model - Layer C: transient genre souls (tint mesh on track hover/play).
+const GENRE_SOULS: Record<string, string> = {
+  cinematic: '#F3D77E',
+  orchestral: '#F3D77E',
+  ambient: '#37D4A3',
+  gaming: '#FF4FD8',
+  electronic: '#FF4FD8',
+  film: '#E8232B',
+  animation: '#9B5CFF',
+};
+
+// Apply theme synchronously before React renders - prevents flash.
 function applyThemeSync(theme: ThemeId): void {
   const vars = THEME_VARIABLES[theme];
   const root = document.documentElement;
   Object.entries(vars).forEach(([key, value]) => {
     root.style.setProperty(key, value);
   });
+  Object.entries(MOTION_TOKENS).forEach(([key, value]) => {
+    root.style.setProperty(key, value);
+  });
+  // Default mesh color tracks the theme accent2 until a language world overrides it.
+  root.style.setProperty('--mesh-color', vars['--accent2-color']);
   root.setAttribute('data-theme', theme);
 }
 
-// Run immediately on module load
+// Apply a per-language color world on top of the active base theme (Layer B).
+function applyLanguageWorldVars(locale: Locale, themeId: ThemeId): void {
+  const world = LANGUAGE_WORLDS[locale];
+  if (!world) return;
+  const root = document.documentElement;
+  root.style.setProperty('--accent-color', world.accent);
+  root.style.setProperty('--accent2-color', world.accent2);
+  root.style.setProperty('--accent-rgb', world.accentRgb);
+  root.style.setProperty('--mesh-color', world.mesh);
+  // Surface warmth only on dark themes; the ivory minimal theme keeps its surface.
+  if (themeId !== 'minimal' && world.surface) {
+    root.style.setProperty('--surface-color', world.surface);
+    if (world.surfaceRgb) root.style.setProperty('--surface-rgb', world.surfaceRgb);
+  }
+  root.setAttribute('data-language-world', locale);
+}
+
+// Run immediately on module load.
 const _storedTheme = localStorage.getItem('ace-theme') as ThemeId | null;
 const _validThemes: ThemeId[] = ['onyx', 'cyber', 'minimal'];
 const _initialTheme: ThemeId = (_storedTheme && _validThemes.includes(_storedTheme))
@@ -104,6 +169,26 @@ const ChromaticContext = createContext<ChromaticContextType | undefined>(undefin
 
 export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
   const [themeId, setThemeId] = useState<ThemeId>(_initialTheme);
+  const [languageWorld, setLanguageWorld] = useState<Locale | null>(null);
+  const languageWorldRef = useRef<Locale | null>(null);
+
+  const applyLanguageWorld = useCallback((locale: Locale) => {
+    languageWorldRef.current = locale;
+    setLanguageWorld(locale);
+    const root = document.documentElement;
+    root.style.transition = 'background-color 800ms ease';
+    applyLanguageWorldVars(locale, themeId);
+  }, [themeId]);
+
+  const applyGenreSoul = useCallback((genre: string | null) => {
+    const root = document.documentElement;
+    if (!genre) {
+      root.style.removeProperty('--genre-soul');
+      return;
+    }
+    const color = GENRE_SOULS[genre.toLowerCase()];
+    if (color) root.style.setProperty('--genre-soul', color);
+  }, []);
 
   const switchTheme = useCallback((theme: ThemeId) => {
     const root = document.documentElement;
@@ -112,6 +197,10 @@ export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
     requestAnimationFrame(() => {
       setTimeout(() => {
         applyThemeSync(theme);
+        // Re-apply the active language world so its accent survives a base-theme switch.
+        if (languageWorldRef.current) {
+          applyLanguageWorldVars(languageWorldRef.current, theme);
+        }
         setThemeId(theme);
         localStorage.setItem('ace-theme', theme);
         root.style.opacity = '1';
@@ -119,8 +208,17 @@ export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  useEffect(() => {
+    // Keep the language world consistent if the theme changes by other means.
+    if (languageWorldRef.current) {
+      applyLanguageWorldVars(languageWorldRef.current, themeId);
+    }
+  }, [themeId]);
+
   return (
-    <ChromaticContext.Provider value={{ themeId, theme: themeId, switchTheme }}>
+    <ChromaticContext.Provider
+      value={{ themeId, theme: themeId, switchTheme, languageWorld, applyLanguageWorld, applyGenreSoul }}
+    >
       {children}
     </ChromaticContext.Provider>
   );
