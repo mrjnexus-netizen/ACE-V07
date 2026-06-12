@@ -1,5 +1,15 @@
-﻿/* ============================================================
-   ACE-2026 — Global Styles
+@import "tailwindcss";
+
+/* Custom font utilities (map to runtime CSS vars injected by ChromaticContext).
+   Defined as plain CSS so they override Tailwind's core font-* utilities and
+   work without a legacy JS config. */
+.font-display { font-family: var(--font-display); }
+.font-body { font-family: var(--font-body); }
+.font-mono { font-family: var(--font-mono); }
+.font-cjk { font-family: var(--font-cjk); }
+
+/* ============================================================
+   ACE-2026 - Global Styles
    Blueprint LAW (Section 21): Zero horizontal overflow at all
    breakpoints. Zero inline styles in TSX. All colours from CSS vars.
    Blueprint Section 6: CSS variables injected by ChromaticContext.
@@ -17,13 +27,13 @@
 }
 
 /* ------------------------------------------------------------------
-   Root — CRITICAL: overflow-x hidden enforces Blueprint LAW
+   Root - CRITICAL: overflow-x hidden enforces Blueprint LAW
    (zero horizontal scroll at 375 / 768 / 1440 px)
    ------------------------------------------------------------------ */
 html {
   overflow-x: hidden;
   scroll-behavior: smooth;
-  /* dvh units everywhere — Blueprint iOS requirement */
+  /* dvh units everywhere - Blueprint iOS requirement */
   height: 100dvh;
 }
 
@@ -44,7 +54,7 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Cursor — MagneticCursor replaces OS pointer on desktop
+   Cursor - MagneticCursor replaces OS pointer on desktop
    ------------------------------------------------------------------ */
 @media (pointer: fine) {
   body {
@@ -53,7 +63,7 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Selection — themed
+   Selection - themed
    ------------------------------------------------------------------ */
 ::selection {
   background-color: var(--accent-color);
@@ -61,7 +71,7 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Focus — accessible indicator, Blueprint Section 21
+   Focus - accessible indicator, Blueprint Section 21
    ------------------------------------------------------------------ */
 :focus-visible {
   outline: 2px solid var(--accent-color);
@@ -74,7 +84,7 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Scrollbar — themed, minimal
+   Scrollbar - themed, minimal
    ------------------------------------------------------------------ */
 ::-webkit-scrollbar {
   width: 4px;
@@ -95,7 +105,7 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Skip navigation — visible on focus, Blueprint accessibility
+   Skip navigation - visible on focus, Blueprint accessibility
    ------------------------------------------------------------------ */
 .skip-nav {
   position: absolute;
@@ -117,7 +127,7 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Typography base — all text uses CSS vars, no hardcoded values
+   Typography base - all text uses CSS vars, no hardcoded values
    ------------------------------------------------------------------ */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
@@ -139,7 +149,7 @@ a:hover {
 }
 
 /* ------------------------------------------------------------------
-   Images — default behaviour
+   Images - default behaviour
    ------------------------------------------------------------------ */
 img {
   max-inline-size: 100%;
@@ -147,7 +157,7 @@ img {
 }
 
 /* ------------------------------------------------------------------
-   Form elements — prevent iOS zoom (min 16px), Blueprint requirement
+   Form elements - prevent iOS zoom (min 16px), Blueprint requirement
    ------------------------------------------------------------------ */
 input,
 textarea,
@@ -165,7 +175,7 @@ button {
 }
 
 /* ------------------------------------------------------------------
-   Reduced motion — Blueprint Section 21
+   Reduced motion - Blueprint Section 21
    All non-essential animations disabled when user prefers
    ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
@@ -180,7 +190,7 @@ button {
 }
 
 /* ------------------------------------------------------------------
-   CJK typography — Blueprint Section 21
+   CJK typography - Blueprint Section 21
    Applied via data-locale attribute set by ChromaticContext
    ------------------------------------------------------------------ */
 [data-locale="ko"] {
@@ -204,7 +214,7 @@ button {
 }
 
 /* ------------------------------------------------------------------
-   DEMO MODE badge — Blueprint Section 36
+   DEMO MODE badge - Blueprint Section 36
    ------------------------------------------------------------------ */
 .demo-badge {
   position: fixed;
@@ -239,7 +249,7 @@ button {
 }
 
 /* ------------------------------------------------------------------
-   React root — full height
+   React root - full height
    ------------------------------------------------------------------ */
 #root {
   min-height: 100dvh;
