@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { useIdentity } from '../context/IdentityContext';
 import { useChromatic } from '../context/ChromaticContext';
+import { useSmoothScroll } from '../hooks/useSmoothScroll';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Lazy-loaded components for code splitting
@@ -25,6 +26,9 @@ export default function MainApp() {
   const { locale, loading } = useIdentity();
   const { themeId } = useChromatic();
 
+  // Global Lenis smooth scroll (safe: native scroll preserved if unavailable).
+  useSmoothScroll();
+
   // Show Linguistic Portal if locale not yet selected
   if (!locale) {
     return (
@@ -44,11 +48,13 @@ export default function MainApp() {
       </ErrorBoundary>
 
       {/* Double Exposure Portrait */}
-      <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <DoubleExposurePortrait />
-        </Suspense>
-      </ErrorBoundary>
+      <div data-reveal>
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <DoubleExposurePortrait />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
 
       {/* Spatial Scroll Engine (Projects Timeline) */}
       <ErrorBoundary>
@@ -58,11 +64,13 @@ export default function MainApp() {
       </ErrorBoundary>
 
       {/* Discography (Section 03 - tracks grid + click to play) */}
-      <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <Discography />
-        </Suspense>
-      </ErrorBoundary>
+      <div data-reveal>
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <Discography />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
 
       {/* Fixed UI: Persistent Audio Player */}
       <ErrorBoundary>

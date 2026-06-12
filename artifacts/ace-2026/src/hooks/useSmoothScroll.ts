@@ -1,16 +1,15 @@
 import Lenis from '@studio-freight/lenis';
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-// Use type assertion / any for option passing to Lenis if types don't match, 
-// to satisfy exact requirements.
-interface ExtendedLenisOptions {
-  duration?: number;
-  easing?: (t: number) => number;
-  direction?: 'vertical' | 'horizontal';
-  smooth?: boolean;
-  smoothTouch?: boolean;
+interface SmoothScrollOptions {
+  duration: number;
+  easing: (t: number) => number;
+  smoothWheel: boolean;
 }
 
+// Global smooth scroll built on Lenis 1.x.
+// Safe by design: native scrolling is never disabled, so if Lenis fails to start
+// (or prefers-reduced-motion is set) the page still scrolls normally.
 const useSmoothScroll = () => {
   const lenisRef = useRef<Lenis | null>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -24,40 +23,43 @@ const useSmoothScroll = () => {
   }, []);
 
   useEffect(() => {
-    const options: ExtendedLenisOptions = {
-      duration: 1.2,
-      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      direction: 'vertical',
-      smooth: true,
-      smoothTouch: false,
-    };
+    if (typeof window === 'undefined') return;
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return;
 
-    const lenis = new Lenis(options as any);
-    lenisRef.current = lenis;
+    const subs = scrollSubscribers.current;
+    let lenis: Lenis | null = null;
+    let rafId = 0;
 
-    const onScroll = ({ scroll }: { scroll: number }) => {
-      setScrollPosition(scroll);
-      scrollSubscribers.current.forEach((callback) => callback(scroll));
-    };
+    try {
+      const options: SmoothScrollOptions = {
+        duration: 1.2,
+        easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        smoothWheel: true,
+      };
+      lenis = new Lenis(options as any);
+      lenisRef.current = lenis;
 
-    lenis.on('scroll', onScroll);
+      const onScroll = ({ scroll }: { scroll: number }) => {
+        setScrollPosition(scroll);
+        subs.forEach((callback) => callback(scroll));
+      };
+      lenis.on('scroll', onScroll);
 
-    let rafId: number;
-    const animate = (time: DOMHighResTimeStamp) => {
-      lenis.raf(time);
+      const animate = (time: number) => {
+        lenisRef.current?.raf(time);
+        rafId = requestAnimationFrame(animate);
+      };
       rafId = requestAnimationFrame(animate);
-    };
-
-    rafId = requestAnimationFrame(animate);
-
-    // Disable native scroll
-    document.body.style.overflow = 'hidden';
+    } catch {
+      // Native scrolling remains fully functional if Lenis cannot initialise.
+    }
 
     return () => {
-      lenis.destroy();
-      cancelAnimationFrame(rafId);
-      document.body.style.overflow = ''; // Re-enable native scroll
-      scrollSubscribers.current.clear();
+      if (rafId) cancelAnimationFrame(rafId);
+      lenisRef.current?.destroy();
+      lenisRef.current = null;
+      subs.clear();
     };
   }, []);
 
@@ -68,9 +70,7 @@ const useScrollPosition = (callback: (scroll: number) => void) => {
   const { subscribeToScroll } = useSmoothScroll();
 
   useEffect(() => {
-    if (subscribeToScroll) {
-      return subscribeToScroll(callback);
-    }
+    return subscribeToScroll(callback);
   }, [callback, subscribeToScroll]);
 };
 

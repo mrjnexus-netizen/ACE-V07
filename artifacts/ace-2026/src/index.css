@@ -358,3 +358,24 @@ button, a, [role="button"], [data-cursor] {
     }
   }
 }
+
+/* ============================================================
+   ACE-2026 v7 - S3: Lenis smooth scroll + glass surface
+   ============================================================ */
+
+/* Lenis 1.x recommended styles (official). Native scroll stays intact. */
+html.lenis,
+html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+.lenis.lenis-smooth iframe { pointer-events: none; }
+
+/* Reusable premium glassmorphism surface (liquid glass panels). */
+.glass {
+  background: rgba(var(--surface-rgb), 0.55);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--border-accent-color);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
