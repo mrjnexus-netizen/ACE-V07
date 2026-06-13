@@ -31,10 +31,10 @@ const seedContent = async (): Promise<void> => {
 
   // 1) Composer identity: fill the empty handoff defaults with real sample content.
   const identityValues = {
-    name: all("Yahya"),
+    name: all("Amir Moslehi"),
     tagline: all("Composer of cinematic worlds"),
     biography: all(
-      "Yahya is an international composer crafting orchestral and electronic scores for film, games, and immersive media. His work fuses classical depth with modern texture, building emotional arcs that move between intimate stillness and full-spectrum intensity."
+      "Amir Moslehi is an international composer crafting orchestral and electronic scores for film, games, and immersive media. His work fuses classical depth with modern texture, building emotional arcs that move between intimate stillness and full-spectrum intensity."
     ),
     awards: [
       "Best Original Score - Aurora Film Festival 2024",
