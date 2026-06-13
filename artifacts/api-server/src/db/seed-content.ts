@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import pino from "pino";
 
 import { db } from "./db";
-import { composerIdentity, tracks } from "./schema";
+import { composerIdentity, projects, tracks } from "./schema";
 
 const logger = pino({
   transport: {
@@ -157,6 +157,63 @@ const seedContent = async (): Promise<void> => {
 
     await db.insert(tracks).values(sampleTracks);
     logger.info(`Seeded ${sampleTracks.length} sample tracks.`);
+  }
+
+  // 3) Sample projects: linked to the composer identity. Idempotent (only seeds
+  //    when the composer has no projects yet). This removes the "NO PROJECTS YET"
+  //    empty state on the projects timeline until real projects are entered.
+  const identityRow = await db.query.composerIdentity.findFirst();
+  if (identityRow) {
+    const existingProjects = await db.query.projects.findMany({
+      where: eq(projects.composerId, identityRow.id),
+    });
+    if (existingProjects.length > 0) {
+      logger.info(
+        `Projects already exist (${existingProjects.length}), skipping project seed.`
+      );
+    } else {
+      const sampleProjects = [
+        {
+          composerId: identityRow.id,
+          title: all("Echoes of Tomorrow"),
+          type: "film",
+          year: 2024,
+          description: all(
+            "An original orchestral score for a near-future science-fiction feature exploring memory and machine consciousness."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Vanguard Protocol"),
+          type: "game",
+          year: 2023,
+          description: all(
+            "Adaptive electronic-orchestral music for a tactical AAA game, scaling in real time with on-screen intensity."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("The Cartographer's Daughter"),
+          type: "animation",
+          year: 2023,
+          description: all(
+            "A delicate, folk-tinged score for an award-winning animated short about a girl who maps imaginary worlds."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Northern Silence"),
+          type: "documentary",
+          year: 2022,
+          description: all(
+            "Ambient textures and field-recording-inspired soundscapes for a documentary on the vanishing Arctic."
+          ),
+        },
+      ];
+
+      await db.insert(projects).values(sampleProjects);
+      logger.info(`Seeded ${sampleProjects.length} sample projects.`);
+    }
   }
 
   logger.info("Sample content seeding complete.");
