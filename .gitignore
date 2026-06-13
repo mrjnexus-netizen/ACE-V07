@@ -33,3 +33,9 @@ test-results/
 *.pem
 *.p12
 *.pfx
+
+# Temporary local demo media for Living Score testing (not for production)
+artifacts/ace-2026/public/media/
+
+# Temporary local demo media for Living Score testing (not for production)
+artifacts/ace-2026/public/media/

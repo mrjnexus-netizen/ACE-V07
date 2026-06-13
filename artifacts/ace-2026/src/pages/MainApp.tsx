@@ -5,6 +5,8 @@ import { useSmoothScroll } from '../hooks/useSmoothScroll';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Lazy-loaded components for code splitting
+const LivingScore = lazy(() => import('../components/LivingScore'));
+const DevAudioTester = lazy(() => import('../components/DevAudioTester'));
 const LinguisticPortal = lazy(() => import('../components/LinguisticPortal'));
 const GridLayoutEngine = lazy(() => import('../components/GridLayoutEngine'));
 const ComposerPresence = lazy(() => import('../components/ComposerPresence'));
@@ -41,43 +43,53 @@ export default function MainApp() {
 
   return (
     <div className="min-h-screen relative" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>
-      {/* Hero Section - Grid Layout Engine (3 random variants) */}
+      {/* Living Score — global fixed 3D particle field behind all content (S5) */}
       <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <GridLayoutEngine />
+        <Suspense fallback={null}>
+          <LivingScore />
         </Suspense>
       </ErrorBoundary>
 
-      {/* Composer Presence - composer gallery (mixed aspect, tilt, parallax) */}
-      <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <ComposerPresence />
-        </Suspense>
-      </ErrorBoundary>
-
-      {/* Double Exposure Portrait */}
-      <div data-reveal>
+      {/* Foreground content sits above the 3D layer */}
+      <div className="relative" style={{ zIndex: 1 }}>
+        {/* Hero Section - Grid Layout Engine (3 random variants) */}
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
-            <DoubleExposurePortrait />
+            <GridLayoutEngine />
           </Suspense>
         </ErrorBoundary>
-      </div>
 
-      {/* Spatial Scroll Engine (Projects Timeline) */}
-      <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <SpatialScrollEngine />
-        </Suspense>
-      </ErrorBoundary>
-
-      {/* Discography (Section 03 - tracks grid + click to play) */}
-      <div data-reveal>
+        {/* Composer Presence - composer gallery (mixed aspect, tilt, parallax) */}
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
-            <Discography />
+            <ComposerPresence />
           </Suspense>
         </ErrorBoundary>
+
+        {/* Double Exposure Portrait */}
+        <div data-reveal>
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <DoubleExposurePortrait />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+
+        {/* Spatial Scroll Engine (Projects Timeline) */}
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <SpatialScrollEngine />
+          </Suspense>
+        </ErrorBoundary>
+
+        {/* Discography (Section 03 - tracks grid + click to play) */}
+        <div data-reveal>
+          <ErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <Discography />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
       </div>
 
       {/* Fixed UI: Persistent Audio Player */}
@@ -100,6 +112,11 @@ export default function MainApp() {
           <MagneticCursor />
         </Suspense>
       </ErrorBoundary>
+
+      {/* TEMP dev-only: Living Score audio tester (renders only in DEV) */}
+      <Suspense fallback={null}>
+        <DevAudioTester />
+      </Suspense>
     </div>
   );
 }
