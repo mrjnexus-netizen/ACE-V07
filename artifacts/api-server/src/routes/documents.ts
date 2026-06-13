@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 import OpenAI from 'openai';
 import pdfkit from 'pdfkit';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 
 import { db } from '../db/db';
 import { apiKeys } from '../db/schema';
@@ -25,6 +26,31 @@ interface EmailAttachment {
   content: Buffer;
   contentType: string;
 }
+
+// Zod schemas (security checklist: validate all mutating request bodies).
+// Shapes mirror the Checklist interface above so the parsed data is safe to
+// hand to generatePdfFromChecklist without a blind `as Checklist` cast.
+const checklistSchema = z.object({
+  timecodes: z.array(z.string()).optional(),
+  revisions: z.array(z.string()).optional(),
+  deliverables: z.array(z.string()).optional(),
+  deadlines: z.array(z.string()).optional(),
+});
+
+const exportBodySchema = z.object({
+  checklist: checklistSchema,
+});
+
+const emailBodySchema = z
+  .object({
+    to: z.string().email('A valid recipient email is required'),
+    subject: z.string().min(1, 'Subject is required'),
+    body: z.string().optional(),
+    checklist: checklistSchema.optional(),
+  })
+  .refine((data) => Boolean(data.body) || Boolean(data.checklist), {
+    message: 'Either a body or a checklist is required',
+  });
 
 // Configure Multer for memory storage for file uploads
 const upload = multer({
@@ -236,19 +262,20 @@ router.post(
   authGuard,
   async (req: Request, res: Response) => {
     try {
-      const { checklist } = req.body;
-
-      if (!checklist) {
+      const parsed = exportBodySchema.safeParse(req.body);
+      if (!parsed.success) {
         return res.status(400).json({
           success: false,
           data: null,
-          error: 'Checklist data is required for export',
+          error: parsed.error.issues[0]?.message ?? 'Checklist data is required for export',
           code: 'VALIDATION_ERROR',
           timestamp: new Date().toISOString(),
         });
       }
 
-      const pdfBuffer = await generatePdfFromChecklist(checklist as Checklist);
+      const { checklist } = parsed.data;
+
+      const pdfBuffer = await generatePdfFromChecklist(checklist);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="project-checklist-${uuidv4()}.pdf"`);
@@ -272,23 +299,24 @@ router.post(
   authGuard,
   async (req: Request, res: Response) => {
     try {
-      const { to, subject, body, checklist } = req.body;
-
-      if (!to || !subject || (!body && !checklist)) {
+      const parsed = emailBodySchema.safeParse(req.body);
+      if (!parsed.success) {
         return res.status(400).json({
           success: false,
           data: null,
-          error: 'Recipient, subject, and either a body or checklist are required',
+          error: parsed.error.issues[0]?.message ?? 'Recipient, subject, and either a body or checklist are required',
           code: 'VALIDATION_ERROR',
           timestamp: new Date().toISOString(),
         });
       }
 
+      const { to, subject, body, checklist } = parsed.data;
+
       let htmlContent = body || '';
       const attachments: EmailAttachment[] = [];
 
       if (checklist) {
-        const pdfBuffer = await generatePdfFromChecklist(checklist as Checklist);
+        const pdfBuffer = await generatePdfFromChecklist(checklist);
         attachments.push({
           filename: `project-checklist-${uuidv4()}.pdf`,
           content: pdfBuffer,
