@@ -7,6 +7,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 // Lazy-loaded components for code splitting
 const LinguisticPortal = lazy(() => import('../components/LinguisticPortal'));
 const GridLayoutEngine = lazy(() => import('../components/GridLayoutEngine'));
+const ComposerPresence = lazy(() => import('../components/ComposerPresence'));
 const DoubleExposurePortrait = lazy(() => import('../components/DoubleExposurePortrait'));
 const SpatialScrollEngine = lazy(() => import('../components/SpatialScrollEngine'));
 const Discography = lazy(() => import('../components/Discography'));
@@ -44,6 +45,13 @@ export default function MainApp() {
       <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <GridLayoutEngine />
+        </Suspense>
+      </ErrorBoundary>
+
+      {/* Composer Presence - Amir Moslehi gallery (mixed aspect, tilt, parallax) */}
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          <ComposerPresence />
         </Suspense>
       </ErrorBoundary>
 
