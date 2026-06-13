@@ -108,7 +108,7 @@ function TiltCard({ image, reduce }: TiltCardProps) {
 }
 
 export default function ComposerPresence() {
-  const { identity, tracks } = useIdentity();
+  const { identity, tracks, locale } = useIdentity();
   const reduce = useReducedMotion() ?? false;
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -140,6 +140,13 @@ export default function ComposerPresence() {
     );
   }, [identity, tracks]);
 
+  // Localized composer name from the canonical identity source, mirroring the
+  // hero's localText() pattern, so the empty-state hero never disagrees with
+  // the rest of the site. Falls back to 'ACE Composer' exactly like the hero.
+  const nameMap = (identity?.name ?? null) as unknown as Record<string, string> | null;
+  const composerName =
+    (nameMap && nameMap[locale ?? 'en']) || (nameMap && nameMap.en) || 'ACE Composer';
+
   // Null-safe elegant empty state (LAW 2): no broken layout, no console noise.
   if (images.length === 0) {
     return (
@@ -163,7 +170,7 @@ export default function ComposerPresence() {
             color: 'var(--text-dim-color)',
           }}
         >
-          AMIR MOSLEHI
+          {composerName}
         </h2>
         <div
           className="mt-8 animate-pulse"

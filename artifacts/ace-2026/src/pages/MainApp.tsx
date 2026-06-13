@@ -48,7 +48,7 @@ export default function MainApp() {
         </Suspense>
       </ErrorBoundary>
 
-      {/* Composer Presence - Amir Moslehi gallery (mixed aspect, tilt, parallax) */}
+      {/* Composer Presence - composer gallery (mixed aspect, tilt, parallax) */}
       <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <ComposerPresence />
