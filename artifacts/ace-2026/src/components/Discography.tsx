@@ -29,8 +29,8 @@ export default function Discography() {
   return (
     <section
       id="discography"
-      className="relative w-full px-6 md:px-16 py-24"
-      style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
+      className="relative w-full px-6 md:px-16 py-24 living-veil"
+      style={{ color: 'var(--text-color)' }}
     >
       <h2
         className="font-display mb-12"

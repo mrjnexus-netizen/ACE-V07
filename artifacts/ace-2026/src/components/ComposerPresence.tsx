@@ -152,8 +152,7 @@ export default function ComposerPresence() {
     return (
       <section
         ref={sectionRef}
-        className="relative w-full min-h-[70vh] flex flex-col items-center justify-center overflow-hidden"
-        style={{ backgroundColor: 'var(--surface-color)' }}
+        className="relative w-full min-h-[70vh] flex flex-col items-center justify-center overflow-hidden living-veil"
         aria-label="The composer"
       >
         <span
@@ -183,8 +182,8 @@ export default function ComposerPresence() {
   return (
     <section
       ref={sectionRef}
-      className="relative w-full overflow-hidden"
-      style={{ backgroundColor: 'var(--surface-color)', padding: 'clamp(4rem, 10vw, 9rem) clamp(1.2rem, 6vw, 7rem)' }}
+      className="relative w-full overflow-hidden living-veil"
+      style={{ padding: 'clamp(4rem, 10vw, 9rem) clamp(1.2rem, 6vw, 7rem)' }}
       aria-label="The composer"
     >
       <div className="flex items-center gap-3 mb-10">
@@ -214,3 +213,4 @@ export default function ComposerPresence() {
     </section>
   );
 }
+
