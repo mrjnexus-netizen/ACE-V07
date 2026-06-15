@@ -1,16 +1,17 @@
 // ============================================================
 // ACE-2026 — seed-images.ts (sample imagery)
-// Sets a sample portrait on the composer identity, sample cover art
-// on the existing live tracks, AND a distinct cover on every project,
-// using public Pexels image URLs so they work both locally and in any
-// deployed/link preview.
+// Sets a sample portrait on the composer identity, cover art on
+// existing tracks, AND a distinct cover on every project.
 //
-// Safe to re-run: it simply UPDATES existing rows. These are
-// placeholders — replace later via the Admin Dashboard.
+// Project/track covers now point at the user's own local images in
+// /public/media (served at /media/*). These are placeholders for local
+// preview — replace later via the Admin Dashboard for deploy.
 //
+// Safe to re-run: it simply UPDATES existing rows.
 // Run: pnpm --filter @workspace/api-server exec tsx src/db/seed-images.ts
 // ============================================================
 import "dotenv/config";
+
 import { asc, eq } from "drizzle-orm";
 import pino from "pino";
 
@@ -21,33 +22,26 @@ const logger = pino({
   transport: { target: "pino-pretty", options: { colorize: true } },
 });
 
-// Public Pexels direct image URLs (stable CDN pattern).
+// Portrait stays as the existing cinematic Pexels portrait (works in deploy too).
 const PORTRAIT =
   "https://images.pexels.com/photos/11805707/pexels-photo-11805707.jpeg?auto=compress&cs=tinysrgb&w=1200";
 
-// Covers used for tracks (audio).
-const TRACK_COVERS = [
-  "https://images.pexels.com/photos/8725223/pexels-photo-8725223.jpeg?auto=compress&cs=tinysrgb&w=800",
-  "https://images.pexels.com/photos/9224637/pexels-photo-9224637.jpeg?auto=compress&cs=tinysrgb&w=800",
-  "https://images.pexels.com/photos/1247591/pexels-photo-1247591.jpeg?auto=compress&cs=tinysrgb&w=800",
-];
+// The user's own uploaded images, served locally from /public/media.
+// (Local preview only — gitignored, replaced via Admin for deploy.)
+const LOCAL = {
+  mic: "/media/img-mic.jpg",
+  piano: "/media/img-piano.jpg",
+  sax: "/media/img-sax.jpg",
+  notes: "/media/img-notes.jpg",
+  producer: "/media/img-producer.jpg",
+  band: "/media/img-band.jpg",
+} as const;
 
-// Distinct, cinematic covers for projects — each one different so the
-// portfolio reads as a varied body of work, not one repeated image.
-const PROJECT_COVERS = [
-  // moody concert / stage lighting
-  "https://images.pexels.com/photos/1190298/pexels-photo-1190298.jpeg?auto=compress&cs=tinysrgb&w=1280",
-  // orchestra / strings
-  "https://images.pexels.com/photos/995301/pexels-photo-995301.jpeg?auto=compress&cs=tinysrgb&w=1280",
-  // cinema / film reel atmosphere
-  "https://images.pexels.com/photos/7234256/pexels-photo-7234256.jpeg?auto=compress&cs=tinysrgb&w=1280",
-  // neon / synth gaming vibe
-  "https://images.pexels.com/photos/1644888/pexels-photo-1644888.jpeg?auto=compress&cs=tinysrgb&w=1280",
-  // studio mixing desk
-  "https://images.pexels.com/photos/164938/pexels-photo-164938.jpeg?auto=compress&cs=tinysrgb&w=1280",
-  // ambient / atmospheric landscape
-  "https://images.pexels.com/photos/3617500/pexels-photo-3617500.jpeg?auto=compress&cs=tinysrgb&w=1280",
-];
+// Covers for tracks (audio) — cycle through a musical subset.
+const TRACK_COVERS = [LOCAL.piano, LOCAL.mic, LOCAL.notes, LOCAL.producer, LOCAL.sax, LOCAL.band];
+
+// Distinct covers for projects — each one different.
+const PROJECT_COVERS = [LOCAL.producer, LOCAL.piano, LOCAL.notes, LOCAL.mic, LOCAL.sax, LOCAL.band];
 
 const seedImages = async (): Promise<void> => {
   logger.info("Seeding sample imagery...");
@@ -64,7 +58,7 @@ const seedImages = async (): Promise<void> => {
     logger.warn("No composer identity found — run db:seed-content first.");
   }
 
-  // 2) Cover art on existing tracks (cycle through the sample covers).
+  // 2) Cover art on existing tracks.
   const allTracks = await db.query.tracks.findMany({
     orderBy: [asc(tracks.sortOrder)],
   });
@@ -80,7 +74,7 @@ const seedImages = async (): Promise<void> => {
     logger.info(`Cover art set on ${allTracks.length} tracks.`);
   }
 
-  // 3) Distinct cover art on every project (ordered by createdAt).
+  // 3) Distinct cover art on every project.
   const allProjects = await db.query.projects.findMany({
     orderBy: [asc(projects.createdAt)],
   });

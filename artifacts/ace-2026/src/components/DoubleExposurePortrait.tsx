@@ -1,171 +1,147 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useRef } from 'react';
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useSpring,
+  useReducedMotion,
+} from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
-import { useChromatic } from '../context/ChromaticContext';
-import { useAudioReactive } from '../hooks/useAudioReactive';
-import { useAudio } from '../context/AudioContext';
+import type { Locale } from '../types';
+
+/**
+ * Cinematic portrait scene.
+ * The composer's portrait is revealed as you scroll: it rises with a slow
+ * parallax, sharpens out of blur, and scales gently into place. Edges are
+ * feathered (no hard rectangle), and a short pull-quote / tagline sits beside
+ * it. Shares the visual language of SpatialScrollEngine so the page reads as
+ * one continuous, deliberate experience.
+ */
+function localText(
+  identity: ReturnType<typeof useIdentity>['composerIdentity'],
+  locale: Locale,
+  field: 'name' | 'tagline' | 'biography'
+): string {
+  if (!identity) return '';
+  const ml = identity[field];
+  if (!ml) return '';
+  return (ml as unknown as Record<string, string>)[locale] || '';
+}
 
 export default function DoubleExposurePortrait() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { composerIdentity } = useIdentity();
-  const { themeId } = useChromatic();
-  const { bassLevel } = useAudioReactive();
-  const { audioState } = useAudio();
-  const animationRef = useRef<number>(0);
-
-  const bpm = audioState.currentTrack?.bpm ?? 80;
+  const sectionRef = useRef<HTMLElement>(null);
+  const { composerIdentity, locale } = useIdentity();
+  const safeLocale = (locale ?? 'en') as Locale;
+  const reduced = useReducedMotion() ?? false;
 
   const portraitUrl = composerIdentity?.portrait?.url;
+  const name = localText(composerIdentity, safeLocale, 'name') || 'Amir Moslehi';
+  const tagline = localText(composerIdentity, safeLocale, 'tagline');
+  const bio = localText(composerIdentity, safeLocale, 'biography');
 
-  const applyThemeTreatment = useCallback((ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number) => {
-    ctx.drawImage(img, 0, 0, w, h);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ['start end', 'end start'],
+  });
 
-    if (themeId === 'onyx') {
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = '#000000';
-      ctx.globalAlpha = 0.3;
-      ctx.fillRect(0, 0, w, h);
-    } else if (themeId === 'cyber') {
-      ctx.globalCompositeOperation = 'overlay';
-      ctx.fillStyle = '#00F5D4';
-      ctx.globalAlpha = 0.15;
-      ctx.fillRect(0, 0, w, h);
-    } else {
-      ctx.globalCompositeOperation = 'saturation';
-      ctx.globalAlpha = 0;
-    }
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-  }, [themeId]);
+  // Parallax: the image drifts slower than the page.
+  const imgY = useTransform(
+    scrollYProgress,
+    [0, 1],
+    reduced ? ['0%', '0%'] : ['-12%', '12%']
+  );
+  // Reveal: blur + scale settle as the scene reaches centre, ease back out.
+  const blurPx = useTransform(
+    scrollYProgress,
+    [0, 0.35, 0.65, 1],
+    reduced ? [0, 0, 0, 0] : [16, 0, 0, 16]
+  );
+  const blur = useTransform(blurPx, (v) => `blur(${v}px)`);
+  const scale = useTransform(
+    scrollYProgress,
+    [0, 0.5, 1],
+    reduced ? [1, 1, 1] : [1.12, 1, 1.12]
+  );
+  const sScale = useSpring(scale, { stiffness: 80, damping: 26, mass: 0.7 });
 
-  const drawMotifs = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, time: number) => {
-    const motifOpacity = Math.min(0.5, bassLevel * 0.8);
-    ctx.save();
-    ctx.globalAlpha = motifOpacity;
-
-    const strokeColor = themeId === 'onyx' ? '#D4AF37' : themeId === 'cyber' ? '#00F5D4' : '#1A1A18';
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 1.5;
-
-    // Blend mode per theme
-    ctx.globalCompositeOperation = themeId === 'onyx' ? 'multiply' : themeId === 'cyber' ? 'screen' : 'overlay';
-
-    // Staff lines (5 horizontal lines)
-    const lineSpacing = h / 8;
-    for (let i = 0; i < 5; i++) {
-      const y = h * 0.2 + i * lineSpacing;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-
-    // Treble clef (simplified)
-    ctx.beginPath();
-    ctx.arc(w * 0.1, h * 0.3, 20, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Sinusoidal waveform
-    const freq = bpm / 60; // cycles per second
-    ctx.beginPath();
-    for (let x = 0; x < w; x++) {
-      const y = h * 0.6 + Math.sin(x * 0.02 + time * freq * Math.PI * 2) * 30;
-      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Musical notes (eighth notes)
-    for (let i = 0; i < 6; i++) {
-      const x = w * (0.2 + i * 0.12);
-      const y = h * 0.7 + Math.sin(time * freq * Math.PI * 2 + i) * 15;
-      ctx.beginPath();
-      ctx.ellipse(x, y, 8, 6, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x + 6, y);
-      ctx.lineTo(x + 6, y - 25);
-      ctx.stroke();
-    }
-
-    // Vinyl groove spiral
-    ctx.beginPath();
-    const cx = w * 0.8, cy = h * 0.5;
-    for (let r = 10; r < 50; r += 2) {
-      ctx.moveTo(cx + r, cy);
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    }
-    ctx.stroke();
-
-    ctx.restore();
-  }, [bassLevel, bpm, themeId]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let img: HTMLImageElement | null = null;
-
-    const resize = () => {
-      const { width, height } = container.getBoundingClientRect();
-      canvas.width = width;
-      canvas.height = height;
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-
-    const draw = () => {
-      if (!ctx || !canvas) return;
-
-      const time = performance.now() / 1000;
-      const w = canvas.width;
-      const h = canvas.height;
-
-      ctx.clearRect(0, 0, w, h);
-
-      // Null state: pure background
-      if (!portraitUrl) {
-        ctx.fillStyle = themeId === 'minimal' ? '#F9F9F7' : '#080808';
-        ctx.fillRect(0, 0, w, h);
-      } else if (img && img.complete && img.naturalWidth > 0) {
-        applyThemeTreatment(ctx, img, w, h);
-      }
-
-      if (img && (!img.complete || img.naturalWidth === 0)) {
-        // Image not yet loaded, still draw motifs on dark/light canvas
-        ctx.fillStyle = themeId === 'minimal' ? '#F9F9F7' : '#080808';
-        ctx.fillRect(0, 0, w, h);
-      }
-
-      drawMotifs(ctx, w, h, time);
-
-      animationRef.current = requestAnimationFrame(draw);
-    };
-
-    if (portraitUrl) {
-      img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        // Initial draw after image load
-      };
-      img.src = portraitUrl;
-    }
-
-    animationRef.current = requestAnimationFrame(draw);
-
-    return () => {
-      cancelAnimationFrame(animationRef.current);
-      window.removeEventListener('resize', resize);
-    };
-  }, [portraitUrl, themeId, bassLevel, bpm, applyThemeTreatment, drawMotifs]);
+  // Text slides up gently into place.
+  const textY = useTransform(
+    scrollYProgress,
+    [0.1, 0.5],
+    reduced ? ['0%', '0%'] : ['40%', '0%']
+  );
+  const textOpacity = useTransform(scrollYProgress, [0.15, 0.45], [0, 1]);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full min-h-[500px]">
-      <canvas ref={canvasRef} className="block w-full h-full" />
-    </div>
+    <section
+      ref={sectionRef}
+      className="relative w-full min-h-screen flex items-center py-24 overflow-hidden"
+    >
+      <div className="w-full max-w-6xl mx-auto px-6 md:px-12 grid md:grid-cols-12 gap-10 items-center">
+        {/* Portrait — feathered, parallaxing, aspect-correct */}
+        <div className="md:col-span-7">
+          <motion.div
+            style={{ scale: sScale, filter: blur }}
+            className="relative w-full overflow-hidden rounded-3xl"
+          >
+            <div className="relative" style={{ aspectRatio: '4 / 5' }}>
+              {portraitUrl ? (
+                <motion.img
+                  src={portraitUrl}
+                  alt={name}
+                  crossOrigin="anonymous"
+                  style={{
+                    y: imgY,
+                    WebkitMaskImage:
+                      'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
+                    maskImage:
+                      'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
+                  }}
+                  className="absolute inset-0 w-full h-[124%] -top-[12%] object-cover will-change-transform"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-[var(--text-muted-color)] text-xs font-mono uppercase tracking-[0.15em]">
+                  Portrait
+                </div>
+              )}
+              {/* soft sheen + bottom legibility veil, feathered */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    'linear-gradient(125deg, rgba(255,255,255,0.08), transparent 40%), linear-gradient(to top, rgba(var(--surface-rgb),0.55), transparent 55%)',
+                }}
+              />
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Text */}
+        <motion.div
+          style={{ y: textY, opacity: textOpacity }}
+          className="md:col-span-5"
+        >
+          <span className="text-xs uppercase tracking-[0.25em] text-[var(--accent-color)] font-mono">
+            The Composer
+          </span>
+          <h2
+            className="font-display text-[var(--text-color)] leading-[1.02] mt-3 mb-5"
+            style={{ fontSize: 'clamp(2.25rem, 5vw, 4.5rem)' }}
+          >
+            {name}
+          </h2>
+          {tagline && (
+            <p className="text-lg md:text-xl text-[var(--text-color)] opacity-90 mb-4 leading-snug">
+              {tagline}
+            </p>
+          )}
+          {bio && (
+            <p className="text-sm md:text-base text-[var(--text-muted-color)] leading-relaxed max-w-md">
+              {bio}
+            </p>
+          )}
+        </motion.div>
+      </div>
+    </section>
   );
 }
