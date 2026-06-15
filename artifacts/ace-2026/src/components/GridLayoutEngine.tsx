@@ -1,127 +1,180 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useRef } from 'react';
+import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import type { ComposerIdentity, Locale } from '../types';
 
-const VARIANTS = ['A', 'B', 'C'] as const;
-type Variant = typeof VARIANTS[number];
-
-function getStoredVariant(): Variant {
-  const stored = sessionStorage.getItem('ace-grid-variant');
-  if (stored && VARIANTS.includes(stored as Variant)) return stored as Variant;
-  const random = VARIANTS[Math.floor(Math.random() * VARIANTS.length)]!;
-  sessionStorage.setItem('ace-grid-variant', random);
-  return random;
-}
-
-function localText(identity: ComposerIdentity | null, locale: Locale, field: 'name' | 'tagline' | 'biography'): string {
+function localText(
+  identity: ComposerIdentity | null,
+  locale: Locale,
+  field: 'name' | 'tagline' | 'biography'
+): string {
   if (!identity) return '';
   const ml = identity[field];
   if (!ml) return '';
   return (ml as unknown as Record<string, string>)[locale] || '';
 }
 
-function VariantA({ identity, locale }: { identity: ComposerIdentity | null; locale: Locale }) {
-  const portraitUrl = identity?.portrait?.url;
-  return (
-    <div className="relative w-screen h-screen overflow-hidden" style={{ backgroundColor: portraitUrl ? 'transparent' : 'var(--surface-color)' }}>
-      {portraitUrl ? (
-        <img src={portraitUrl} alt="" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
-      ) : (
-        <div className="absolute inset-0 bg-[var(--surface-color)]" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-      <div className="absolute bottom-12 left-8 md:left-16">
-        <h1 className="text-[clamp(3rem,8vw,9rem)] font-display leading-none text-white">
-          {localText(identity, locale, 'name') || 'ACE Composer'}
-        </h1>
-        <p className="text-[clamp(1rem,2vw,1.5rem)] opacity-70 text-white mt-2">
-          {localText(identity, locale, 'tagline')}
-        </p>
-      </div>
-      <div className="absolute right-8 top-1/2 -translate-y-1/2 hidden md:block">
-        <div className="w-px h-24 bg-white/30 animate-pulse" style={{ animationDuration: '3s' }} />
-      </div>
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
-        <button className="px-6 py-3 border border-white/30 text-white/80 hover:bg-white/10 transition-colors rounded font-mono text-sm tracking-widest uppercase">
-          Enter Studio
-        </button>
-      </div>
-    </div>
-  );
+function rand(seed: number) {
+  const x = Math.sin(seed * 999.13) * 43758.5453;
+  return x - Math.floor(x);
 }
 
-function VariantB({ identity, locale }: { identity: ComposerIdentity | null; locale: Locale }) {
-  const portraitUrl = identity?.portrait?.url;
-  return (
-    <div className="grid grid-cols-12 h-screen" style={{ backgroundColor: 'var(--surface-color)' }}>
-      <div className="col-span-7 row-span-4 bg-[var(--surface2-color)] overflow-hidden">
-        {portraitUrl ? (
-          <img src={portraitUrl} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
-        ) : (
-          <div className="w-full h-full bg-[var(--surface3-color)]" />
-        )}
-      </div>
-      <div className="col-span-5 row-span-2 flex flex-col justify-end p-8">
-        <h2 className="text-[clamp(2.5rem,5vw,6rem)] font-display leading-none" style={{ color: 'var(--text-color)' }}>
-          {localText(identity, locale, 'name') || 'ACE'}
-        </h2>
-        <p className="text-sm mt-4 opacity-70" style={{ color: 'var(--text-muted-color)' }}>
-          {localText(identity, locale, 'tagline')}
-        </p>
-      </div>
-      <div className="col-span-5 row-span-1 p-8 pt-0">
-        <p className="text-sm line-clamp-3" style={{ color: 'var(--text-muted-color)' }}>
-          {localText(identity, locale, 'biography')}
-        </p>
-      </div>
-      <div className="col-span-5 row-span-2 p-8">
-        <div className="w-full h-32 rounded-lg border flex items-center justify-center" style={{ borderColor: 'var(--border-color)', backgroundColor: 'rgba(var(--surface-rgb),0.5)' }}>
-          <span className="text-xs font-mono uppercase tracking-widest" style={{ color: 'var(--text-muted-color)' }}>Audio Player</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function VariantC({ identity, locale }: { identity: ComposerIdentity | null; locale: Locale }) {
-  const name = localText(identity, locale, 'name') || 'ACE COMPOSER';
-  const letters = name.split('');
-  const portraitUrl = identity?.portrait?.url;
-  return (
-    <div className="relative h-screen overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
-      <div className="flex items-center justify-center h-full px-4">
-        <div className="grid grid-cols-3 md:grid-cols-5 gap-4 max-w-5xl w-full">
-          {letters.map((letter, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.6 }}
-              className="text-[15vw] md:text-[18vw] font-display leading-none select-none"
-              style={{ color: 'var(--text-color)', gridColumn: i % 2 === 0 ? 'span 2' : 'span 1' }}
-            >{letter}</motion.div>
-          ))}
-        </div>
-      </div>
-      {portraitUrl && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full overflow-hidden opacity-20 pointer-events-none">
-          <img src={portraitUrl} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
-        </div>
-      )}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs font-mono tracking-[0.2em] opacity-40" style={{ color: 'var(--text-muted-color)' }}>SCROLL TO EXPLORE</div>
-    </div>
-  );
-}
-
+/**
+ * Hero — restrained, luxurious title sequence (Borgo Santandrea / Sal Parasuco DNA).
+ * Centered composition, generous negative space, refined letter-spaced typography,
+ * one slow & dignified fade-rise. No glitch, no neon, no snap. The portrait breathes
+ * gently behind a soft vignette so the name stays clean and legible.
+ */
 export default function GridLayoutEngine() {
   const { composerIdentity, locale } = useIdentity();
   const safeLocale = (locale ?? 'en') as Locale;
-  const [variant] = useState<Variant>(getStoredVariant);
+  const reduced = useReducedMotion() ?? false;
+  const ref = useRef<HTMLDivElement>(null);
+
+  const name = localText(composerIdentity, safeLocale, 'name') || 'Amir Moslehi';
+  const tagline = localText(composerIdentity, safeLocale, 'tagline');
+  const portraitUrl = composerIdentity?.portrait?.url;
+
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
+  const bgY = useTransform(scrollYProgress, [0, 1], reduced ? ['0%', '0%'] : ['0%', '14%']);
+  const contentY = useTransform(scrollYProgress, [0, 1], reduced ? ['0%', '0%'] : ['0%', '-22%']);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.55], [1, 0]);
+
+  const motes = Array.from({ length: 60 }, (_, i) => i);
+  const ease = [0.16, 1, 0.3, 1] as const;
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div key={variant} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.6 }}>
-        {variant === 'A' && <VariantA identity={composerIdentity} locale={safeLocale} />}
-        {variant === 'B' && <VariantB identity={composerIdentity} locale={safeLocale} />}
-        {variant === 'C' && <VariantC identity={composerIdentity} locale={safeLocale} />}
+    <div ref={ref} className="relative w-full h-screen overflow-hidden" style={{ backgroundColor: '#000' }}>
+      {/* Background portrait — gentle perpetual drift + scroll parallax */}
+      <motion.div className="absolute inset-0" style={{ y: bgY }}>
+        <motion.div
+          className="absolute inset-0"
+          initial={reduced ? { scale: 1.06 } : { scale: 1.2, filter: 'blur(16px)' }}
+          animate={
+            reduced
+              ? { scale: 1.06 }
+              : { scale: [1.1, 1.16, 1.1], x: ['-1%', '1%', '-1%'], filter: 'blur(0px)' }
+          }
+          transition={{
+            scale: { duration: 22, repeat: Infinity, ease: 'easeInOut' },
+            x: { duration: 28, repeat: Infinity, ease: 'easeInOut' },
+            filter: { duration: 1.6, ease },
+          }}
+        >
+          {portraitUrl ? (
+            <img
+              src={portraitUrl}
+              alt=""
+              crossOrigin="anonymous"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 60%, transparent 96%)',
+                maskImage: 'linear-gradient(to bottom, #000 0%, #000 60%, transparent 96%)',
+              }}
+            />
+          ) : (
+            <div className="absolute inset-0" style={{ backgroundColor: 'var(--surface-color)' }} />
+          )}
+        </motion.div>
+        {/* Soft cinematic vignette — even darkening + a long smooth fade to black at the bottom (no hard edge) */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(120% 90% at 50% 45%, transparent 30%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.8) 100%), linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.3) 65%)',
+          }}
+        />
+        {/* dedicated long fade-out to pure black at the very bottom — removes any hard seam */}
+        <div
+          className="absolute bottom-0 left-0 right-0"
+          style={{ height: '40%', background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.6) 55%, #000 100%)' }}
+        />
       </motion.div>
-    </AnimatePresence>
+
+      {/* Floating motes — barely-there, slow */}
+      {!reduced && (
+        <div className="absolute inset-0 pointer-events-none">
+          {motes.map((i) => {
+            const left = rand(i + 1) * 100;
+            const top = rand(i + 7) * 100;
+            const size = 1.5 + rand(i + 3) * 3;
+            const dur = 14 + rand(i + 5) * 14;
+            const drift = 24 + rand(i + 9) * 48;
+            return (
+              <motion.span
+                key={i}
+                className="absolute rounded-full"
+                style={{ left: `${left}%`, top: `${top}%`, width: size, height: size, background: 'rgba(255,255,255,0.8)', boxShadow: '0 0 6px rgba(255,255,255,0.5)' }}
+                animate={{ y: [0, -drift, 0], opacity: [0, 0.75, 0] }}
+                transition={{ duration: dur, repeat: Infinity, ease: 'easeInOut', delay: rand(i + 11) * 8 }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Centered, luxurious composition */}
+      <motion.div
+        style={{ y: contentY, opacity: contentOpacity }}
+        className="absolute inset-0 flex flex-col items-center justify-center text-center px-6"
+      >
+        <motion.span
+          initial={{ opacity: 0, y: 14, letterSpacing: '0.5em' }}
+          animate={{ opacity: 1, y: 0, letterSpacing: '0.42em' }}
+          transition={{ duration: 1.2, ease, delay: 0.3 }}
+          className="text-[0.7rem] md:text-xs uppercase text-white/70 font-mono mb-8"
+          style={{ letterSpacing: '0.42em' }}
+        >
+          Cinematic Composer
+        </motion.span>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 28, filter: 'blur(10px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ duration: 1.6, ease, delay: 0.5 }}
+          className="font-display text-white font-light"
+          style={{ fontSize: 'clamp(2.75rem, 9vw, 9rem)', letterSpacing: '0.04em', lineHeight: 1.02 }}
+        >
+          {name}
+        </motion.h1>
+
+        {/* thin decorative rule */}
+        <motion.div
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          transition={{ duration: 1.4, ease, delay: 1 }}
+          className="mt-8 mb-7 h-px"
+          style={{ width: 'clamp(80px, 14vw, 200px)', background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent)' }}
+        />
+
+        {tagline && (
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2, ease, delay: 1.15 }}
+            className="text-white/65 max-w-lg font-light"
+            style={{ fontSize: 'clamp(0.95rem, 1.5vw, 1.25rem)', letterSpacing: '0.02em' }}
+          >
+            {tagline}
+          </motion.p>
+        )}
+      </motion.div>
+
+      {/* Scroll cue */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.8, duration: 1.2 }}
+        style={{ opacity: contentOpacity }}
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
+      >
+        <span className="text-[0.6rem] font-mono uppercase tracking-[0.35em] text-white/45">Scroll</span>
+        <motion.div
+          animate={reduced ? {} : { scaleY: [1, 0.4, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-px h-12 bg-gradient-to-b from-white/50 to-transparent origin-top"
+        />
+      </motion.div>
+    </div>
   );
 }
