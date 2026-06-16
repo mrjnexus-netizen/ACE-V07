@@ -160,8 +160,8 @@ const seedContent = async (): Promise<void> => {
   }
 
   // 3) Sample projects: linked to the composer identity. Idempotent (only seeds
-  //    when the composer has no projects yet). This removes the "NO PROJECTS YET"
-  //    empty state on the projects timeline until real projects are entered.
+  //    when the composer has no projects yet). Twelve projects, one per concept,
+  //    so the Works "piano" shows the full professional spread of key types.
   const identityRow = await db.query.composerIdentity.findFirst();
   if (identityRow) {
     const existingProjects = await db.query.projects.findMany({
@@ -180,6 +180,15 @@ const seedContent = async (): Promise<void> => {
           year: 2024,
           description: all(
             "An original orchestral score for a near-future science-fiction feature exploring memory and machine consciousness."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("The Hollow Crown"),
+          type: "tv",
+          year: 2024,
+          description: all(
+            "Recurring themes and season-long motifs for a prestige historical drama series."
           ),
         },
         {
@@ -207,6 +216,69 @@ const seedContent = async (): Promise<void> => {
           year: 2022,
           description: all(
             "Ambient textures and field-recording-inspired soundscapes for a documentary on the vanishing Arctic."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Aurora — Brand Anthem"),
+          type: "advertising",
+          year: 2024,
+          description: all(
+            "A precise, memorable sonic identity composed for a global brand's flagship campaign."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Dominion — Main Trailer"),
+          type: "trailer",
+          year: 2024,
+          description: all(
+            "High-impact hybrid cues engineered to drive a blockbuster theatrical trailer."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("The Glass Garden"),
+          type: "theatre",
+          year: 2023,
+          description: all(
+            "A live chamber score for the stage, written to breathe with the performers each night."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Murmuration"),
+          type: "dance",
+          year: 2023,
+          description: all(
+            "A rhythm-led score for a contemporary ballet, tempo shaped as choreography."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Symphony No. 1 — Tidewater"),
+          type: "concert",
+          year: 2022,
+          description: all(
+            "A full-scale concert work for orchestra, premiered in the season's opening night."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Liminal Spaces"),
+          type: "vr",
+          year: 2024,
+          description: all(
+            "Spatial, fully immersive audio composed for a room-scale VR art installation."
+          ),
+        },
+        {
+          composerId: identityRow.id,
+          title: all("Nightfall Sessions"),
+          type: "album",
+          year: 2023,
+          description: all(
+            "A long-form artist album released under the composer's own name — intimate and exploratory."
           ),
         },
       ];

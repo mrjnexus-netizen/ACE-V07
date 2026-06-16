@@ -6,32 +6,28 @@ import type { Project, Locale } from '../types';
 /**
  * Cinematic, chapter-based portfolio scroll.
  *
- * Projects are grouped into pairs. The rhythm is:
- *   [2 projects] -> [interlude text] -> [2 projects] -> [interlude text] -> ...
+ * The rhythm alternates one-to-one:
+ *   [project] -> [interlude text] -> [project] -> [interlude text] -> ...
  * automatically, for ANY number of projects the admin adds. Each project
  * reveals out of blur+scale as it reaches the centre, parallaxes, and banks
  * gently in 3D. Edges are feathered, cards are a uniform size.
  */
 
-// Cinematic interludes shown between project pairs (editable later via Admin).
+// Cinematic interludes shown between projects (editable later via Admin).
 // They cycle if there are more gaps than lines.
 const INTERLUDES = [
-  {
-    kicker: 'Between the notes',
-    line: 'Every score begins in silence — a held breath before the first phrase finds its shape.',
-  },
-  {
-    kicker: 'Texture & tension',
-    line: 'Orchestral weight meets electronic pulse, building arcs that move between stillness and storm.',
-  },
-  {
-    kicker: 'The unseen craft',
-    line: 'Music written for the screen lives beneath the image, shaping what the eye believes it feels.',
-  },
-  {
-    kicker: 'A continuing story',
-    line: 'Each work is a chapter — and the next is always being written.',
-  },
+  { kicker: 'Hans Zimmer', line: 'I see music as colours, and I try to paint with sound.' },
+  { kicker: 'Ludwig van Beethoven', line: 'Music is the mediator between the spiritual and the sensual life.' },
+  { kicker: 'Claude Debussy', line: 'Music is the silence between the notes.' },
+  { kicker: 'Johann Sebastian Bach', line: 'The aim of music is to touch the heart and refresh the soul.' },
+  { kicker: 'Ennio Morricone', line: 'Silence is also music, and the most important one.' },
+  { kicker: 'Igor Stravinsky', line: 'To listen is an effort, and just to hear is no merit.' },
+  { kicker: 'Wolfgang Amadeus Mozart', line: 'The music is not in the notes, but in the silence between.' },
+  { kicker: 'John Williams', line: 'A great film score reaches the audience before they even know it.' },
+  { kicker: 'Frederic Chopin', line: 'Simplicity is the final achievement, the crowning reward of art.' },
+  { kicker: 'Gustav Mahler', line: 'The symphony must be like the world; it must embrace everything.' },
+  { kicker: 'Leonard Bernstein', line: 'Music can name the unnameable and communicate the unknowable.' },
+  { kicker: 'Pyotr Ilyich Tchaikovsky', line: 'Music is the language of the soul, where words fall silent.' },
 ];
 
 function pad(n: number) {
@@ -62,20 +58,17 @@ export default function SpatialScrollEngine() {
       </section>
     );
 
-  // Build the sequence: pair projects, insert an interlude after each pair
-  // (except trailing). This scales to ANY number of projects automatically.
+  // Build the sequence: one project, then one interlude, alternating. An
+  // interlude follows every project except the last. Scales to ANY number.
   type Slot =
     | { kind: 'project'; project: Project; index: number }
     | { kind: 'interlude'; data: { kicker: string; line: string } };
   const slots: Slot[] = [];
   let interludeCount = 0;
-  for (let i = 0; i < projects.length; i += 2) {
+  for (let i = 0; i < projects.length; i += 1) {
     slots.push({ kind: 'project', project: projects[i]!, index: i });
+    // Interlude after each project, only if more projects follow.
     if (i + 1 < projects.length) {
-      slots.push({ kind: 'project', project: projects[i + 1]!, index: i + 1 });
-    }
-    // Interlude after this pair, only if more projects follow.
-    if (i + 2 < projects.length) {
       slots.push({ kind: 'interlude', data: INTERLUDES[interludeCount % INTERLUDES.length]! });
       interludeCount += 1;
     }
@@ -111,7 +104,7 @@ export default function SpatialScrollEngine() {
               (p.title as unknown as Record<string, string>)[safeLocale] || p.title?.en || 'Untitled';
             const desc =
               (p.description as unknown as Record<string, string>)[safeLocale] || p.description?.en || '';
-            const cover = p.coverImage?.url || '';
+            const cover = p.coverImage?.url || (p as unknown as { coverUrl?: string }).coverUrl || '';
             return (
               <motion.article
                 key={p.id}
@@ -166,14 +159,15 @@ export default function SpatialScrollEngine() {
             return (
               <div
                 key={`int-${si}`}
-                className="min-h-screen flex items-center justify-center px-8 text-center"
+                className="flex items-center justify-center px-8 text-center"
+                style={{ minHeight: '22vh' }}
               >
                 <motion.div
                   initial={{ opacity: 0, filter: 'blur(10px)', y: 40 }}
                   whileInView={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
                   viewport={{ once: false, amount: 0.6 }}
                   transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-                  className="max-w-2xl rounded-3xl px-10 py-12"
+                  className="max-w-none rounded-3xl px-10 py-8"
                   style={{
                     background:
                       'radial-gradient(120% 120% at 50% 50%, rgba(var(--surface-rgb),0.85) 40%, rgba(var(--surface-rgb),0.45) 75%, transparent 100%)',
@@ -183,8 +177,8 @@ export default function SpatialScrollEngine() {
                     {slot.data.kicker}
                   </span>
                   <p
-                    className="font-display text-[var(--text-color)] leading-[1.25] mt-5"
-                    style={{ fontSize: 'clamp(1.6rem, 3.4vw, 3rem)', fontStyle: 'italic' }}
+                    className="font-display text-[var(--text-color)] mt-5 whitespace-nowrap"
+                    style={{ fontSize: 'clamp(0.7rem, 2vw, 1.4rem)', fontStyle: 'italic', lineHeight: 1.2 }}
                   >
                     {slot.data.line}
                   </p>
@@ -198,10 +192,10 @@ export default function SpatialScrollEngine() {
             (p.title as unknown as Record<string, string>)[safeLocale] || p.title?.en || 'Untitled';
           const desc =
             (p.description as unknown as Record<string, string>)[safeLocale] || p.description?.en || '';
-          const cover = p.coverImage?.url || '';
+          const cover = p.coverImage?.url || (p as unknown as { coverUrl?: string }).coverUrl || '';
 
           return (
-            <div key={p.id} className="min-h-screen flex items-center justify-center px-6 md:px-16">
+            <div key={p.id} className="flex items-center justify-center px-6 md:px-16" style={{ minHeight: '78vh' }}>
               <motion.article
                 initial={{ opacity: 0, filter: 'blur(12px)', scale: 0.94, y: 50 }}
                 whileInView={{ opacity: 1, filter: 'blur(0px)', scale: 1, y: 0 }}

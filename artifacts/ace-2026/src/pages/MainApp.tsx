@@ -6,13 +6,12 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Lazy-loaded components for code splitting
 const LivingScore = lazy(() => import('../components/LivingScore'));
-const DevAudioTester = lazy(() => import('../components/DevAudioTester'));
 const LinguisticPortal = lazy(() => import('../components/LinguisticPortal'));
 const GridLayoutEngine = lazy(() => import('../components/GridLayoutEngine'));
 const ComposerPresence = lazy(() => import('../components/ComposerPresence'));
 const DoubleExposurePortrait = lazy(() => import('../components/DoubleExposurePortrait'));
 const SpatialScrollEngine = lazy(() => import('../components/SpatialScrollEngine'));
-const Discography = lazy(() => import('../components/Discography'));
+const WorksGallery = lazy(() => import('../components/WorksGallery'));
 const PersistentAudioPlayer = lazy(() => import('../components/PersistentAudioPlayer'));
 const ExecutiveStudioBot = lazy(() => import('../components/ExecutiveStudioBot'));
 const MagneticCursor = lazy(() => import('../components/MagneticCursor'));
@@ -43,7 +42,7 @@ export default function MainApp() {
 
   return (
     <div className="min-h-screen relative" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>
-      {/* Living Score — global fixed 3D particle field behind all content (S5) */}
+      {/* Living Score â€” global fixed 3D particle field behind all content (S5) */}
       <ErrorBoundary>
         <Suspense fallback={null}>
           <LivingScore />
@@ -82,14 +81,15 @@ export default function MainApp() {
           </Suspense>
         </ErrorBoundary>
 
-        {/* Discography (Section 03 - tracks grid + click to play) */}
-        <div data-reveal>
-          <ErrorBoundary>
-            <Suspense fallback={<LoadingFallback />}>
-              <Discography />
-            </Suspense>
-          </ErrorBoundary>
-        </div>
+        {/* Works (Section 03 - concept menu: Cinema / Game / Animation / ...) */}
+        {/* No data-reveal wrapper: its scroll animation creates a stacking
+            context that breaks the living-veil backdrop-filter, letting the
+            particle field bleed over the content. */}
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <WorksGallery />
+          </Suspense>
+        </ErrorBoundary>
       </div>
 
       {/* Fixed UI: Persistent Audio Player */}
@@ -112,11 +112,6 @@ export default function MainApp() {
           <MagneticCursor />
         </Suspense>
       </ErrorBoundary>
-
-      {/* TEMP dev-only: Living Score audio tester (renders only in DEV) */}
-      <Suspense fallback={null}>
-        <DevAudioTester />
-      </Suspense>
     </div>
   );
 }
