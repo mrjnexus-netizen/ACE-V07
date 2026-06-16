@@ -1,216 +1,193 @@
-import { useRef, useMemo } from 'react';
-import {
-  motion,
-  useMotionValue,
-  useSpring,
-  useScroll,
-  useTransform,
-  useReducedMotion,
-} from 'framer-motion';
+import { useRef, useMemo, useState, useEffect } from 'react';
+import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
+import { useAudio } from '../context/AudioContext';
+import type { AudioTrack } from '../types';
 
-// A single image with real intrinsic dimensions, sourced from existing identity data.
-interface GalleryImage {
-  url: string;
-  width: number;
-  height: number;
+// Short, editable blurbs per genre (lowercased key).
+const GENRE_BLURBS: Record<string, string> = {
+  orchestral: 'Sweeping strings and brass — the grammar of the symphony, rebuilt for the modern screen.',
+  cinematic: 'Themes written to live beneath the image, shaping what the eye believes it feels.',
+  gaming: 'Adaptive, interactive scores that respond and evolve with the player in real time.',
+  animation: 'Bright, characterful music that gives motion its heartbeat and worlds their wonder.',
+  ambient: 'Slow, weightless texture — sound designed to surround rather than to lead.',
+  electronic: 'Synthesised pulse and grain, where circuitry learns to breathe.',
+  'electronic-orchestral': 'Where live orchestra and electronics meet — organic and synthetic in one breath.',
+  synthwave: 'Neon-lit nostalgia: analog warmth wrapped around a driving retro pulse.',
+  choral: 'The human voice, massed and luminous — the oldest instrument, reimagined.',
+  other: 'Work that resists category — experiments and one-of-a-kind scores.',
+};
+
+function blurbFor(genre: string): string {
+  return GENRE_BLURBS[genre.toLowerCase()] || GENRE_BLURBS.other!;
 }
 
-// Collect every available composer image from the canonical identity sources:
-// portrait, project cover images, and track cover art. No invented fields.
-function collectImages(
-  portraitUrl: string | undefined,
-  portraitW: number | undefined,
-  portraitH: number | undefined,
-  projectCovers: GalleryImage[],
-  trackCovers: GalleryImage[],
-): GalleryImage[] {
-  const images: GalleryImage[] = [];
-  if (portraitUrl) {
-    images.push({ url: portraitUrl, width: portraitW || 1000, height: portraitH || 1400 });
-  }
-  projectCovers.forEach((p) => images.push(p));
-  trackCovers.forEach((t) => images.push(t));
-  return images;
+interface GenreGroup {
+  genre: string;
+  tracks: AudioTrack[];
+  cover: string;
 }
 
-// Derive a grid footprint from the real aspect ratio (mixed landscape / portrait / tall / wide).
-function spanFor(width: number, height: number): { col: number; row: number } {
-  const ratio = width && height ? width / height : 1;
-  if (ratio >= 1.5) return { col: 2, row: 1 }; // wide
-  if (ratio <= 0.66) return { col: 1, row: 2 }; // tall
-  return { col: 1, row: 1 };
+function coverOf(t: AudioTrack): string {
+  return t.coverArt?.url || (t as unknown as { coverUrl?: string }).coverUrl || '';
 }
 
-interface TiltCardProps {
-  image: GalleryImage;
-  reduce: boolean;
-}
-
-function TiltCard({ image, reduce }: TiltCardProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const rxRaw = useMotionValue(0);
-  const ryRaw = useMotionValue(0);
-  const rotateX = useSpring(rxRaw, { stiffness: 150, damping: 18 });
-  const rotateY = useSpring(ryRaw, { stiffness: 150, damping: 18 });
-
-  const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (reduce) return;
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    ryRaw.set(px * 8);
-    rxRaw.set(-py * 8);
-  };
-
-  const handleLeave = () => {
-    rxRaw.set(0);
-    ryRaw.set(0);
-  };
-
-  const span = spanFor(image.width, image.height);
-
-  return (
-    <motion.div
-      ref={ref}
-      data-cursor="media"
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      style={{
-        rotateX: reduce ? 0 : rotateX,
-        rotateY: reduce ? 0 : rotateY,
-        transformPerspective: 1000,
-        gridColumn: `span ${span.col}`,
-        gridRow: `span ${span.row}`,
-        borderColor: 'var(--border-color)',
-      }}
-      className="relative overflow-hidden border will-change-transform"
-    >
-      <img
-        src={image.url}
-        alt=""
-        crossOrigin="anonymous"
-        loading="lazy"
-        className="w-full h-full object-cover"
-      />
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ boxShadow: 'inset 0 0 80px rgba(0,0,0,0.45)' }}
-      />
-    </motion.div>
-  );
-}
+const ROTATE_MS = 3000;
 
 export default function ComposerPresence() {
   const { identity, tracks, locale } = useIdentity();
+  const { playTrack } = useAudio();
   const reduce = useReducedMotion() ?? false;
   const sectionRef = useRef<HTMLElement>(null);
+  const inView = useInView(sectionRef, { amount: 0.5 });
 
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start end', 'end start'],
-  });
-  // Three parallax depth layers (Composer Presence: 3D-on-scroll feel).
-  const y0 = useTransform(scrollYProgress, [0, 1], ['0%', '-4%']);
-  const y1 = useTransform(scrollYProgress, [0, 1], ['0%', '-10%']);
-  const y2 = useTransform(scrollYProgress, [0, 1], ['0%', '-16%']);
-  const layers = [y0, y1, y2];
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
 
-  const images = useMemo<GalleryImage[]>(() => {
-    const projectCovers: GalleryImage[] = (identity?.projects || [])
-      .map((p) => p.coverImage)
-      .filter((c): c is NonNullable<typeof c> => !!c && !!c.url)
-      .map((c) => ({ url: c.url, width: c.width, height: c.height }));
-    const trackCovers: GalleryImage[] = (tracks || [])
-      .map((t) => t.coverArt)
-      .filter((c): c is NonNullable<typeof c> => !!c && !!c.url)
-      .map((c) => ({ url: c.url, width: c.width, height: c.height }));
-    return collectImages(
-      identity?.portrait?.url,
-      identity?.portrait?.width,
-      identity?.portrait?.height,
-      projectCovers,
-      trackCovers,
-    );
-  }, [identity, tracks]);
+  // Group tracks by genre automatically.
+  const groups = useMemo<GenreGroup[]>(() => {
+    const map = new Map<string, AudioTrack[]>();
+    (tracks ?? []).forEach((t) => {
+      const g = (t.genre || 'other').trim();
+      if (!map.has(g)) map.set(g, []);
+      map.get(g)!.push(t);
+    });
+    return Array.from(map.entries()).map(([genre, list]) => ({
+      genre,
+      tracks: list,
+      cover: coverOf(list[0]!),
+    }));
+  }, [tracks]);
 
-  // Localized composer name from the canonical identity source, mirroring the
-  // hero's localText() pattern, so the empty-state hero never disagrees with
-  // the rest of the site. Falls back to 'ACE Composer' exactly like the hero.
+  // Auto-advance every ROTATE_MS while the section is in view and not paused.
+  useEffect(() => {
+    if (!inView || paused || reduce || groups.length <= 1) return;
+    const id = setInterval(() => {
+      setActive((a) => (a + 1) % groups.length);
+    }, ROTATE_MS);
+    return () => clearInterval(id);
+  }, [inView, paused, reduce, groups.length]);
+
   const nameMap = (identity?.name ?? null) as unknown as Record<string, string> | null;
   const composerName =
     (nameMap && nameMap[locale ?? 'en']) || (nameMap && nameMap.en) || 'ACE Composer';
 
-  // Null-safe elegant empty state (LAW 2): no broken layout, no console noise.
-  if (images.length === 0) {
+  if (groups.length === 0) {
     return (
-      <section
-        ref={sectionRef}
-        className="relative w-full min-h-[70vh] flex flex-col items-center justify-center overflow-hidden living-veil"
-        aria-label="The composer"
-      >
-        <span
-          className="font-mono uppercase"
-          style={{ fontSize: '0.66rem', letterSpacing: '0.34em', color: 'var(--accent-color)' }}
-        >
-          The Composer
-        </span>
-        <h2
-          className="font-display text-center mt-6"
-          style={{
-            fontSize: 'clamp(2.5rem, 9vw, 8rem)',
-            lineHeight: 0.95,
-            color: 'var(--text-dim-color)',
-          }}
-        >
-          {composerName}
-        </h2>
-        <div
-          className="mt-8 animate-pulse"
-          style={{ width: '40%', height: '1px', backgroundColor: 'var(--border-color)', animationDuration: '3s' }}
-        />
+      <section ref={sectionRef} className="relative w-full min-h-[70vh] flex flex-col items-center justify-center overflow-hidden living-veil" aria-label="The composer">
+        <span className="font-mono uppercase" style={{ fontSize: '0.66rem', letterSpacing: '0.34em', color: 'var(--accent-color)' }}>The Composer</span>
+        <h2 className="font-display text-center mt-6" style={{ fontSize: 'clamp(2.5rem, 9vw, 8rem)', lineHeight: 0.95, color: 'var(--text-dim-color)' }}>{composerName}</h2>
       </section>
     );
   }
+
+  const current = groups[active]!;
 
   return (
     <section
       ref={sectionRef}
       className="relative w-full overflow-hidden living-veil"
-      style={{ padding: 'clamp(4rem, 10vw, 9rem) clamp(1.2rem, 6vw, 7rem)' }}
+      style={{ padding: 'clamp(6rem, 14vw, 12rem) 0', minHeight: '100vh' }}
       aria-label="The composer"
     >
-      <div className="flex items-center gap-3 mb-10">
-        <span style={{ width: '34px', height: '1px', backgroundColor: 'var(--accent-color)' }} />
-        <span
-          className="font-mono uppercase"
-          style={{ fontSize: '0.66rem', letterSpacing: '0.34em', color: 'var(--accent-color)' }}
-        >
+      {/* Heading — centred, generous breathing room above the band */}
+      <div
+        className="flex flex-col items-center text-center"
+        style={{ padding: '0 clamp(1.5rem, 8vw, 9rem)', marginBottom: 'clamp(4rem, 9vw, 7rem)' }}
+      >
+        <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.45em', color: 'var(--accent-color)' }}>
           The Composer
         </span>
+        <h2
+          className="font-display font-light mt-6"
+          style={{ fontSize: 'clamp(1.4rem, 2.8vw, 2.4rem)', lineHeight: 1.3, color: 'var(--text-color)', maxWidth: '24ch' }}
+        >
+          The worlds {composerName.split(' ')[0]} scores for.
+        </h2>
       </div>
 
+      {/* The rotating band — curved like a strap around a cylinder */}
       <div
-        className="grid gap-2 md:gap-3"
-        style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gridAutoRows: '200px',
-          gridAutoFlow: 'dense',
-        }}
+        className="relative w-full"
+        style={{ perspective: '1400px', height: 'clamp(220px, 34vh, 360px)' }}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
       >
-        {images.map((image, i) => (
-          <motion.div key={`${image.url}-${i}`} style={{ y: reduce ? 0 : layers[i % 3] }}>
-            <TiltCard image={image} reduce={reduce} />
-          </motion.div>
+        <AnimatePresence mode="popLayout">
+          <motion.button
+            key={current.genre}
+            type="button"
+            data-cursor="media"
+            onClick={() => current.tracks[0] && void playTrack(current.tracks[0])}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, x: '60%', rotateY: -28, filter: 'blur(8px)' }}
+            animate={reduce ? { opacity: 1 } : { opacity: 1, x: '0%', rotateY: 0, filter: 'blur(0px)' }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, x: '-60%', rotateY: 28, filter: 'blur(8px)' }}
+            transition={{ duration: 1, ease: [0.5, 0, 0.2, 1] }}
+            className="absolute inset-0 w-full flex items-center focus:outline-none"
+            style={{ transformStyle: 'preserve-3d' }}
+          >
+            {/* full-bleed background image with side curvature via mask + gradients */}
+            <div className="absolute inset-0 overflow-hidden">
+              {current.cover && (
+                <img
+                  src={current.cover}
+                  alt=""
+                  crossOrigin="anonymous"
+                  className="w-full h-full object-cover"
+                  style={{
+                    WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%)',
+                    maskImage: 'linear-gradient(to right, transparent 0%, #000 18%, #000 82%, transparent 100%)',
+                  }}
+                />
+              )}
+              {/* darkening for legibility */}
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, #000 2%, rgba(0,0,0,0.45) 30%, rgba(0,0,0,0.45) 70%, #000 98%), linear-gradient(to top, rgba(0,0,0,0.6), transparent 60%)' }} />
+              {/* top + bottom hairlines to read as a 'band' */}
+              <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent)' }} />
+              <div className="absolute bottom-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent)' }} />
+            </div>
+
+            {/* content */}
+            <div className="relative z-10 w-full flex items-center justify-between" style={{ padding: '0 clamp(2rem, 9vw, 10rem)' }}>
+              <div className="max-w-2xl text-left">
+                <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: 'var(--accent-color)' }}>
+                  {String(active + 1).padStart(2, '0')} / {String(groups.length).padStart(2, '0')}
+                </span>
+                <h3
+                  className="font-display font-light mt-3 text-white capitalize"
+                  style={{ fontSize: 'clamp(2rem, 5.5vw, 4.5rem)', lineHeight: 1 }}
+                >
+                  {current.genre}
+                </h3>
+                <p className="font-light mt-4 text-white/75" style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.05rem)', lineHeight: 1.55, maxWidth: '46ch' }}>
+                  {blurbFor(current.genre)}
+                </p>
+                <span className="inline-block font-mono mt-5 text-white/50" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>
+                  {String(current.tracks.length).padStart(2, '0')} {current.tracks.length === 1 ? 'work' : 'works'}
+                </span>
+              </div>
+            </div>
+          </motion.button>
+        </AnimatePresence>
+      </div>
+
+      {/* progress dots */}
+      <div className="flex items-center justify-center gap-2.5" style={{ marginTop: 'clamp(3rem, 6vw, 5rem)' }}>
+        {groups.map((g, i) => (
+          <button
+            key={g.genre}
+            type="button"
+            aria-label={`Show ${g.genre}`}
+            onClick={() => setActive(i)}
+            className="rounded-full transition-all duration-500"
+            style={{
+              width: i === active ? 26 : 7,
+              height: 7,
+              backgroundColor: i === active ? 'var(--accent-color)' : 'rgba(255,255,255,0.25)',
+            }}
+          />
         ))}
       </div>
     </section>
   );
 }
-
