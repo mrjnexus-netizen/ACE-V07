@@ -39,6 +39,9 @@ const useSmoothScroll = () => {
       };
       lenis = new Lenis(options as any);
       lenisRef.current = lenis;
+      // Expose the instance globally so overlays/modals can stop/start the
+      // smooth-scroll engine (it ignores body overflow:hidden on its own).
+      (window as unknown as { __lenis?: Lenis | null }).__lenis = lenis;
 
       const onScroll = ({ scroll }: { scroll: number }) => {
         setScrollPosition(scroll);
@@ -59,6 +62,7 @@ const useSmoothScroll = () => {
       if (rafId) cancelAnimationFrame(rafId);
       lenisRef.current?.destroy();
       lenisRef.current = null;
+      (window as unknown as { __lenis?: Lenis | null }).__lenis = null;
       subs.clear();
     };
   }, []);

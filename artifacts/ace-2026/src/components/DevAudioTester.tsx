@@ -51,6 +51,8 @@ const makeTrack = (
   sortOrder: 0,
   isLive: true,
   createdAt: new Date().toISOString(),
+  concept: null,
+  isFeatured: false,
 });
 
 const DEMO: { label: string; track: AudioTrack }[] = [

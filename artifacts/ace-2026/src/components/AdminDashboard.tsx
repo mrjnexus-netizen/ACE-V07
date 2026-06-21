@@ -12,6 +12,13 @@ const emptyMultiLingual = (): MultiLingual => ({ en: '', es: '', fr: '', zh: '',
 const locales = ['en', 'es', 'fr', 'zh', 'ja', 'ko'] as const;
 const localeLabels: Record<string, string> = { en: 'English', es: 'Espa\u00f1ol', fr: 'Fran\u00e7ais', zh: '\u4e2d\u6587', ja: '\u65e5\u672c\u8a9e', ko: '\ud55c\uad6d\uc5b4' };
 
+// Selected-Works concepts — MUST match the ORDER list in WorksGallery.tsx so a
+// track assigned here lands on the correct piano key on the home page.
+const CONCEPT_OPTIONS = [
+  'Cinema', 'Television', 'Games', 'Animation', 'Documentary', 'Advertising',
+  'Trailers', 'Theatre', 'Dance', 'Concert', 'Immersive', 'Albums',
+] as const;
+
 // ---------- Tab Content Components ----------
 const TabIdentityMatrix = () => {
   const { composerIdentity, fetchIdentity, updateIdentity } = useIdentity();
@@ -88,15 +95,37 @@ const TabIdentityMatrix = () => {
 
 const TabMediaPipeline = () => {
   const { tracks, fetchTracks } = useIdentity();
-  const { audioState, playTrack } = useAudio();
+  const { playTrack } = useAudio();
   const { currentJob, startPipeline, approvePipeline, resetJob } = usePipeline();
   const [file, setFile] = useState<File | null>(null);
-  const [narratives, setNarratives] = useState<MultiLingual>(emptyMultiLingual());
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files?.[0]) setFile(e.dataTransfer.files[0]);
   };
+
+  // Persist a single field change for a track (concept or featured star).
+  // For the star we also clear the star on every OTHER track in the same
+  // concept first, so each concept keeps at most one featured track.
+  const updateTrack = useCallback(async (track: AudioTrack, patch: Partial<AudioTrack>) => {
+    setSavingId(track.id);
+    try {
+      if (patch.isFeatured === true) {
+        const concept = patch.concept ?? track.concept;
+        const clashes = tracks.filter(
+          (t) => t.id !== track.id && t.isFeatured && (t.concept ?? null) === (concept ?? null),
+        );
+        for (const c of clashes) {
+          await apiPut(`/api/tracks/${c.id}`, { ...c, isFeatured: false });
+        }
+      }
+      await apiPut(`/api/tracks/${track.id}`, { ...track, ...patch });
+      await fetchTracks();
+    } finally {
+      setSavingId(null);
+    }
+  }, [tracks, fetchTracks]);
 
   return (
     <div className="space-y-6">
@@ -125,13 +154,52 @@ const TabMediaPipeline = () => {
         </div>
       )}
       <div>
-        <h3 className="font-display text-lg mb-2">Playlist</h3>
-        {tracks.filter(t => t.isLive).map(track => (
-          <div key={track.id} className="flex items-center justify-between p-2 border-b border-[var(--border-color)]">
-            <span className="text-sm">{track.title?.en || 'Untitled'}</span>
-            <button onClick={() => playTrack(track)} className="text-[var(--accent-color)] text-xs">Play</button>
-          </div>
-        ))}
+        <h3 className="font-display text-lg mb-1">Playlist</h3>
+        <p className="text-xs text-[var(--text-muted-color)] mb-3">
+          Assign each track a concept, and star one per concept to feature it on the home page.
+        </p>
+        <div className="space-y-2">
+          {tracks.map(track => (
+            <div key={track.id} className="flex items-center gap-3 p-3 border-b border-[var(--border-color)]">
+              {/* Star (featured) toggle */}
+              <button
+                onClick={() => { void updateTrack(track, { isFeatured: !track.isFeatured }); }}
+                disabled={savingId === track.id}
+                title={track.isFeatured ? 'Featured on home page' : 'Mark as featured (one per concept)'}
+                className="text-lg leading-none disabled:opacity-40"
+                style={{ color: track.isFeatured ? 'var(--accent-color)' : 'var(--text-dim-color)' }}
+                aria-label="Toggle featured"
+              >
+                {track.isFeatured ? '\u2605' : '\u2606'}
+              </button>
+
+              {/* Title */}
+              <span className="text-sm flex-1 min-w-0 truncate">{track.title?.en || 'Untitled'}</span>
+
+              {/* Concept selector */}
+              <select
+                value={track.concept ?? ''}
+                onChange={e => { void updateTrack(track, { concept: e.target.value || null }); }}
+                disabled={savingId === track.id}
+                className="bg-[var(--surface3-color)] border border-[var(--border-color)] rounded px-2 py-1 text-xs text-[var(--text-color)] disabled:opacity-40"
+                aria-label="Concept"
+              >
+                <option value="">— concept —</option>
+                {CONCEPT_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+
+              {/* Live badge + play */}
+              <span className="text-[0.6rem] font-mono px-2 py-0.5 rounded"
+                style={{ color: track.isLive ? 'var(--accent-color)' : 'var(--text-dim-color)', border: '1px solid var(--border-color)' }}>
+                {track.isLive ? 'LIVE' : 'DRAFT'}
+              </span>
+              <button onClick={() => { void playTrack(track); }} className="text-[var(--accent-color)] text-xs">Play</button>
+            </div>
+          ))}
+          {tracks.length === 0 && (
+            <p className="text-xs text-[var(--text-muted-color)]">No tracks yet. Upload one above.</p>
+          )}
+        </div>
       </div>
     </div>
   );

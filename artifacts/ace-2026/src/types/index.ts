@@ -106,6 +106,11 @@ export interface AudioTrack {
   duration: number;
   sortOrder: number;
   isLive: boolean;
+  // Selected-Works concept this track belongs to (e.g. "Cinema"). Null until
+  // the admin assigns one on upload.
+  concept: string | null;
+  // Featured ("starred") track — one per concept surfaces on the home page.
+  isFeatured: boolean;
   createdAt: string;
 }
 

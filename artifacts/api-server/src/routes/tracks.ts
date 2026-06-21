@@ -31,6 +31,9 @@ const trackWriteSchema = z.object({
   duration: z.union([z.string(), z.number()]).nullish(),
   sortOrder: z.union([z.string(), z.number()]).nullish(),
   isLive: z.boolean().optional(),
+  // Selected-Works concept this track belongs to + featured ("star") flag.
+  concept: z.string().nullish(),
+  isFeatured: z.boolean().optional(),
 }).passthrough();
 
 const reorderSchema = z.object({
@@ -90,6 +93,8 @@ router.post('/', authGuard, async (req: Request, res: Response) => {
       duration: data.duration ? parseInt(data.duration) : 0,
       sortOrder: data.sortOrder ? parseInt(data.sortOrder) : 0,
       isLive: data.isLive || false,
+      concept: data.concept ?? null,
+      isFeatured: data.isFeatured ?? false,
     }).returning();
     return res.status(201).json({
       success: true,
@@ -178,6 +183,12 @@ router.put('/:id', authGuard, async (req: Request, res: Response) => {
     }
     if (data.isLive !== undefined) {
       updatePayload.isLive = data.isLive;
+    }
+    if (data.concept !== undefined) {
+      updatePayload.concept = data.concept;
+    }
+    if (data.isFeatured !== undefined) {
+      updatePayload.isFeatured = data.isFeatured;
     }
     const [updatedTrack] = await db.update(tracks).set(updatePayload).where(eq(tracks.id, id!)).returning();
     if (!updatedTrack) {

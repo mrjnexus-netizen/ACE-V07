@@ -56,12 +56,19 @@ export const tracks = pgTable(
     duration: integer('duration'),
     sortOrder: integer('sort_order').notNull().default(0),
     isLive: boolean('is_live').default(false),
+    // Which Selected-Works concept this track belongs to (e.g. "Cinema",
+    // "Games"). Admin picks one on upload. Null until assigned.
+    concept: text('concept'),
+    // Featured ("starred") track. Only one per concept should be true; that
+    // track surfaces on the home page Selected Works piano key.
+    isFeatured: boolean('is_featured').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   },
   (table) => ({
     sortOrderIdx: index('idx_tracks_sort_order').on(table.sortOrder),
     isLiveIdx: index('idx_tracks_is_live').on(table.isLive),
+    conceptIdx: index('idx_tracks_concept').on(table.concept),
   })
 );
 

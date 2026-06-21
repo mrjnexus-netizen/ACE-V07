@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 
 // Cursor: a music-note-in-twirl logo. The golden spiral spins continuously;
 // the grey stem stays fixed. On click the whole mark "breathes" and a few
-// tiny golden sparks rise and fade. Vector — never loses quality.
+// tiny golden sparks rise and fade. Vector â€” never loses quality.
 
 interface Spark {
   id: number;
@@ -54,7 +55,7 @@ const NoteMark = ({ size = 52, opacity = 1, spin = false }: { size?: number; opa
           <stop offset="82%" stopColor="#C57E07" />
           <stop offset="100%" stopColor="#8F5E04" />
         </linearGradient>
-        {/* Glassy diagonal highlight overlay — subtle, only a top sheen */}
+        {/* Glassy diagonal highlight overlay â€” subtle, only a top sheen */}
         <linearGradient id={hid} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.55" />
           <stop offset="18%" stopColor="#FFFFFF" stopOpacity="0.1" />
@@ -63,7 +64,7 @@ const NoteMark = ({ size = 52, opacity = 1, spin = false }: { size?: number; opa
         </linearGradient>
       </defs>
 
-      {/* grey stem (fixed) — bold via same-color stroke */}
+      {/* grey stem (fixed) â€” bold via same-color stroke */}
       <g transform={ART_TRANSFORM}>
         <path d={STEM_D} fill="#a3a3a3" stroke="#a3a3a3" strokeWidth="500" strokeLinejoin="round" fillRule="evenodd" />
         <path d={STEM2_D} fill="#828282" fillRule="evenodd" />
@@ -93,7 +94,7 @@ const MagneticCursor = () => {
   const posX = useMotionValue(-100);
   const posY = useMotionValue(-100);
 
-  const springConfig = { damping: 30, stiffness: 130, mass: 1.1 };
+  const springConfig = { damping: 22, stiffness: 380, mass: 0.5 };
   const cursorX = useSpring(posX, springConfig);
   const cursorY = useSpring(posY, springConfig);
 
@@ -105,11 +106,13 @@ const MagneticCursor = () => {
   useEffect(() => {
     const isTouch = window.matchMedia('(pointer: coarse)').matches;
     if (isTouch) {
-      document.body.style.cursor = 'auto';
+      // Touch device: never show the custom cursor; leave the OS cursor alone.
       return;
     }
 
-    document.body.style.cursor = 'none';
+    // Desktop: the OS pointer is hidden by global CSS (@media(pointer:fine)
+    // body{cursor:none}). We intentionally do NOT toggle body.style.cursor in
+    // JS — doing so raced with the CSS rule and briefly showed both cursors.
     setVisible(true);
 
     let seed = 0;
@@ -165,13 +168,17 @@ const MagneticCursor = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'auto';
     };
   }, [posX, posY, TIP_X, TIP_Y]);
 
   if (!visible) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  // Portal to <body> so the cursor shares the same stacking context as other
+  // body-level portals (e.g. the Works concept overlay). This makes its high
+  // z-index actually win against them instead of being trapped inside #root
+  // (which has isolation:isolate). Same mark, same twirl, same details.
+  return createPortal(
     <>
       <motion.div
         style={{
@@ -210,7 +217,8 @@ const MagneticCursor = () => {
           />
         ))}
       </AnimatePresence>
-    </>
+    </>,
+    document.body,
   );
 };
 

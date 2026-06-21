@@ -386,3 +386,9 @@ html.lenis body { height: auto; }
 }
 
 
+
+/* Works (Section 03): remove backdrop blur only, keep veil tint */
+#works.living-veil {
+  backdrop-filter: saturate(115%);
+  -webkit-backdrop-filter: saturate(115%);
+}

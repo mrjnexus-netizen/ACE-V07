@@ -3,6 +3,9 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useIdentity } from '../context/IdentityContext';
 import { useChromatic } from '../context/ChromaticContext';
+import PortalCursor from './PortalCursor';
+import PortalComposer from './PortalComposer';
+import LiquidSeam from './LiquidSeam';
 
 const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'ENGLISH' },
@@ -14,23 +17,14 @@ const SUPPORTED_LANGUAGES = [
 ] as const;
 
 const MICRO_TONES: Record<string, number> = {
-  en: 440,
-  es: 528,
-  fr: 396,
-  zh: 639,
-  ja: 741,
-  ko: 852,
+  en: 440, es: 528, fr: 396, zh: 639, ja: 741, ko: 852,
 };
 
-// Per-language starfield hover color. Mirrors the mesh colors of the canonical
-// LANGUAGE_WORLDS in ChromaticContext (Layer B of the v7 color model).
 const LANGUAGE_MESH: Record<string, string> = {
-  en: '#F3D77E',
-  es: '#FF9A3F',
-  fr: '#D8C290',
-  zh: '#FF5A4D',
-  ja: '#4D8BFF',
-  ko: '#FF6FE0',
+  en: '#F3D77E', es: '#FF9A3F', fr: '#D8C290', zh: '#FF5A4D', ja: '#4D8BFF', ko: '#FF6FE0',
+};
+const LANGUAGE_PASTEL: Record<string, string> = {
+  en: '#F7E6B0', es: '#FFCB94', fr: '#EAD9B5', zh: '#FFA79E', ja: '#A9C7FF', ko: '#FFB3F0',
 };
 
 const DEFAULT_STAR_COLOR = '#FFFFFF';
@@ -39,30 +33,60 @@ const SHATTER_DURATION = 900;
 const SHATTER_DESKTOP_FRAGMENTS = 48;
 const SHATTER_MOBILE_FRAGMENTS = 24;
 
-const Starfield = ({ targetColor }: { targetColor: string }) => {
+// Refined 3D mirrored headstock geometry (SVG viewBox 0 0 160 90, anchored
+// top-right). Tuning pegs + labels sit on the RIGHT; each colored string fans
+// down to the nut and melts into the central 6-color silk column below.
+const PEG_Y = [8, 12.5, 17, 21.5, 26, 30.5];
+const STRING_D = [
+  'M110,8 C109,20 107.4,31 106.96,37.44',
+  'M110,12.5 C109.3,22 107.9,31 107.61,37.27',
+  'M110,17 C109.7,25 108.5,32 108.26,37.09',
+  'M110,21.5 C110,28 109.1,33 108.92,36.92',
+  'M110,26 C110.1,30 109.9,34 109.7,36.71',
+  'M110,30.5 C110.4,33 110.5,35 110.35,36.53',
+];
+
+// gentle silk-sway per string (pinned at the peg) — visibly dancing, like the column
+const SWAY = [
+  { dur: 13, begin: -2, ang: 1.7 },
+  { dur: 15, begin: -6, ang: 1.9 },
+  { dur: 12, begin: -1, ang: 2.1 },
+  { dur: 16, begin: -8, ang: 2.3 },
+  { dur: 14, begin: -4, ang: 2.0 },
+  { dur: 17, begin: -7, ang: 2.2 },
+];
+
+// Tuners protrude at varied lengths (real-world staggered look).
+const NECK_W = [8.5, 6.8, 8.0, 6.5, 7.8, 7.2];
+const KNOB_CX = [118.5, 116.8, 118.0, 116.5, 117.8, 117.2];
+
+const Starfield = ({ targetColor, hovered }: { targetColor: string; hovered: boolean }) => {
   const meshRef = useRef<THREE.Points>(null);
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const currentColor = useRef(new THREE.Color(DEFAULT_STAR_COLOR));
   const target = useRef(new THREE.Color(DEFAULT_STAR_COLOR));
+  const hoverVal = useRef(0);
   const { camera } = useThree();
 
-  useEffect(() => {
-    camera.position.set(0, 0, 5);
-  }, [camera]);
+  useEffect(() => { camera.position.set(0, 0, 5); }, [camera]);
+  useEffect(() => { target.current.set(targetColor || DEFAULT_STAR_COLOR); }, [targetColor]);
 
-  useEffect(() => {
-    target.current.set(targetColor || DEFAULT_STAR_COLOR);
-  }, [targetColor]);
-
-  useFrame(() => {
+  useFrame((state) => {
+    const tt = state.clock.getElapsedTime();
     if (meshRef.current) {
       meshRef.current.rotation.y += 0.00008;
+      meshRef.current.rotation.x = Math.sin(tt * 0.04) * 0.05;
+      meshRef.current.position.y = Math.sin(tt * 0.06) * 0.18;
     }
-    // Smoothly lerp the starfield color toward the hovered language world.
-    currentColor.current.lerp(target.current, 0.06);
+    currentColor.current.lerp(target.current, 0.12);
+    hoverVal.current += ((hovered ? 1 : 0) - hoverVal.current) * 0.1;
     if (matRef.current) {
       const u = matRef.current.uniforms.uColor;
       if (u) (u.value as THREE.Color).copy(currentColor.current);
+      const ut = matRef.current.uniforms.uTime;
+      if (ut) ut.value = tt;
+      const uh = matRef.current.uniforms.uHover;
+      if (uh) uh.value = hoverVal.current;
     }
   });
 
@@ -76,10 +100,13 @@ const Starfield = ({ targetColor }: { targetColor: string }) => {
     }
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const phases = new Float32Array(count);
+    for (let i = 0; i < count; i++) phases[i] = Math.random() * Math.PI * 2;
+    geom.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
     return geom;
   }, []);
 
-  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color(DEFAULT_STAR_COLOR) } }), []);
+  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color(DEFAULT_STAR_COLOR) }, uTime: { value: 0 }, uHover: { value: 0 } }), []);
 
   return (
     <points ref={meshRef} geometry={geometry}>
@@ -87,18 +114,25 @@ const Starfield = ({ targetColor }: { targetColor: string }) => {
         ref={matRef}
         uniforms={uniforms}
         vertexShader={`
+          attribute float aPhase;
+          uniform float uTime;
+          uniform float uHover;
+          varying float vTw;
           void main() {
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            gl_PointSize = 1.5;
+            vTw = 0.5 + 0.5 * sin(uTime * 1.3 + aPhase);
+            gl_PointSize = 1.5 + uHover * 1.5;
             gl_Position = projectionMatrix * mvPosition;
           }
         `}
         fragmentShader={`
           uniform vec3 uColor;
+          uniform float uHover;
+          varying float vTw;
           void main() {
             float d = distance(gl_PointCoord, vec2(0.5));
             if (d > 0.5) discard;
-            gl_FragColor = vec4(uColor, (1.0 - d * 2.0) * 0.8);
+            gl_FragColor = vec4(uColor, (1.0 - d * 2.0) * (0.78 + uHover * 0.55) * vTw);
           }
         `}
         depthWrite={false}
@@ -121,8 +155,188 @@ const StarfieldCanvas = ({ hoveredLang }: { hoveredLang: string | null }) => {
     >
       <ambientLight intensity={0.1} />
       <directionalLight intensity={0.3} position={[5, 3, 5]} />
-      <Starfield targetColor={targetColor} />
+      <Starfield targetColor={targetColor} hovered={!!hoveredLang} />
     </Canvas>
+  );
+};
+
+// The refined 3D luxury mirrored headstock with the six languages on its pegs.
+const HeadstockSelector = ({
+  selectedLang, hoveredLang, onHover, onLeave, onSelect,
+}: {
+  selectedLang: string | null;
+  hoveredLang: string | null;
+  onHover: (code: string) => void;
+  onLeave: () => void;
+  onSelect: (code: string) => void;
+}) => {
+  const activeLang = hoveredLang || selectedLang;
+  const vaporColor = activeLang ? LANGUAGE_MESH[activeLang] : '#ffffff';
+  const vaporCore = activeLang ? (LANGUAGE_PASTEL[activeLang] || '#ffffff') : '#ffffff';
+  const vaporIdx = activeLang ? SUPPORTED_LANGUAGES.findIndex((l) => l.code === activeLang) : -1;
+  const vaporY = vaporIdx >= 0 ? PEG_Y[vaporIdx] : 20;
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full"
+      viewBox="0 0 160 90"
+      preserveAspectRatio="xMaxYMin slice"
+      style={{ zIndex: 7, pointerEvents: 'none' }}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="glass" x1="0.1" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor="rgba(88,102,128,0.30)" /><stop offset="0.45" stopColor="rgba(34,40,55,0.22)" /><stop offset="1" stopColor="rgba(12,15,22,0.16)" />
+        </linearGradient>
+        <radialGradient id="aura" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="rgba(126,146,186,0.16)" /><stop offset="0.6" stopColor="rgba(120,140,180,0.06)" /><stop offset="1" stopColor="rgba(120,140,180,0)" />
+        </radialGradient>
+        <linearGradient id="gknob" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="rgba(150,168,196,0.5)" /><stop offset="0.5" stopColor="rgba(70,82,104,0.42)" /><stop offset="1" stopColor="rgba(28,34,48,0.4)" />
+        </linearGradient>
+        <radialGradient id="gspot" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="rgba(255,255,255,0.5)" /><stop offset="1" stopColor="rgba(255,255,255,0)" />
+        </radialGradient>
+        <radialGradient id="met" cx="0.3" cy="0.3" r="0.9">
+          <stop offset="0" stopColor="#fffdf6" /><stop offset="0.5" stopColor="#cfd6e0" /><stop offset="1" stopColor="#6a7080" />
+        </radialGradient>
+        <radialGradient id="bush" cx="0.4" cy="0.35" r="0.8">
+          <stop offset="0" stopColor="#eef2f8" /><stop offset="0.6" stopColor="#9aa3b2" /><stop offset="1" stopColor="#454b58" />
+        </radialGradient>
+        <filter id="pegGlow" x="-400%" y="-400%" width="900%" height="900%"><feGaussianBlur stdDeviation="1.1" /></filter>
+        <filter id="strGlow" x="-400%" y="-50%" width="900%" height="200%"><feGaussianBlur stdDeviation="0.7" /></filter>
+        <filter id="glassBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="0.7" /></filter>
+        <filter id="vapor" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.4" /></filter>
+        <linearGradient id="strFadeGrad" gradientUnits="userSpaceOnUse" x1="0" y1="36" x2="0" y2="38.5">
+          <stop offset="0" stopColor="#fff" stopOpacity="1" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <mask id="strFade" maskUnits="userSpaceOnUse" x="90" y="0" width="40" height="48">
+          <rect x="90" y="0" width="40" height="36" fill="#fff" />
+          <rect x="90" y="36" width="40" height="2.5" fill="url(#strFadeGrad)" />
+        </mask>
+        <linearGradient id="botFadeGrad" gradientUnits="userSpaceOnUse" x1="0" y1="33" x2="0" y2="40">
+          <stop offset="0" stopColor="#fff" stopOpacity="1" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <mask id="bottomFade" maskUnits="userSpaceOnUse" x="90" y="0" width="40" height="48">
+          <rect x="90" y="0" width="40" height="33" fill="#fff" />
+          <rect x="90" y="33" width="40" height="7" fill="url(#botFadeGrad)" />
+        </mask>
+        <clipPath id="bladeClip">
+          <path d="M103.5,37.5 C101.6,34 100.4,29 100,24 C99.6,19 99.5,13.5 100.6,9.5 C101.4,6.6 102.8,4 105,2.9 C106.1,2.35 107,2.6 107.3,3.7 C107.55,4.6 107.7,5.4 109,5.7 C111.6,6.2 113.7,7.6 114.6,10 C115.4,12.2 115.4,15 115.2,18.5 C114.9,25 114.3,31 112.4,34.6 C111.1,37 107.5,37.8 103.5,37.5 Z" />
+        </clipPath>
+      </defs>
+
+      {/* tilt 15deg to the right + smaller, pivoting at the nut */}
+      <g transform="translate(106 37) scale(0.74) rotate(15) translate(-106 -37)">
+
+      {/* soft ambient halo — dissolves the headstock into the surrounding space */}
+      <ellipse cx="107" cy="20" rx="21" ry="27" fill="url(#aura)" filter="url(#vapor)" />
+
+      {/* glass guitar headstock silhouette (swept tip), thin minimal border */}
+      <path
+        d="M103.5,37.5 C101.6,34 100.4,29 100,24 C99.6,19 99.5,13.5 100.6,9.5 C101.4,6.6 102.8,4 105,2.9 C106.1,2.35 107,2.6 107.3,3.7 C107.55,4.6 107.7,5.4 109,5.7 C111.6,6.2 113.7,7.6 114.6,10 C115.4,12.2 115.4,15 115.2,18.5 C114.9,25 114.3,31 112.4,34.6 C111.1,37 107.5,37.8 103.5,37.5 Z"
+        fill="url(#glass)" stroke="rgba(210,226,255,0.45)" strokeWidth={0.22} strokeLinejoin="round"
+      />
+      {/* living silk border — a gentle breathing glow */}
+      <path
+        d="M103.5,37.5 C101.6,34 100.4,29 100,24 C99.6,19 99.5,13.5 100.6,9.5 C101.4,6.6 102.8,4 105,2.9 C106.1,2.35 107,2.6 107.3,3.7 C107.55,4.6 107.7,5.4 109,5.7 C111.6,6.2 113.7,7.6 114.6,10 C115.4,12.2 115.4,15 115.2,18.5 C114.9,25 114.3,31 112.4,34.6 C111.1,37 107.5,37.8 103.5,37.5 Z"
+        fill="none" stroke="rgba(205,222,255,0.5)" strokeWidth={0.42} strokeLinejoin="round" filter="url(#strGlow)"
+      >
+        <animate attributeName="opacity" values="0.28;0.6;0.28" dur="6.5s" repeatCount="indefinite"
+          calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
+      </path>
+      {/* living silk border — a soft glint sliding slowly around */}
+      <path
+        d="M103.5,37.5 C101.6,34 100.4,29 100,24 C99.6,19 99.5,13.5 100.6,9.5 C101.4,6.6 102.8,4 105,2.9 C106.1,2.35 107,2.6 107.3,3.7 C107.55,4.6 107.7,5.4 109,5.7 C111.6,6.2 113.7,7.6 114.6,10 C115.4,12.2 115.4,15 115.2,18.5 C114.9,25 114.3,31 112.4,34.6 C111.1,37 107.5,37.8 103.5,37.5 Z"
+        fill="none" pathLength={100} stroke="rgba(248,251,255,0.95)" strokeWidth={0.34} strokeLinecap="round" strokeLinejoin="round"
+        strokeDasharray="15 85" filter="url(#strGlow)" style={{ mixBlendMode: 'screen' }}
+      >
+        <animate attributeName="stroke-dashoffset" values="100;0" dur="10s" repeatCount="indefinite" />
+      </path>
+      {/* magical colored vapor inside the glass — soft, light, tinted to the hovered language */}
+      <g clipPath="url(#bladeClip)">
+        <ellipse cx="105.5" cy={vaporY} rx="11" ry="14" fill={vaporColor} opacity={activeLang ? 0.20 : 0} filter="url(#vapor)"
+          style={{ transition: 'opacity 0.6s ease, fill 0.6s ease, cy 0.7s cubic-bezier(0.22,1,0.36,1)' }} />
+        <ellipse cx="104" cy={vaporY - 4} rx="6.5" ry="9" fill={vaporColor} opacity={activeLang ? 0.13 : 0} filter="url(#vapor)"
+          style={{ transition: 'opacity 0.75s ease, fill 0.75s ease, cy 0.85s cubic-bezier(0.22,1,0.36,1)' }} />
+        <ellipse cx="105" cy={vaporY} rx="3" ry="4.5" fill={vaporCore} opacity={activeLang ? 0.28 : 0} filter="url(#glassBlur)"
+          style={{ transition: 'opacity 0.55s ease, fill 0.55s ease, cy 0.6s cubic-bezier(0.22,1,0.36,1)' }} />
+      </g>
+      {/* glass reflections, clipped inside the blade */}
+      <g clipPath="url(#bladeClip)">
+        <path d="M101.5,4 C100,9 99.6,18 100,26 L102.8,26 C102.4,18 102.8,9 104,4.5 Z" fill="rgba(255,255,255,0.16)" filter="url(#glassBlur)" />
+        <path d="M104.5,3.5 C103.5,8 103.3,15 103.6,22 L104.6,22 C104.4,15 104.6,8 105.4,4 Z" fill="rgba(255,255,255,0.28)" />
+        <ellipse cx="106" cy="11" rx="3.2" ry="5" fill="url(#gspot)" filter="url(#glassBlur)" />
+        <path d="M112,30 C111,33 109,36 106,37 L114,37 C114,34 113.5,31 113,29 Z" fill="rgba(255,255,255,0.06)" filter="url(#glassBlur)" />
+      </g>
+      {/* very thin top-left edge catch */}
+      <path d="M101,28 C99.9,23 99.9,15 100.9,10.5 C101.6,7.4 102.9,4.7 105,3.7"
+        fill="none" stroke="rgba(235,244,255,0.55)" strokeWidth={0.16} strokeLinecap="round" />
+      {/* frosted diamond etch */}
+      <path d="M104,6.5 l0.8,1.2 -0.8,1.2 -0.8,-1.2 Z" fill="rgba(230,240,255,0.35)" />
+
+      {/* thin glowing strings to the pegs — captive in the frame, dancing, melting into the column at the border */}
+      <g mask="url(#strFade)" strokeLinecap="round" fill="none">
+        {SUPPORTED_LANGUAGES.map((l, i) => {
+          const active = selectedLang === l.code || hoveredLang === l.code;
+          return (
+            <g key={l.code}>
+              <animateTransform attributeName="transform" attributeType="XML" type="rotate"
+                values={`${-SWAY[i].ang} 110 ${PEG_Y[i]}; ${SWAY[i].ang} 110 ${PEG_Y[i]}; ${-SWAY[i].ang} 110 ${PEG_Y[i]}`}
+                dur={`${SWAY[i].dur}s`} begin={`${SWAY[i].begin}s`} repeatCount="indefinite"
+                calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1" />
+              <path d={STRING_D[i]} stroke={LANGUAGE_MESH[l.code]} strokeWidth={active ? 1.1 : 0.5} opacity={active ? 0.55 : 0.22} filter="url(#strGlow)" />
+              <path d={STRING_D[i]} stroke={active ? LANGUAGE_PASTEL[l.code] : LANGUAGE_MESH[l.code]} strokeWidth={active ? 0.4 : 0.24} opacity={active ? 1 : 0.72} />
+            </g>
+          );
+        })}
+      </g>
+
+      {/* one interactive group per language / tuning peg (right side) */}
+      {SUPPORTED_LANGUAGES.map((l, i) => {
+        const active = selectedLang === l.code || hoveredLang === l.code;
+        const dimmed = !!selectedLang && selectedLang !== l.code;
+        const y = PEG_Y[i];
+        const pastel = LANGUAGE_PASTEL[l.code];
+        return (
+          <g
+            key={l.code}
+            onMouseEnter={() => onHover(l.code)}
+            onMouseLeave={onLeave}
+            onClick={() => onSelect(l.code)}
+            data-cursor="go"
+            style={{ pointerEvents: 'auto', cursor: 'pointer', opacity: dimmed ? 0 : 1, transition: 'opacity 0.6s ease' }}
+          >
+            {active && <circle cx={KNOB_CX[i]} cy={y} r="3" fill={LANGUAGE_MESH[l.code]} opacity={0.4} filter="url(#pegGlow)" />}
+            {/* glass machine-head: slim glass rod (varied length) + delicate smoked-glass button beyond the border */}
+            <rect x="110" y={y - 0.25} width={NECK_W[i]} height="0.5" rx="0.25" fill={active ? pastel : 'rgba(170,190,220,0.28)'} stroke="rgba(210,226,255,0.34)" strokeWidth={0.055} />
+            <circle cx="109.6" cy={y} r={active ? 0.6 : 0.52} fill={active ? pastel : 'rgba(225,235,250,0.5)'} style={{ transition: 'all 0.4s ease' }} />
+            <ellipse cx={KNOB_CX[i]} cy={y} rx={active ? 1.95 : 1.8} ry={active ? 0.82 : 0.74} fill={active ? pastel : 'url(#gknob)'} stroke="rgba(210,226,255,0.42)" strokeWidth={0.08} style={{ transition: 'all 0.4s ease' }} />
+            <ellipse cx={KNOB_CX[i]} cy={y} rx={active ? 1.42 : 1.3} ry={active ? 0.5 : 0.45} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={0.045} />
+            <ellipse cx={KNOB_CX[i] - 0.5} cy={y - 0.3} rx="0.6" ry="0.17" fill="rgba(255,255,255,0.55)" />
+            <circle cx={KNOB_CX[i] + 0.82} cy={y + 0.16} r="0.11" fill="rgba(255,255,255,0.32)" />
+            {/* label to the RIGHT — kept horizontal (counter-rotated against the tilt) */}
+            <text
+              x="121.5" y={y + 0.8} textAnchor="start"
+              transform={`rotate(-15 121.5 ${y + 0.8})`}
+              fontSize={active ? 2.85 : 2.45} letterSpacing={active ? 0.62 : 0.46}
+              fill={active ? pastel : 'rgba(255,255,255,0.62)'}
+              style={{
+                fontFamily: "'Cormorant Garamond', 'Didot', Georgia, serif",
+                fontWeight: active ? 600 : 500,
+                fontStyle: (l.code === 'zh' || l.code === 'ja' || l.code === 'ko') ? 'normal' : 'italic',
+                textShadow: active ? `0 0 5px ${LANGUAGE_MESH[l.code]}` : 'none',
+                transition: 'fill 0.4s ease, font-size 0.4s ease, letter-spacing 0.4s ease',
+              }}
+            >
+              {l.label}
+            </text>
+            {/* invisible hit area covering tuner + label */}
+            <rect x="108" y={y - 2.2} width="44" height="4.4" fill="transparent" style={{ pointerEvents: 'all' }} />
+          </g>
+        );
+      })}
+      </g>
+    </svg>
   );
 };
 
@@ -177,7 +391,6 @@ export const LinguisticPortal = () => {
     if (selectedLang) return;
     setSelectedLang(langCode);
     playMicroTone(langCode);
-    // Apply the chosen language color world so the site adopts it immediately (v7 Layer B).
     applyLanguageWorld(langCode as any);
 
     const rect = containerRef.current?.getBoundingClientRect();
@@ -187,7 +400,6 @@ export const LinguisticPortal = () => {
     if (lowEnd) {
       setTimeout(() => {
         setLocale(langCode as any);
-        localStorage.setItem('ace-locale', langCode);
         document.documentElement.setAttribute('lang', langCode);
         window.location.hash = '/app';
       }, SHATTER_DURATION * 0.7);
@@ -219,21 +431,17 @@ export const LinguisticPortal = () => {
     }
 
     const startTime = performance.now();
-
     const animate = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / SHATTER_DURATION, 1);
-
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
       fragments.forEach(f => {
         f.scale = 1 - progress * 0.8;
         f.opacity = 1 - progress;
         f.x += f.tx * 0.02;
         f.y += f.ty * 0.02;
-
         ctx.save();
         ctx.translate(f.x, f.y);
         ctx.rotate(f.angle);
@@ -242,55 +450,65 @@ export const LinguisticPortal = () => {
         ctx.fillRect(-f.w / 2 * f.scale, -f.h / 2 * f.scale, f.w * f.scale, f.h * f.scale);
         ctx.restore();
       });
-
       if (progress < 1) {
         animFrameId.current = requestAnimationFrame(animate);
       } else {
         setLocale(langCode as any);
-        localStorage.setItem('ace-locale', langCode);
         document.documentElement.setAttribute('lang', langCode);
         window.location.hash = '/app';
       }
     };
-
     animFrameId.current = requestAnimationFrame(animate);
   }, [selectedLang, setLocale, isMobile, lowEnd, playMicroTone, applyLanguageWorld]);
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 bg-black overflow-hidden">
+      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');" }} />
+      <PortalComposer />
+      <LiquidSeam hoveredLang={hoveredLang} rightPx={375} width={140} />
+      <PortalCursor />
       <StarfieldCanvas hoveredLang={hoveredLang} />
 
-      <div className="absolute inset-0 flex flex-col md:flex-row items-center justify-center">
-        <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-6'} gap-6 md:gap-12 p-8`}>
-          {SUPPORTED_LANGUAGES.map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => handleLanguageSelect(lang.code)}
-              onMouseEnter={() => handleLanguageHover(lang.code)}
-              onMouseLeave={() => setHoveredLang(null)}
-              data-cursor="go"
-              className={`
-                font-display text-white/40 hover:text-white/100
-                transition-all duration-300 ease-out
-                ${isMobile ? 'text-6xl' : 'text-[3.5vw]'}
-                tracking-[0.15em] hover:tracking-[0.45em]
-                min-h-[52px] min-w-[52px] flex items-center justify-center
-                ${selectedLang === lang.code ? 'scale-200 opacity-100' : ''}
-                ${selectedLang && selectedLang !== lang.code ? 'opacity-0 translate-y-[-20px]' : ''}
-                ${!selectedLang && hoveredLang && hoveredLang !== lang.code ? 'opacity-20' : ''}
-              `}
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              {lang.label}
-            </button>
-          ))}
+      {isMobile ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="grid grid-cols-2 gap-6 p-8">
+            {SUPPORTED_LANGUAGES.map((lang) => {
+              const active = selectedLang === lang.code || hoveredLang === lang.code;
+              return (
+                <button
+                  key={lang.code}
+                  onClick={() => handleLanguageSelect(lang.code)}
+                  onMouseEnter={() => handleLanguageHover(lang.code)}
+                  onMouseLeave={() => setHoveredLang(null)}
+                  data-cursor="go"
+                  className={`
+                    font-display transition-all duration-300 ease-out
+                    text-6xl tracking-[0.15em]
+                    min-h-[52px] min-w-[52px] flex items-center justify-center
+                    ${selectedLang === lang.code ? 'scale-150 opacity-100' : ''}
+                    ${selectedLang && selectedLang !== lang.code ? 'opacity-0 translate-y-[-20px]' : ''}
+                    ${!selectedLang && hoveredLang && hoveredLang !== lang.code ? 'opacity-20' : ''}
+                  `}
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    color: active ? LANGUAGE_PASTEL[lang.code] : 'rgba(255,255,255,0.45)',
+                  }}
+                >
+                  {lang.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
-
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <div className="text-[32px] font-mono tracking-[0.15em] text-white/50">ACE</div>
-        <div className="w-3/5 h-px bg-white/20 mt-2 animate-pulse" style={{ animationDuration: '3s' }} />
-      </div>
+      ) : (
+        <HeadstockSelector
+          selectedLang={selectedLang}
+          hoveredLang={hoveredLang}
+          onHover={handleLanguageHover}
+          onLeave={() => setHoveredLang(null)}
+          onSelect={handleLanguageSelect}
+        />
+      )}
 
       <canvas
         ref={shatterCanvasRef}
