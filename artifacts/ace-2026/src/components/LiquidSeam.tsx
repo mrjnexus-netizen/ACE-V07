@@ -10,6 +10,8 @@ interface LiquidSeamProps {
   rightPx?: number;
   width?: number;
   hoveredLang?: string | null;
+  handoffY?: number; // screen Y where strings meet the column; column is pinned (no sway) here, dances below
+  downPct?: number;  // shift the whole band down by this % of viewport height
 }
 
 type RGB = [number, number, number];
@@ -28,11 +30,13 @@ const PAL: Record<string, Pal> = {
   ko: { glow: [255, 111, 224], mid: [255, 160, 236], core: [255, 210, 246] },
 };
 
-const LiquidSeam = ({ rightPx = 375, width = 140, hoveredLang = null }: LiquidSeamProps) => {
+const LiquidSeam = ({ rightPx = 375, width = 140, hoveredLang = null, handoffY = 0, downPct = 0 }: LiquidSeamProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
   const hoverRef = useRef<string | null>(hoveredLang);
   useEffect(() => { hoverRef.current = hoveredLang; }, [hoveredLang]);
+  const handoffRef = useRef<number>(handoffY);
+  useEffect(() => { handoffRef.current = handoffY; }, [handoffY]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,20 +55,19 @@ const LiquidSeam = ({ rightPx = 375, width = 140, hoveredLang = null }: LiquidSe
     window.addEventListener('resize', resize);
 
     const threads: Thread[] = [
-      { lang: 'en', amp: 0.090, freq: 0.0040, phase: 0.0, speed: 0.030,  offset: 0.39,  lineW: 1.8,  bright: 0.85, pal: PAL.en },
-      { lang: 'es', amp: 0.100, freq: 0.0038, phase: 0.9, speed: 0.0285, offset: 0.435, lineW: 1.3,  bright: 0.70, pal: PAL.es },
-      { lang: 'fr', amp: 0.085, freq: 0.0043, phase: 1.7, speed: 0.033,  offset: 0.48,  lineW: 1.0,  bright: 0.58, pal: PAL.fr },
-      { lang: 'zh', amp: 0.105, freq: 0.0036, phase: 2.5, speed: 0.027,  offset: 0.525, lineW: 1.5,  bright: 0.78, pal: PAL.zh },
-      { lang: 'ja', amp: 0.095, freq: 0.0041, phase: 3.3, speed: 0.031,  offset: 0.57,  lineW: 1.1,  bright: 0.64, pal: PAL.ja },
-      { lang: 'ko', amp: 0.080, freq: 0.0037, phase: 4.1, speed: 0.029,  offset: 0.615, lineW: 0.85, bright: 0.54, pal: PAL.ko },
+      { lang: 'en', amp: 0.135, freq: 0.0040, phase: 0.0, speed: 0.030,  offset: 0.35, lineW: 1.8,  bright: 0.85, pal: PAL.en },
+      { lang: 'es', amp: 0.150, freq: 0.0038, phase: 0.9, speed: 0.0285, offset: 0.41, lineW: 1.3,  bright: 0.70, pal: PAL.es },
+      { lang: 'fr', amp: 0.120, freq: 0.0043, phase: 1.7, speed: 0.033,  offset: 0.47, lineW: 1.0,  bright: 0.58, pal: PAL.fr },
+      { lang: 'zh', amp: 0.155, freq: 0.0036, phase: 2.5, speed: 0.027,  offset: 0.53, lineW: 1.5,  bright: 0.78, pal: PAL.zh },
+      { lang: 'ja', amp: 0.135, freq: 0.0041, phase: 3.3, speed: 0.031,  offset: 0.59, lineW: 1.1,  bright: 0.64, pal: PAL.ja },
+      { lang: 'ko', amp: 0.115, freq: 0.0037, phase: 4.1, speed: 0.029,  offset: 0.65, lineW: 0.85, bright: 0.54, pal: PAL.ko },
     ];
 
     const boosts = new Array(threads.length).fill(0);
     const rgba = (c: RGB, a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
     const xAt = (th: Thread, y: number, t: number) => {
-      const spread = Math.min(1, Math.max(0, y) / (H * 0.7));
-      const off = 0.5 + (th.offset - 0.5) * spread;
+      const off = th.offset; // parallel lanes (no funnel, no pinch) — full weave everywhere
       return (
         W * off +
         Math.sin(y * th.freq + t * th.speed + th.phase) * (W * th.amp) +
@@ -140,8 +143,8 @@ const LiquidSeam = ({ rightPx = 375, width = 140, hoveredLang = null }: LiquidSe
 
   return (
     <div
-      className="absolute top-0 bottom-0 pointer-events-none"
-      style={{ right: `${rightPx}px`, width: `${width}px`, zIndex: 5 }}
+      className="absolute top-0 pointer-events-none"
+      style={{ right: `${rightPx}px`, width: `${width}px`, height: '155%', zIndex: 5 }}
       aria-hidden="true"
     >
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />

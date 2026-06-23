@@ -1,31 +1,44 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type TargetAndTransition, type Transition } from 'framer-motion';
 
 /**
- * PortalComposer — the cinematic composer image that lives at the heart of the
- * language portal, sitting BEHIND the language buttons and the ACE logo.
+ * PortalComposer — the cinematic composer image at the heart of the language
+ * portal, sitting BEHIND the language buttons and the ACE logo.
  *
  * Design intent (luxury / "less effect = more luxury"):
- *  - A slow "breathing" zoom (1.00 -> ~1.045) combined with a very slow
- *    diagonal drift, on three DIFFERENT time cycles so the motion never reads
- *    as a loop. This is the same trick used in expensive cinematic banners.
- *  - The image is dimmed (opacity 0.5) so the composer is *felt* rather than
- *    competing with the language buttons. A soft radial vignette melts the
- *    edges further into the black background (the PNG already fades to black
- *    at its edges, so there is never a hard border).
- *  - pointer-events: none and a low z-index keep it purely decorative — it can
- *    never intercept a click meant for a language button.
+ *  - Slow breathing zoom + very slow diagonal drift on three different cycles
+ *    so motion never reads as a loop.
+ *  - Clean natural grade, image at opacity ~0.82 so it melts softly into space.
+ *  - A radial MASK feathers all edges (esp. the right vertical edge) so the
+ *    PNG's rectangle never shows as a hard line.
  *
- * IMPORTANT (framer-motion 11): centering is done by a STATIC flex wrapper,
- * NOT by animating translate/x with a '-50%' base. Mixing a percentage base
- * transform with numeric keyframes throws "All keyframes must be of the same
- * type" and crashes the component. The drift below uses clean numeric px
- * keyframes only.
+ * IMPORTANT (framer-motion 11): centering uses a STATIC flex wrapper.
  */
+
+const EDGE_FADE =
+  'radial-gradient(ellipse 64% 78% at 44% 48%, ' +
+  '#000 0%, #000 52%, rgba(0,0,0,0.72) 70%, rgba(0,0,0,0.4) 83%, ' +
+  'rgba(0,0,0,0.14) 93%, rgba(0,0,0,0) 100%)';
+
+const RIGHT_FADE =
+  'linear-gradient(to right, #000 80%, rgba(0,0,0,0.35) 92%, rgba(0,0,0,0) 99%)';
+
+const MASK = EDGE_FADE + ', ' + RIGHT_FADE;
+
+const ANIM: TargetAndTransition = { scale: [1, 1.022, 1], x: [0, 6, -4, 0], y: [0, -5, 5, 0] };
+
+const TRANS: Transition = {
+  scale: { duration: 22, ease: 'easeInOut', repeat: Infinity },
+  x: { duration: 34, ease: 'easeInOut', repeat: Infinity },
+  y: { duration: 29, ease: 'easeInOut', repeat: Infinity },
+};
+
+const CINEMA_FILTER =
+  'url(#composerSharp) contrast(1.08) saturate(1.16) brightness(1.20)';
+
 const PortalComposer = () => {
   const [ready, setReady] = useState(false);
 
-  // Fade the composer in gently once mounted, so it doesn't "pop".
   useEffect(() => {
     const id = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(id);
@@ -37,46 +50,48 @@ const PortalComposer = () => {
       style={{ zIndex: 1 }}
       aria-hidden="true"
     >
-      {/* Fade-in + dim layer */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <filter id="composerSharp" x="0" y="0" width="100%" height="100%">
+          <feConvolveMatrix
+            order="3"
+            preserveAlpha="true"
+            kernelMatrix="0 -0.35 0  -0.35 2.4 -0.35  0 -0.35 0"
+          />
+        </filter>
+      </svg>
+
       <motion.div
         className="absolute inset-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: ready ? 1 : 0 }}
         transition={{ duration: 2.4, ease: 'easeOut' }}
       >
-        {/* Static centering wrapper — anchors the image to screen center. */}
         <div className="absolute inset-0 flex items-center justify-start">
-          <motion.img
-            src="/composer.png"
-            alt=""
-            draggable={false}
-            className="max-w-none select-none"
-            style={{ width: 'min(165vh, 200vw)', marginLeft: '-6vw', willChange: 'transform' }}
-            // Slow breathing zoom + very slow diagonal drift. Three different
-            // cycle lengths => the combined motion never visibly repeats.
-            animate={{
-              scale: [1, 1.022, 1],
-              x: [0, 6, -4, 0],
-              y: [0, -5, 5, 0],
-            }}
-            transition={{
-              scale: { duration: 22, ease: 'easeInOut', repeat: Infinity },
-              x: { duration: 34, ease: 'easeInOut', repeat: Infinity },
-              y: { duration: 29, ease: 'easeInOut', repeat: Infinity },
-            }}
-          />
+          <div style={{ position: 'relative', marginLeft: '1vw' }}>
+            <motion.img
+              src="/composer.png"
+              alt=""
+              draggable={false}
+              className="max-w-none select-none"
+              style={{
+                display: 'block',
+                width: 'min(120vh, 140vw)',
+                opacity: 0.82,
+                willChange: 'transform',
+                filter: CINEMA_FILTER,
+                WebkitMaskImage: MASK,
+                maskImage: MASK,
+                WebkitMaskComposite: 'source-in',
+                maskComposite: 'intersect',
+              }}
+              animate={ANIM}
+              transition={TRANS}
+            />
+          </div>
         </div>
       </motion.div>
 
-      {/* Soft radial vignette — melts the edges into the black background and
-          keeps the center calm so the buttons stay legible. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 75% 75% at 30% 50%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 78%, rgba(0,0,0,0.92) 100%)',
-        }}
-      />
+      <div className="absolute inset-0" style={{ background: 'transparent' }} />
     </div>
   );
 };
