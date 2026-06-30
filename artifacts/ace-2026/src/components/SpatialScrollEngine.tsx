@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { SchematicPlaceholder } from './conceptArt';
+import { useT } from '../context/TranslationContext';
 import type { AudioTrack, Locale } from '../types';
 
 /**
@@ -72,6 +73,7 @@ export default function SpatialScrollEngine() {
   const { tracks, locale } = useIdentity();
   const safeLocale = (locale ?? 'en') as Locale;
   const { audioState, playTrack, pauseTrack, setPlaylist } = useAudio();
+  const { t } = useT();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -132,9 +134,9 @@ export default function SpatialScrollEngine() {
       <section className="relative py-16 px-4">
         <header className="text-center mb-10">
           <span className="text-xs uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">
-            The Score
+            {t('The Score')}
           </span>
-          <h2 className="text-3xl font-display text-[var(--text-color)] mt-2">Selected Works</h2>
+          <h2 className="text-3xl font-display text-[var(--text-color)] mt-2">{t('Selected Works')}</h2>
         </header>
         <div className="flex flex-col gap-14">
           {slots.map((slot, si) => {
@@ -146,14 +148,14 @@ export default function SpatialScrollEngine() {
                   </span>
                   <p className="font-display text-[var(--text-color)] italic leading-snug mt-3"
                      style={{ fontSize: 'clamp(1.4rem, 6vw, 2rem)' }}>
-                    {slot.data.line}
+                    {t(slot.data.line)}
                   </p>
                 </div>
               );
             }
             const { concept, blurb, track } = slot.card;
-            const title = track ? (localized(track.title) || 'Untitled') : concept;
-            const desc = track ? localized(track.narrative) : blurb;
+            const title = track ? (localized(track.title) || t('Untitled')) : t(concept);
+            const desc = track ? localized(track.narrative) : t(blurb);
             const cover = track ? trackCover(track) : '';
             const isCurrent = !!track && audioState.currentTrack?.id === track.id;
             const isPlaying = isCurrent && audioState.isPlaying;
@@ -171,7 +173,7 @@ export default function SpatialScrollEngine() {
                   onClick={() => onCardClick(track)}
                   className="block w-full text-left focus:outline-none"
                   style={{ cursor: track ? 'pointer' : 'default' }}
-                  aria-label={track ? `${isPlaying ? 'Pause' : 'Play'} ${title}` : `${concept} — coming soon`}
+                  aria-label={track ? `${isPlaying ? t('Pause') : t('Play')} ${title}` : `${t(concept)} — ${t('coming soon')}`}
                 >
                   <div className="relative overflow-hidden rounded-3xl" style={{ aspectRatio: '16 / 10' }}>
                     {cover ? (
@@ -187,7 +189,7 @@ export default function SpatialScrollEngine() {
                     {isCurrent && <NowPlaying active={isPlaying} />}
                   </div>
                   <div className="mt-4">
-                    <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">{concept}</span>
+                    <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">{t(concept)}</span>
                     <h3 className="text-2xl font-display text-[var(--text-color)] leading-tight mt-1 mb-1">{title}</h3>
                     {desc && <p className="text-sm text-[var(--text-muted-color)]">{desc}</p>}
                   </div>
@@ -206,10 +208,10 @@ export default function SpatialScrollEngine() {
     <section ref={containerRef} className="relative">
       <header className="h-[60vh] flex flex-col items-center justify-center text-center px-8">
         <span className="text-xs uppercase tracking-[0.25em] text-[var(--accent-color)] font-mono">
-          The Score
+          {t('The Score')}
         </span>
         <h2 className="text-5xl md:text-7xl font-display text-[var(--text-color)] mt-3">
-          Selected Works
+          {t('Selected Works')}
         </h2>
       </header>
 
@@ -240,7 +242,7 @@ export default function SpatialScrollEngine() {
                     className="font-display text-[var(--text-color)] mt-5 whitespace-nowrap"
                     style={{ fontSize: 'clamp(0.7rem, 2vw, 1.4rem)', fontStyle: 'italic', lineHeight: 1.2 }}
                   >
-                    {slot.data.line}
+                    {t(slot.data.line)}
                   </p>
                 </motion.div>
               </div>
@@ -248,8 +250,8 @@ export default function SpatialScrollEngine() {
           }
 
           const { concept, blurb, track, index } = slot.card;
-          const title = track ? (localized(track.title) || 'Untitled') : concept;
-          const desc = track ? localized(track.narrative) : blurb;
+          const title = track ? (localized(track.title) || t('Untitled')) : t(concept);
+          const desc = track ? localized(track.narrative) : t(blurb);
           const cover = track ? trackCover(track) : '';
           const year = track ? new Date(track.createdAt).getFullYear() : null;
           const isCurrent = !!track && audioState.currentTrack?.id === track.id;
@@ -275,7 +277,7 @@ export default function SpatialScrollEngine() {
                     onClick={() => onCardClick(track)}
                     className="block w-full focus:outline-none group"
                     style={{ cursor: track ? 'pointer' : 'default' }}
-                    aria-label={track ? `${isPlaying ? 'Pause' : 'Play'} ${title}` : `${concept} — coming soon`}
+                    aria-label={track ? `${isPlaying ? t('Pause') : t('Play')} ${title}` : `${t(concept)} — ${t('coming soon')}`}
                   >
                     <div
                       className="relative overflow-hidden rounded-3xl"
@@ -327,7 +329,7 @@ export default function SpatialScrollEngine() {
                 >
                   <div className="flex items-baseline gap-3 mb-3">
                     <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">
-                      {concept}
+                      {t(concept)}
                     </span>
                     {year ? (
                       <span className="text-[0.7rem] text-[var(--text-muted-color)] font-mono">{year}</span>
@@ -344,7 +346,7 @@ export default function SpatialScrollEngine() {
                   )}
                   {!track && (
                     <p className="text-[0.7rem] uppercase tracking-[0.25em] text-[var(--text-dim-color)] font-mono mt-4">
-                      In composition
+                      {t('In composition')}
                     </p>
                   )}
                 </div>
@@ -383,3 +385,4 @@ function NowPlaying({ active }: { active: boolean }) {
     </div>
   );
 }
+

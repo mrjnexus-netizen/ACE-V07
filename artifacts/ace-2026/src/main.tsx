@@ -14,6 +14,7 @@ import ReactDOM from 'react-dom/client';
 
 import { ChromaticProvider } from './context/ChromaticContext';
 import { IdentityProvider } from './context/IdentityContext';
+import { TranslationProvider } from './context/TranslationContext';
 import { AudioProvider } from './context/AudioContext';
 import { PipelineProvider } from './context/PipelineContext';
 import { StagingProvider } from './context/StagingContext';
@@ -28,13 +29,15 @@ ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ChromaticProvider>
       <IdentityProvider>
-        <AudioProvider>
+        <TranslationProvider>
+          <AudioProvider>
           <PipelineProvider>
             <StagingProvider>
               <AppRouter />
             </StagingProvider>
           </PipelineProvider>
-        </AudioProvider>
+          </AudioProvider>
+        </TranslationProvider>
       </IdentityProvider>
     </ChromaticProvider>
   </React.StrictMode>,

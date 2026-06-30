@@ -7,6 +7,7 @@ import {
   useReducedMotion,
 } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
+import { useT } from '../context/TranslationContext';
 import type { Locale } from '../types';
 
 /**
@@ -25,12 +26,13 @@ function localText(
   if (!identity) return '';
   const ml = identity[field];
   if (!ml) return '';
-  return (ml as unknown as Record<string, string>)[locale] || '';
+  const rec = ml as unknown as Record<string, string>; return rec[locale] || rec.en || '';
 }
 
 export default function DoubleExposurePortrait() {
   const sectionRef = useRef<HTMLElement>(null);
   const { composerIdentity, locale } = useIdentity();
+  const { t } = useT();
   const safeLocale = (locale ?? 'en') as Locale;
   const reduced = useReducedMotion() ?? false;
 
@@ -101,7 +103,7 @@ export default function DoubleExposurePortrait() {
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-[var(--text-muted-color)] text-xs font-mono uppercase tracking-[0.15em]">
-                  Portrait
+                  {t('Portrait')}
                 </div>
               )}
               {/* soft sheen + bottom legibility veil, feathered */}
@@ -122,7 +124,7 @@ export default function DoubleExposurePortrait() {
           className="md:col-span-5"
         >
           <span className="text-xs uppercase tracking-[0.25em] text-[var(--accent-color)] font-mono">
-            The Composer
+            {t('The Composer')}
           </span>
           <h2
             className="font-display text-[var(--text-color)] leading-[1.02] mt-3 mb-5"
@@ -132,12 +134,12 @@ export default function DoubleExposurePortrait() {
           </h2>
           {tagline && (
             <p className="text-lg md:text-xl text-[var(--text-color)] opacity-90 mb-4 leading-snug">
-              {tagline}
+              {t(tagline)}
             </p>
           )}
           {bio && (
             <p className="text-sm md:text-base text-[var(--text-muted-color)] leading-relaxed max-w-md">
-              {bio}
+              {t(bio)}
             </p>
           )}
         </motion.div>

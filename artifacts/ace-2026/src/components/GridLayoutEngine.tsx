@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
+import { useT } from '../context/TranslationContext';
 import type { ComposerIdentity, Locale } from '../types';
 
 function localText(
@@ -11,7 +12,7 @@ function localText(
   if (!identity) return '';
   const ml = identity[field];
   if (!ml) return '';
-  return (ml as unknown as Record<string, string>)[locale] || '';
+  const rec = ml as unknown as Record<string, string>; return rec[locale] || rec.en || '';
 }
 
 function rand(seed: number) {
@@ -30,6 +31,7 @@ export default function GridLayoutEngine() {
   const safeLocale = (locale ?? 'en') as Locale;
   const reduced = useReducedMotion() ?? false;
   const ref = useRef<HTMLDivElement>(null);
+  const { t } = useT();
 
   const name = localText(composerIdentity, safeLocale, 'name') || 'Amir Moslehi';
   const tagline = localText(composerIdentity, safeLocale, 'tagline');
@@ -125,7 +127,7 @@ export default function GridLayoutEngine() {
           className="text-[0.7rem] md:text-xs uppercase text-white/70 font-mono mb-8"
           style={{ letterSpacing: '0.42em' }}
         >
-          Cinematic Composer
+          {t('Cinematic Composer')}
         </motion.span>
 
         <motion.h1
@@ -155,7 +157,7 @@ export default function GridLayoutEngine() {
             className="text-white/65 max-w-lg font-light"
             style={{ fontSize: 'clamp(0.95rem, 1.5vw, 1.25rem)', letterSpacing: '0.02em' }}
           >
-            {tagline}
+            {t(tagline)}
           </motion.p>
         )}
       </motion.div>
@@ -168,7 +170,7 @@ export default function GridLayoutEngine() {
         style={{ opacity: contentOpacity }}
         className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
       >
-        <span className="text-[0.6rem] font-mono uppercase tracking-[0.35em] text-white/45">Scroll</span>
+        <span className="text-[0.6rem] font-mono uppercase tracking-[0.35em] text-white/45">{t('Scroll')}</span>
         <motion.div
           animate={reduced ? {} : { scaleY: [1, 0.4, 1], opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
@@ -178,3 +180,4 @@ export default function GridLayoutEngine() {
     </div>
   );
 }
+

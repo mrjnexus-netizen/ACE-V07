@@ -1,9 +1,11 @@
 import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useWebGLRecovery } from '../three/core/useWebGLRecovery';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAudio } from '../context/AudioContext';
 import { useAudioReactive } from '../hooks/useAudioReactive';
+import { T } from '../context/TranslationContext';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: any) {
@@ -20,7 +22,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     if (this.state.hasError) {
       return (
         <div className="w-full h-full min-h-[400px] flex items-center justify-center bg-black text-red-500 font-mono text-xs">
-          WEBGL RENDER ERROR
+          <T>WEBGL RENDER ERROR</T>
         </div>
       );
     }
@@ -202,6 +204,7 @@ const ParticleSphere = ({ isVisibleRef, shaderTexts }: { isVisibleRef: React.Ref
 };
 
 const AudioReactiveMesh = () => {
+  const { canvasKey, onCreated } = useWebGLRecovery();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isVisibleRef = useRef<boolean>(true);
   const [shaderTexts, setShaderTexts] = useState({ vert: '', frag: '' });
@@ -234,7 +237,7 @@ const AudioReactiveMesh = () => {
     <div ref={containerRef} className="w-full h-full min-h-[400px] relative bg-transparent">
       <ErrorBoundary>
         <Suspense fallback={<MeshSkeletonLoader />}>
-          <Canvas camera={{ position: [0, 0, 5], fov: 60 }} dpr={[1, 2]}>
+          <Canvas key={canvasKey} onCreated={onCreated} camera={{ position: [0, 0, 5], fov: 60 }} dpr={[1, 2]}>
             <ambientLight intensity={0.15} />
             <pointLight position={[10, 10, 10]} intensity={0.5} />
             <ParticleSphere isVisibleRef={isVisibleRef} shaderTexts={shaderTexts} />

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
+import { useT } from '../context/TranslationContext';
 import type { AudioTrack } from '../types';
 
 // Section 03 - Discography. Lists the composer's live tracks and plays them
@@ -9,7 +10,9 @@ import type { AudioTrack } from '../types';
 export default function Discography() {
   const { tracks, locale } = useIdentity();
   const { playTrack, setPlaylist, audioState } = useAudio();
+  const { t } = useT();
   const safeLocale = locale ?? 'en';
+  const untitled = t('Untitled');
 
   const liveTracks = tracks.filter((t) => t.isLive);
 
@@ -18,7 +21,7 @@ export default function Discography() {
   }, [liveTracks, setPlaylist]);
 
   const titleOf = (t: AudioTrack) =>
-    (t.title as unknown as Record<string, string>)[safeLocale] || t.title?.en || 'Untitled';
+    (t.title as unknown as Record<string, string>)[safeLocale] || t.title?.en || untitled;
 
   const fmt = (s: number) => {
     if (!s || Number.isNaN(s)) return '';
@@ -48,13 +51,13 @@ export default function Discography() {
           className="font-mono uppercase"
           style={{ fontSize: '0.7rem', letterSpacing: '0.4em', color: 'var(--accent-color)' }}
         >
-          Section 03
+          {t('Section')} 03
         </span>
         <h2
           className="font-display font-light mt-5"
           style={{ fontSize: 'clamp(2rem, 5vw, 3.6rem)', lineHeight: 1.05, letterSpacing: '0.01em', color: 'var(--text-color)' }}
         >
-          Discography
+          {t('Discography')}
         </h2>
       </div>
 
@@ -63,7 +66,7 @@ export default function Discography() {
           className="w-full flex items-center justify-center py-24"
           style={{ borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted-color)' }}
         >
-          <p style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', fontSize: '0.8rem' }}>No tracks published yet.</p>
+          <p style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', fontSize: '0.8rem' }}>{t('No tracks published yet.')}</p>
         </div>
       ) : (
         <ul className="flex flex-col">
@@ -85,7 +88,7 @@ export default function Discography() {
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.paddingLeft = '1.25rem'; e.currentTarget.style.opacity = '1'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.paddingLeft = '0.25rem'; e.currentTarget.style.opacity = active ? '1' : '0.92'; }}
-                  aria-label={`Play ${titleOf(track)}`}
+                  aria-label={`${t('Play')} ${titleOf(track)}`}
                 >
                   {/* index */}
                   <span
@@ -141,3 +144,4 @@ export default function Discography() {
     </section>
   );
 }
+

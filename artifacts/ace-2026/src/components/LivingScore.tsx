@@ -22,6 +22,7 @@
 
 import { useRef, useMemo, useEffect, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useWebGLRecovery } from '../three/core/useWebGLRecovery';
 import * as THREE from 'three';
 import { useAudioReactive } from '../hooks/useAudioReactive';
 import { useAudio } from '../context/AudioContext';
@@ -67,6 +68,15 @@ const readDynamicAccent = (): string | null => {
     .getPropertyValue('--dynamic-accent')
     .trim();
   return dyn || null;
+};
+
+// The orb's primary colour follows the ACTIVE LANGUAGE accent (per-language
+// world), read live each frame so switching language recolours the sphere.
+const readAccentColor = (): string | null => {
+  const a = getComputedStyle(document.documentElement)
+    .getPropertyValue('--accent-color')
+    .trim();
+  return a || null;
 };
 
 const isLightSurface = (): boolean => {
@@ -165,13 +175,13 @@ const Orb = () => {
     () => ({
       uTime: { value: 0 },
       uPulse: { value: 0 },
-      uColor: { value: new THREE.Color(paletteFor(genreToIndex(genreRef.current))) },
+      uColor: { value: new THREE.Color(readAccentColor() || paletteFor(genreToIndex(genreRef.current))) },
       uOpacity: { value: 0.6 },
     }),
     [],
   );
 
-  const ringColor = useMemo(() => new THREE.Color(paletteFor(genreToIndex(genreRef.current))), []);
+  const ringColor = useMemo(() => new THREE.Color(readAccentColor() || paletteFor(genreToIndex(genreRef.current))), []);
   const targetColor = useMemo(() => new THREE.Color(), []);
   const env = useRef({ pulse: 0, avg: 0, mx: 0, my: 0 });
 
@@ -255,7 +265,7 @@ const Orb = () => {
 
     // colour: saturated genre hue, cover art nudges ~25%
     const dyn = readDynamicAccent();
-    targetColor.set(paletteFor(genreToIndex(genreRef.current)));
+    targetColor.set(readAccentColor() || paletteFor(genreToIndex(genreRef.current)));
     if (dyn) {
       try {
         targetColor.lerp(new THREE.Color(dyn), 0.25);
@@ -336,6 +346,7 @@ const Orb = () => {
 };
 
 const LivingScore = () => {
+  const { canvasKey, onCreated } = useWebGLRecovery();
   return (
     <div
       aria-hidden="true"
@@ -343,6 +354,8 @@ const LivingScore = () => {
     >
       <Suspense fallback={null}>
         <Canvas
+          key={canvasKey}
+          onCreated={onCreated}
           camera={{ position: [0, 0, 9.2], fov: 60 }}
           dpr={[1, 2]}
           gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}

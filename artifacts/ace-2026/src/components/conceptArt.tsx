@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
+import { useT } from '../context/TranslationContext';
 
 // ===========================================================================
 // Shared per-concept schematic art — single source of truth used by BOTH the
@@ -247,6 +248,7 @@ export const CONCEPT_ART: Record<string, { tint: string; render: () => ReactNode
 // gently animated coded motif per concept, with a soft glow, so each card is
 // distinct, alive and never empty.
 export function SchematicPlaceholder({ concept }: { concept: string }) {
+  const { t } = useT();
   const art = CONCEPT_ART[concept];
   const tint = art?.tint ?? 'var(--accent-color)';
   return (
@@ -272,10 +274,10 @@ export function SchematicPlaceholder({ concept }: { concept: string }) {
         animate={{ opacity: [0.7, 1, 0.7] }}
         transition={{ duration: 4, repeat: Infinity, ease: EASE_SOFT as unknown as number[] }}
       >
-        {concept}
+        {t(concept)}
       </motion.span>
       <span className="font-display font-light relative mt-2" style={{ fontSize: 'clamp(0.85rem, 1.4vw, 1.05rem)', color: 'var(--text-dim-color)' }}>
-        In composition
+        {t('In composition')}
       </span>
     </div>
   );

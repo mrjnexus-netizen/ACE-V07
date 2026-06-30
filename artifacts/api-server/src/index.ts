@@ -21,6 +21,7 @@ import keysRoutes from "./routes/keys";
 import mediaRoutes from "./routes/media";
 import pipelineRoutes from "./routes/pipeline";
 import tracksRoutes from "./routes/tracks";
+import translateRoutes from "./routes/translate";
 import { createChildLogger } from "./utils/logger";
 
 const app = express();
@@ -62,6 +63,7 @@ app.use(globalRateLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/identity", identityRoutes);
 app.use("/api/tracks", tracksRoutes);
+app.use("/api/translate", translateRoutes);
 app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/media", mediaRoutes);
 app.use("/api/briefs", briefsRoutes);

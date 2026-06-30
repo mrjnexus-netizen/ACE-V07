@@ -5,7 +5,7 @@ import { useIdentity } from '../context/IdentityContext';
 import { useChromatic } from '../context/ChromaticContext';
 import PortalCursor from './PortalCursor';
 import PortalComposer from './PortalComposer';
-import LiquidSeam from './LiquidSeam';
+import LiquidSeam, { type SeamPin } from './LiquidSeam';
 import WelcomeGate from './WelcomeGate';
 
 const SUPPORTED_LANGUAGES = [
@@ -30,38 +30,83 @@ const LANGUAGE_PASTEL: Record<string, string> = {
 
 const DEFAULT_STAR_COLOR = '#FFFFFF';
 
-const SHATTER_DURATION = 900;
-const SHATTER_DESKTOP_FRAGMENTS = 48;
-const SHATTER_MOBILE_FRAGMENTS = 24;
+const SELECT_TRANSITION_MS = 2560; // cover -> light rake -> melt into site tone, then cross over
 
-// Refined 3D mirrored headstock geometry (SVG viewBox 0 0 160 90, anchored
-// top-right). Tuning pegs + labels sit on the RIGHT; each colored string fans
-// down to the nut and melts into the central 6-color silk column below.
-const PEG_Y = [8, 12.5, 17, 21.5, 26, 30.5];
-const STRING_D = [
-  'M110,8 C109,20 107.4,31 106.96,37.44 L106.96,42.5',
-  'M110,12.5 C109.3,22 107.9,31 107.61,37.27 L107.61,42.5',
-  'M110,17 C109.7,25 108.5,32 108.26,37.09 L108.26,42.5',
-  'M110,21.5 C110,28 109.1,33 108.92,36.92 L108.92,42.5',
-  'M110,26 C110.1,30 109.9,34 109.7,36.71 L109.7,42.5',
-  'M110,30.5 C110.4,33 110.5,35 110.35,36.53 L110.35,42.5',
+// ─────────────────────────────────────────────────────────────────────────
+// Image-based headstock (luxury crystal headstock PNG). SVG viewBox 0 0 160 90.
+// EASY-TUNE BLOCK: nudge these few numbers to align the photo + pins precisely.
+// ─────────────────────────────────────────────────────────────────────────
+const IMG_X = 108.0;  // left edge of the headstock image in viewBox units
+const IMG_Y = 5.0;    // top edge (a touch lower)
+const IMG_H = 30.0;   // image height — smaller, more elegant (was 42)
+const IMG_W = IMG_H * 0.5711;
+
+// Two measured point-sets from the real photo (normalized 0..1 within the
+// headstock image). Order top → bottom = en,es,fr,zh,ja,ko.
+//   CRYSTAL = the crystal knob centers (hover glow + label anchor)
+//   POST    = the metal tuner pegs where the silk strings actually tie on
+//             (user-marked white dots).
+const CRYSTAL_NORM: [number, number][] = [
+  [0.616, 0.098], [0.682, 0.194], [0.748, 0.297],
+  [0.814, 0.401], [0.884, 0.509], [0.948, 0.613],
+];
+const POST_NORM: [number, number][] = [
+  [0.405, 0.135], [0.455, 0.235], [0.525, 0.335],
+  [0.585, 0.440], [0.665, 0.555], [0.720, 0.655],
 ];
 
-// gentle silk-sway per string (pinned at the peg) — visibly dancing, like the column
-const SWAY = [
-  { dur: 13, begin: -2, ang: 1.7 },
-  { dur: 15, begin: -6, ang: 1.9 },
-  { dur: 12, begin: -1, ang: 2.1 },
-  { dur: 16, begin: -8, ang: 2.3 },
-  { dur: 14, begin: -4, ang: 2.0 },
-  { dur: 17, begin: -7, ang: 2.2 },
-];
+// Weave center: the X the freed strands gently lean toward below the nut.
+// Sits near the mean of the pegs, on the neck centerline.
+const NUT_X = 117.0;
+const NUT_Y = 31.4;
 
-// Tuners protrude at varied lengths (real-world staggered look).
-const NECK_W = [3.4, 3.4, 3.4, 3.4, 3.4, 3.4];
-const KNOB_CX = [113.4, 113.4, 113.4, 113.4, 113.4, 113.4];
+// Half-width of the wooden neck (viewBox units): the silk weave stays within
+// this band so the strings never spill outside the fretboard.
+const NECK_HALF_W = 9.0;
 
-const Starfield = ({ colorRef, hoverRef, audioRef }: { colorRef: React.MutableRefObject<string>; hoverRef: React.MutableRefObject<number>; audioRef: React.MutableRefObject<number> }) => {
+// ── WHOLE-ASSEMBLY transform (headstock + neck + strings + labels TOGETHER).
+//    Scales the entire instrument and slides it down the Y axis as one unit,
+//    pivoting on the neck centerline (NUT_X) so it stays horizontally put.
+//    The strings auto-follow because they tie to the (now transformed) pegs.
+//    EASY-TUNE: ASM_SCALE = overall size (1.0 = original);
+//               ASM_TOP_Y = where the headstock top sits (raise → everything DOWN).
+const ASM_SCALE = 0.75;                    // overall length/size → 75%
+const ASM_TOP_Y = 22.0;                    // new headstock-top Y (bigger = lower)
+const ASM_TX = NUT_X * (1 - ASM_SCALE);    // keep nut X fixed while scaling
+const ASM_TY = ASM_TOP_Y - 5 * ASM_SCALE;  // map the old top (y=5) to ASM_TOP_Y
+
+// ── NECK STRIP (the long ornate fretboard continuing BELOW the headstock to
+//    fill the space down toward the galaxy). Image: /neck.png — only the
+//    straight neck, its black background baked transparent so it melts into
+//    space; sides & bottom feather out. It sits BEHIND the silk strings and
+//    its top tucks UNDER the headstock so the join is invisible (not pasted).
+//    EASY-TUNE: nudge these few numbers to seat it cleanly under the headstock.
+const NECK_SRC_ASPECT = 0.1943;          // neck.png width / height (do not change)
+// base neck geometry (in the headstock's ORIGINAL coordinate space)…
+const NECK_BASE_CX = 116.3;              // center X — the headstock neck centerline
+const NECK_BASE_W = 13.0;                // neck width (match headstock base)
+const NECK_BASE_TOP_Y = 30.0;            // top edge — tucked just under the nut
+const NECK_BASE_FADE_TOP = 70.0;         // where the bottom melt-into-galaxy begins
+const NECK_BASE_FADE_BOT = 90.0;         // where the neck has fully dissolved
+// …carried through the SAME assembly transform so the neck scales + drops WITH
+// the headstock and the join stays seamless.
+const NECK_CX = NECK_BASE_CX * ASM_SCALE + ASM_TX;
+const NECK_W = NECK_BASE_W * ASM_SCALE;
+const NECK_TOP_Y = NECK_BASE_TOP_Y * ASM_SCALE + ASM_TY;
+const NECK_FADE_TOP = NECK_BASE_FADE_TOP * ASM_SCALE + ASM_TY;
+const NECK_FADE_BOT = NECK_BASE_FADE_BOT * ASM_SCALE + ASM_TY;
+const NECK_H = NECK_W / NECK_SRC_ASPECT; // derived height — keeps the photo's aspect
+const NECK_TOPIN_OFF = 4 / NECK_H;                       // soft tuck-in at the very top
+const NECK_FADE_OFF0 = (NECK_FADE_TOP - NECK_TOP_Y) / NECK_H;
+const NECK_FADE_OFF1 = (NECK_FADE_BOT - NECK_TOP_Y) / NECK_H;
+
+// Derived absolute coords (viewBox units).
+const PIN_CX = CRYSTAL_NORM.map(([nx]) => IMG_X + nx * IMG_W); // crystal centers
+const PIN_CY = CRYSTAL_NORM.map(([, ny]) => IMG_Y + ny * IMG_H);
+const POST_X = POST_NORM.map(([nx]) => IMG_X + nx * IMG_W);    // string tie points
+const POST_Y = POST_NORM.map(([, ny]) => IMG_Y + ny * IMG_H);
+
+const Starfield = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRef: React.MutableRefObject<string>; hoverRef: React.MutableRefObject<number>; audioRef: React.MutableRefObject<number>; pointerRef: React.MutableRefObject<{ x: number; y: number }> }) => {
   const meshRef = useRef<THREE.Points>(null);
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const currentColor = useRef(new THREE.Color(DEFAULT_STAR_COLOR));
@@ -86,6 +131,15 @@ const Starfield = ({ colorRef, hoverRef, audioRef }: { colorRef: React.MutableRe
       const s = 1 + beat * 0.10;
       meshRef.current.scale.set(s, s, s);
     }
+
+    // Cursor depth-parallax: glide the camera a touch toward the pointer and
+    // keep it aimed at the heart of the field. Because the stars sit at many
+    // depths, the near ones sweep more than the far ones — real 3D parallax,
+    // while the instrument (a separate DOM layer) stays perfectly anchored.
+    const PAR = 0.85;
+    camera.position.x += (pointerRef.current.x * PAR - camera.position.x) * 0.045;
+    camera.position.y += (-pointerRef.current.y * PAR - camera.position.y) * 0.045;
+    camera.lookAt(0, 0, 0);
     target.current.set(colorRef.current || DEFAULT_STAR_COLOR);
     currentColor.current.lerp(target.current, 0.18);
     hoverVal.current += ((hoverRef.current || 0) - hoverVal.current) * 0.12;
@@ -206,7 +260,7 @@ const Starfield = ({ colorRef, hoverRef, audioRef }: { colorRef: React.MutableRe
   );
 };
 
-const StarfieldCanvas = ({ colorRef, hoverRef, audioRef }: { colorRef: React.MutableRefObject<string>; hoverRef: React.MutableRefObject<number>; audioRef: React.MutableRefObject<number> }) => {
+const StarfieldCanvas = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRef: React.MutableRefObject<string>; hoverRef: React.MutableRefObject<number>; audioRef: React.MutableRefObject<number>; pointerRef: React.MutableRefObject<{ x: number; y: number }> }) => {
   return (
     <Canvas
       style={{ position: 'fixed', inset: 0, zIndex: -1 }}
@@ -218,38 +272,233 @@ const StarfieldCanvas = ({ colorRef, hoverRef, audioRef }: { colorRef: React.Mut
     >
       <ambientLight intensity={0.1} />
       <directionalLight intensity={0.3} position={[5, 3, 5]} />
-      <Starfield colorRef={colorRef} hoverRef={hoverRef} audioRef={audioRef} />
+      <Starfield colorRef={colorRef} hoverRef={hoverRef} audioRef={audioRef} pointerRef={pointerRef} />
     </Canvas>
   );
 };
 
-// The refined 3D luxury mirrored headstock with the six languages on its pegs.
+// The luxury crystal headstock photo with the six languages on its crystal pegs.
+// The silk strings themselves are drawn by <LiquidSeam/> in screen-space; this
+// component only draws the photo, the hover glow, the labels + hit areas, and
+// reports the live pixel positions of the pins / nut so the strings tie on
+// exactly to the crystal knobs.
+// ── Delaunay triangulation (compact, typed; adapted from R. Rauwolf) ──
+type Circ = { i: number; j: number; k: number; x: number; y: number; r: number };
+const Delaunay = (() => {
+  const EPSILON = 1.0 / 1048576.0;
+  function supertriangle(v: number[][]): number[][] {
+    let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+    for (let i = v.length; i--; ) {
+      if (v[i][0] < xmin) xmin = v[i][0];
+      if (v[i][0] > xmax) xmax = v[i][0];
+      if (v[i][1] < ymin) ymin = v[i][1];
+      if (v[i][1] > ymax) ymax = v[i][1];
+    }
+    const dx = xmax - xmin, dy = ymax - ymin, dmax = Math.max(dx, dy);
+    const xmid = xmin + dx * 0.5, ymid = ymin + dy * 0.5;
+    return [[xmid - 20 * dmax, ymid - dmax], [xmid, ymid + 20 * dmax], [xmid + 20 * dmax, ymid - dmax]];
+  }
+  function circumcircle(v: number[][], i: number, j: number, k: number): Circ {
+    const x1 = v[i][0], y1 = v[i][1], x2 = v[j][0], y2 = v[j][1], x3 = v[k][0], y3 = v[k][1];
+    const fy12 = Math.abs(y1 - y2), fy23 = Math.abs(y2 - y3);
+    let xc = 0, yc = 0, m1, m2, mx1, mx2, my1, my2;
+    if (fy12 < EPSILON) {
+      m2 = -((x3 - x2) / (y3 - y2)); mx2 = (x2 + x3) / 2; my2 = (y2 + y3) / 2;
+      xc = (x2 + x1) / 2; yc = m2 * (xc - mx2) + my2;
+    } else if (fy23 < EPSILON) {
+      m1 = -((x2 - x1) / (y2 - y1)); mx1 = (x1 + x2) / 2; my1 = (y1 + y2) / 2;
+      xc = (x3 + x2) / 2; yc = m1 * (xc - mx1) + my1;
+    } else {
+      m1 = -((x2 - x1) / (y2 - y1)); m2 = -((x3 - x2) / (y3 - y2));
+      mx1 = (x1 + x2) / 2; mx2 = (x2 + x3) / 2; my1 = (y1 + y2) / 2; my2 = (y2 + y3) / 2;
+      xc = (m1 * mx1 - m2 * mx2 + my2 - my1) / (m1 - m2);
+      yc = fy12 > fy23 ? m1 * (xc - mx1) + my1 : m2 * (xc - mx2) + my2;
+    }
+    const dx = x2 - xc, dy = y2 - yc;
+    return { i, j, k, x: xc, y: yc, r: dx * dx + dy * dy };
+  }
+  function dedup(edges: number[]) {
+    for (let j = edges.length; j; ) {
+      const b = edges[--j], a = edges[--j];
+      for (let i = j; i; ) {
+        const n = edges[--i], m = edges[--i];
+        if ((a === m && b === n) || (a === n && b === m)) { edges.splice(j, 2); edges.splice(i, 2); break; }
+      }
+    }
+  }
+  return {
+    triangulate(vertices: number[][]): number[] {
+      const n = vertices.length;
+      if (n < 3) return [];
+      const verts = vertices.slice(0);
+      const indices: number[] = new Array(n);
+      for (let i = n; i--; ) indices[i] = i;
+      indices.sort((a, b) => verts[b][0] - verts[a][0]);
+      const st = supertriangle(verts);
+      verts.push(st[0], st[1], st[2]);
+      const open: Circ[] = [circumcircle(verts, n + 0, n + 1, n + 2)];
+      let closed: Circ[] = [];
+      const edges: number[] = [];
+      for (let i = indices.length; i--; edges.length = 0) {
+        const c = indices[i];
+        for (let j = open.length; j--; ) {
+          const dx = verts[c][0] - open[j].x;
+          if (dx > 0 && dx * dx > open[j].r) { closed.push(open[j]); open.splice(j, 1); continue; }
+          const dy = verts[c][1] - open[j].y;
+          if (dx * dx + dy * dy - open[j].r > EPSILON) continue;
+          edges.push(open[j].i, open[j].j, open[j].j, open[j].k, open[j].k, open[j].i);
+          open.splice(j, 1);
+        }
+        dedup(edges);
+        for (let j = edges.length; j; ) { const b = edges[--j], a = edges[--j]; open.push(circumcircle(verts, a, b, c)); }
+      }
+      for (let i = open.length; i--; ) closed.push(open[i]);
+      const out: number[] = [];
+      for (let i = closed.length; i--; )
+        if (closed[i].i < n && closed[i].j < n && closed[i].k < n) out.push(closed[i].i, closed[i].j, closed[i].k);
+      return out;
+    },
+  };
+})();
+
+// Luxury low-poly page wipe: faceted gold leaf, tinted by the chosen language's
+// light, blooms outward FROM the instrument across the whole screen, then we
+// cross into the site. Cheap (filled triangles, no glow) — smooth, no lag.
+const MeshWipe = ({ color, fx, fy }: { color: string; fx?: number; fy?: number }) => {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const W = (canvas.width = window.innerWidth);
+    const H = (canvas.height = window.innerHeight);
+    const cr = parseInt(color.slice(1, 3), 16) || 243;
+    const cg = parseInt(color.slice(3, 5), 16) || 215;
+    const cb = parseInt(color.slice(5, 7), 16) || 126;
+    const ox = fx ?? W * 0.62, oy = fy ?? H * 0.4;
+
+    const pw = Math.max(8, Math.round(W / 120)), ph = Math.max(6, Math.round(H / 120));
+    const off = W / 55;
+    const anchors: number[][] = [];
+    for (let i = 0; i <= ph; i++) {
+      for (let j = 0; j <= pw; j++) {
+        let hx = (Math.random() > 0.5 ? -1 : 1) * Math.random() * off;
+        let vy = (Math.random() > 0.5 ? -1 : 1) * Math.random() * off;
+        if (j === 0) hx = -Math.abs(hx); else if (j === pw) hx = Math.abs(hx);
+        if (i === 0) vy = -Math.abs(vy); else if (i === ph) vy = Math.abs(vy);
+        anchors.push([(W / pw) * j + hx, (H / ph) * i + vy]);
+      }
+    }
+    const idx = Delaunay.triangulate(anchors);
+    const maxDist = Math.hypot(Math.max(ox, W - ox), Math.max(oy, H - oy)) || 1;
+    const SPAN = 950;
+    type T = { ax: number; ay: number; bx: number; by: number; cx: number; cy: number; mx: number; my: number; R: number; G: number; B: number; delay: number; dur: number };
+    const tris: T[] = [];
+    for (let k = 0; k < idx.length; k += 3) {
+      const a = anchors[idx[k]], b = anchors[idx[k + 1]], c = anchors[idx[k + 2]];
+      const cxT = (a[0] + b[0] + c[0]) / 3, cyT = (a[1] + b[1] + c[1]) / 3;
+      const d = Math.min(1, Math.hypot(cxT - ox, cyT - oy) / maxDist);
+      const lum = Math.pow(1 - d, 1.3);
+      const baseR = 12 + (245 - 12) * lum, baseG = 11 + (222 - 11) * lum, baseB = 16 + (150 - 16) * lum;
+      const ta = 0.2 + Math.random() * 0.35;
+      const jit = 0.82 + Math.random() * 0.34;
+      tris.push({
+        ax: a[0], ay: a[1], bx: b[0], by: b[1], cx: c[0], cy: c[1], mx: cxT, my: cyT,
+        R: Math.min(255, (baseR * (1 - ta) + cr * ta) * jit),
+        G: Math.min(255, (baseG * (1 - ta) + cg * ta) * jit),
+        B: Math.min(255, (baseB * (1 - ta) + cb * ta) * jit),
+        delay: d * SPAN + Math.random() * 170,
+        dur: 420 + Math.random() * 520,
+      });
+    }
+
+    const start = performance.now();
+    let raf = 0;
+    const HOLD_END = 1950;          // facets covered + shimmered by here
+    const DARK_DUR = 620;           // then melt the whole sheet into the site's tone
+    const endR = 8 + cr * 0.1, endG = 8 + cg * 0.1, endB = 10 + cb * 0.1; // deep language tint
+    const diag = 0.94, diagY = 0.34;
+    const uMin = -0.35 * W, uMax = 1.35 * W + H * diagY;
+    const sig = 0.17 * W;
+    const draw = (now: number) => {
+      const dt = now - start;
+      ctx.clearRect(0, 0, W, H);
+      // a single luxurious light rake travelling across the gold facets
+      const sweepP = Math.min(1, dt / (HOLD_END + 250));
+      const sweepU = uMin + (uMax - uMin) * (sweepP < 0.5 ? 4 * sweepP * sweepP * sweepP : 1 - Math.pow(-2 * sweepP + 2, 3) / 2);
+      // global melt that blends the whole sheet into the site's tone before we cross over
+      const melt = dt < HOLD_END ? 0 : Math.min(1, (dt - HOLD_END) / DARK_DUR);
+      for (let i = 0; i < tris.length; i++) {
+        const t = tris[i];
+        if (dt <= t.delay) continue;
+        const prog = (dt - t.delay) / t.dur;
+        const lin = Math.min(1, prog);
+        const op = 1 - Math.pow(1 - lin, 3);
+        const sc = 0.9 + 0.1 * op;
+        const u = t.mx * diag + t.my * diagY;
+        const shine = Math.exp(-((u - sweepU) * (u - sweepU)) / (2 * sig * sig));
+        const add = shine * 90 * op * (1 - melt);
+        const fR = Math.min(255, t.R + add), fG = Math.min(255, t.G + add * 0.92), fB = Math.min(255, t.B + add * 0.7);
+        const R = fR * (1 - melt) + endR * melt, G = fG * (1 - melt) + endG * melt, B = fB * (1 - melt) + endB * melt;
+        ctx.beginPath();
+        ctx.moveTo(t.mx + (t.ax - t.mx) * sc, t.my + (t.ay - t.my) * sc);
+        ctx.lineTo(t.mx + (t.bx - t.mx) * sc, t.my + (t.by - t.my) * sc);
+        ctx.lineTo(t.mx + (t.cx - t.mx) * sc, t.my + (t.cy - t.my) * sc);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(${R | 0},${G | 0},${B | 0},${op})`;
+        ctx.fill();
+        const eg = Math.max(0, 1 - Math.abs(prog - 1) / 0.35);
+        const edge = (eg * 0.5 + shine * 0.4) * (1 - melt);
+        ctx.strokeStyle = `rgba(${Math.min(255, R + 30 + eg * 70) | 0},${Math.min(255, G + 24 + eg * 60) | 0},${Math.min(255, B + 10 + eg * 40) | 0},${op * 0.4 + edge})`;
+        ctx.lineWidth = 1 + (eg + shine) * 0.5; ctx.stroke();
+      }
+      if (dt < HOLD_END + DARK_DUR + 200) raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [color, fx, fy]);
+  return <canvas ref={ref} className="absolute inset-0 pointer-events-none" style={{ zIndex: 100 }} />;
+};
+
 const HeadstockSelector = ({
-  selectedLang, hoveredLang, onHover, onLeave, onSelect, onHandoffY,
+  selectedLang, hoveredLang, onHover, onLeave, onSelect, onGeometry, entered,
 }: {
   selectedLang: string | null;
   hoveredLang: string | null;
   onHover: (code: string) => void;
   onLeave: () => void;
   onSelect: (code: string) => void;
-  onHandoffY: (y: number) => void;
+  onGeometry: (g: { pins: SeamPin[]; nutX: number; nutY: number; neckHalfW: number }) => void;
+  entered: boolean;
 }) => {
-  const handoffRef = useRef<SVGCircleElement | null>(null);
+  const pinRefs = useRef<(SVGCircleElement | null)[]>([]);
+  const nutRef = useRef<SVGCircleElement | null>(null);
+  const neckLRef = useRef<SVGCircleElement | null>(null);
+  const neckRRef = useRef<SVGCircleElement | null>(null);
+
   useEffect(() => {
     const measure = () => {
-      const r = handoffRef.current?.getBoundingClientRect();
-      if (r) onHandoffY(r.top + r.height / 2);
+      const pins: SeamPin[] = [];
+      for (let i = 0; i < SUPPORTED_LANGUAGES.length; i++) {
+        const r = pinRefs.current[i]?.getBoundingClientRect();
+        if (!r) return;
+        pins.push({ x: r.left + r.width / 2, y: r.top + r.height / 2, lang: SUPPORTED_LANGUAGES[i].code });
+      }
+      const nr = nutRef.current?.getBoundingClientRect();
+      const lr = neckLRef.current?.getBoundingClientRect();
+      const rr = neckRRef.current?.getBoundingClientRect();
+      if (!nr || !lr || !rr) return;
+      const nutX = nr.left + nr.width / 2;
+      const nutY = nr.top + nr.height / 2;
+      const neckHalfW = Math.abs((rr.left + rr.width / 2) - (lr.left + lr.width / 2)) / 2;
+      onGeometry({ pins, nutX, nutY, neckHalfW });
     };
     measure();
     const id = window.setTimeout(measure, 350);
+    const id2 = window.setTimeout(measure, 900);
     window.addEventListener('resize', measure);
-    return () => { window.clearTimeout(id); window.removeEventListener('resize', measure); };
-  }, [onHandoffY]);
-  const activeLang = hoveredLang || selectedLang;
-  const vaporColor = activeLang ? LANGUAGE_MESH[activeLang] : '#ffffff';
-  const vaporCore = activeLang ? (LANGUAGE_PASTEL[activeLang] || '#ffffff') : '#ffffff';
-  const vaporIdx = activeLang ? SUPPORTED_LANGUAGES.findIndex((l) => l.code === activeLang) : -1;
-  const vaporY = vaporIdx >= 0 ? PEG_Y[vaporIdx] : 20;
+    return () => { window.clearTimeout(id); window.clearTimeout(id2); window.removeEventListener('resize', measure); };
+  }, [onGeometry]);
+
   return (
     <svg
       className="absolute inset-0 w-full h-full"
@@ -258,122 +507,54 @@ const HeadstockSelector = ({
       style={{ zIndex: 7, pointerEvents: 'none' }}
       aria-hidden="true"
     >
+      {/* Feather mask: melts the photo's rectangular edges into the galaxy so
+          it never looks like a hard cropped box pasted on space. The left and
+          bottom edges (which meet empty space) fade most; the crystal pegs in
+          the center/right stay fully crisp. */}
       <defs>
-        <linearGradient id="glass" x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0" stopColor="rgba(88,102,128,0.30)" /><stop offset="0.45" stopColor="rgba(34,40,55,0.22)" /><stop offset="1" stopColor="rgba(12,15,22,0.16)" />
-        </linearGradient>
-        <radialGradient id="aura" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="rgba(126,146,186,0.16)" /><stop offset="0.6" stopColor="rgba(120,140,180,0.06)" /><stop offset="1" stopColor="rgba(120,140,180,0)" />
-        </radialGradient>
-        <linearGradient id="gknob" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="rgba(150,168,196,0.5)" /><stop offset="0.5" stopColor="rgba(70,82,104,0.42)" /><stop offset="1" stopColor="rgba(28,34,48,0.4)" />
-        </linearGradient>
-        <radialGradient id="gspot" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="rgba(255,255,255,0.5)" /><stop offset="1" stopColor="rgba(255,255,255,0)" />
-        </radialGradient>
-        <radialGradient id="met" cx="0.3" cy="0.3" r="0.9">
-          <stop offset="0" stopColor="#fffdf6" /><stop offset="0.5" stopColor="#cfd6e0" /><stop offset="1" stopColor="#6a7080" />
-        </radialGradient>
-        <radialGradient id="bush" cx="0.4" cy="0.35" r="0.8">
-          <stop offset="0" stopColor="#eef2f8" /><stop offset="0.6" stopColor="#9aa3b2" /><stop offset="1" stopColor="#454b58" />
-        </radialGradient>
-        <filter id="pegGlow" x="-400%" y="-400%" width="900%" height="900%"><feGaussianBlur stdDeviation="1.1" /></filter>
-        <filter id="strGlow" x="-400%" y="-50%" width="900%" height="200%"><feGaussianBlur stdDeviation="0.7" /></filter>
-        <filter id="glassBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="0.7" /></filter>
-        <filter id="vapor" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.4" /></filter>
-        <linearGradient id="strFadeGrad" gradientUnits="userSpaceOnUse" x1="0" y1="37.5" x2="0" y2="42.5">
-          <stop offset="0" stopColor="#fff" stopOpacity="1" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-        <mask id="strFade" maskUnits="userSpaceOnUse" x="90" y="0" width="40" height="48">
-          <rect x="90" y="0" width="40" height="37.5" fill="#fff" />
-          <rect x="90" y="37.5" width="40" height="5" fill="url(#strFadeGrad)" />
+        <filter id="hsFeather" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="2.2" />
+        </filter>
+        <mask id="hsMask" maskUnits="userSpaceOnUse"
+              x={IMG_X - 8} y={IMG_Y - 8} width={IMG_W + 16} height={IMG_H + 16}>
+          <rect
+            x={IMG_X + 1.6} y={IMG_Y + 0.8}
+            width={IMG_W - 1.6 - 0.4} height={IMG_H - 0.8 - 3.4}
+            fill="#fff" filter="url(#hsFeather)"
+          />
         </mask>
-        <linearGradient id="botFadeGrad" gradientUnits="userSpaceOnUse" x1="0" y1="33" x2="0" y2="40">
-          <stop offset="0" stopColor="#fff" stopOpacity="1" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-        <mask id="bottomFade" maskUnits="userSpaceOnUse" x="90" y="0" width="40" height="48">
-          <rect x="90" y="0" width="40" height="33" fill="#fff" />
-          <rect x="90" y="33" width="40" height="7" fill="url(#botFadeGrad)" />
-        </mask>
-        <clipPath id="bladeClip">
-          <path d="M100.6,5.0 C99.9,3.7 100.7,2.6 102.0,2.55 C102.8,2.52 103.3,3.0 103.5,3.8 C103.7,4.5 103.9,5.1 104.7,4.95 C105.8,4.6 107.0,4.7 108.2,5.7 C109.6,6.9 110.6,8.0 111.0,10.5 C111.3,13.5 111.2,16.5 111.0,19.5 C110.8,23.0 110.6,27.0 110.0,30.5 C109.5,32.8 108.7,34.6 107.8,36.4 C107.1,37.8 106.2,39.0 105.4,40.2 C105.1,40.6 104.2,40.6 103.9,40.2 C103.4,39.2 103.2,38.0 102.9,36.6 C102.5,34.8 102.6,33.4 102.1,30.8 C101.5,27.4 101.0,23.8 100.9,20.4 C100.8,16.9 101.0,13.8 101.6,11.4 C101.0,9.0 100.2,7.2 100.6,5.0 Z" />
-        </clipPath>
       </defs>
 
-      {/* tilt 15deg to the right + smaller, pivoting at the nut */}
-      <g transform="translate(106 37) scale(0.74) rotate(15) translate(-106 -37)">
-
-      {/* soft ambient halo — dissolves the headstock into the surrounding space */}
-      <ellipse cx="107" cy="20" rx="21" ry="27" fill="url(#aura)" filter="url(#vapor)" />
-
-      {/* glass guitar headstock silhouette (swept tip), thin minimal border */}
-      <path
-        d="M100.6,5.0 C99.9,3.7 100.7,2.6 102.0,2.55 C102.8,2.52 103.3,3.0 103.5,3.8 C103.7,4.5 103.9,5.1 104.7,4.95 C105.8,4.6 107.0,4.7 108.2,5.7 C109.6,6.9 110.6,8.0 111.0,10.5 C111.3,13.5 111.2,16.5 111.0,19.5 C110.8,23.0 110.6,27.0 110.0,30.5 C109.5,32.8 108.7,34.6 107.8,36.4 C107.1,37.8 106.2,39.0 105.4,40.2 C105.1,40.6 104.2,40.6 103.9,40.2 C103.4,39.2 103.2,38.0 102.9,36.6 C102.5,34.8 102.6,33.4 102.1,30.8 C101.5,27.4 101.0,23.8 100.9,20.4 C100.8,16.9 101.0,13.8 101.6,11.4 C101.0,9.0 100.2,7.2 100.6,5.0 Z"
-        fill="url(#glass)" stroke="rgba(210,226,255,0.45)" strokeWidth={0.22} strokeLinejoin="round"
+      {/* Whole assembly scaled + dropped as one unit. The pegs are measured
+          AFTER this transform, so the silk strings tie to the new positions. */}
+      <g transform={`translate(${ASM_TX} ${ASM_TY}) scale(${ASM_SCALE})`}>
+      {/* The luxury crystal headstock photo, sitting where the silhouette was. */}
+      <image
+        href="/headstock.png"
+        x={IMG_X} y={IMG_Y} width={IMG_W} height={IMG_H}
+        preserveAspectRatio="xMidYMid meet"
+        mask="url(#hsMask)"
+        style={{ pointerEvents: 'none' }}
       />
-      {/* living silk border — a gentle breathing glow */}
-      <path
-        d="M100.6,5.0 C99.9,3.7 100.7,2.6 102.0,2.55 C102.8,2.52 103.3,3.0 103.5,3.8 C103.7,4.5 103.9,5.1 104.7,4.95 C105.8,4.6 107.0,4.7 108.2,5.7 C109.6,6.9 110.6,8.0 111.0,10.5 C111.3,13.5 111.2,16.5 111.0,19.5 C110.8,23.0 110.6,27.0 110.0,30.5 C109.5,32.8 108.7,34.6 107.8,36.4 C107.1,37.8 106.2,39.0 105.4,40.2 C105.1,40.6 104.2,40.6 103.9,40.2 C103.4,39.2 103.2,38.0 102.9,36.6 C102.5,34.8 102.6,33.4 102.1,30.8 C101.5,27.4 101.0,23.8 100.9,20.4 C100.8,16.9 101.0,13.8 101.6,11.4 C101.0,9.0 100.2,7.2 100.6,5.0 Z"
-        fill="none" stroke="rgba(205,222,255,0.5)" strokeWidth={0.42} strokeLinejoin="round" filter="url(#strGlow)"
-      >
-        <animate attributeName="opacity" values="0.28;0.6;0.28" dur="6.5s" repeatCount="indefinite"
-          calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
-      </path>
-      {/* living silk border — a soft glint sliding slowly around */}
-      <path
-        d="M100.6,5.0 C99.9,3.7 100.7,2.6 102.0,2.55 C102.8,2.52 103.3,3.0 103.5,3.8 C103.7,4.5 103.9,5.1 104.7,4.95 C105.8,4.6 107.0,4.7 108.2,5.7 C109.6,6.9 110.6,8.0 111.0,10.5 C111.3,13.5 111.2,16.5 111.0,19.5 C110.8,23.0 110.6,27.0 110.0,30.5 C109.5,32.8 108.7,34.6 107.8,36.4 C107.1,37.8 106.2,39.0 105.4,40.2 C105.1,40.6 104.2,40.6 103.9,40.2 C103.4,39.2 103.2,38.0 102.9,36.6 C102.5,34.8 102.6,33.4 102.1,30.8 C101.5,27.4 101.0,23.8 100.9,20.4 C100.8,16.9 101.0,13.8 101.6,11.4 C101.0,9.0 100.2,7.2 100.6,5.0 Z"
-        fill="none" pathLength={100} stroke="rgba(248,251,255,0.95)" strokeWidth={0.34} strokeLinecap="round" strokeLinejoin="round"
-        strokeDasharray="15 85" filter="url(#strGlow)" style={{ mixBlendMode: 'screen' }}
-      >
-        <animate attributeName="stroke-dashoffset" values="100;0" dur="10s" repeatCount="indefinite" />
-      </path>
-      {/* magical colored vapor inside the glass — soft, light, tinted to the hovered language */}
-      <g clipPath="url(#bladeClip)">
-        <ellipse cx="105.5" cy={vaporY} rx="11" ry="14" fill={vaporColor} opacity={activeLang ? 0.20 : 0} filter="url(#vapor)"
-          style={{ transition: 'opacity 0.6s ease, fill 0.6s ease, cy 0.7s cubic-bezier(0.22,1,0.36,1)' }} />
-        <ellipse cx="104" cy={vaporY - 4} rx="6.5" ry="9" fill={vaporColor} opacity={activeLang ? 0.13 : 0} filter="url(#vapor)"
-          style={{ transition: 'opacity 0.75s ease, fill 0.75s ease, cy 0.85s cubic-bezier(0.22,1,0.36,1)' }} />
-        <ellipse cx="105" cy={vaporY} rx="3" ry="4.5" fill={vaporCore} opacity={activeLang ? 0.28 : 0} filter="url(#glassBlur)"
-          style={{ transition: 'opacity 0.55s ease, fill 0.55s ease, cy 0.6s cubic-bezier(0.22,1,0.36,1)' }} />
-      </g>
-      {/* glass reflections, clipped inside the blade */}
-      <g clipPath="url(#bladeClip)">
-        <path d="M101.5,4 C100,9 99.6,18 100,26 L102.8,26 C102.4,18 102.8,9 104,4.5 Z" fill="rgba(255,255,255,0.16)" filter="url(#glassBlur)" />
-        <path d="M104.5,3.5 C103.5,8 103.3,15 103.6,22 L104.6,22 C104.4,15 104.6,8 105.4,4 Z" fill="rgba(255,255,255,0.28)" />
-        <ellipse cx="106" cy="11" rx="3.2" ry="5" fill="url(#gspot)" filter="url(#glassBlur)" />
-        <path d="M112,30 C111,33 109,36 106,37 L114,37 C114,34 113.5,31 113,29 Z" fill="rgba(255,255,255,0.06)" filter="url(#glassBlur)" />
-      </g>
-      {/* very thin top-left edge catch */}
-      <path d="M101,28 C99.9,23 99.9,15 100.9,10.5 C101.6,7.4 102.9,4.7 105,3.7"
-        fill="none" stroke="rgba(235,244,255,0.55)" strokeWidth={0.16} strokeLinecap="round" />
-      {/* frosted diamond etch */}
-      <path d="M104,6.5 l0.8,1.2 -0.8,1.2 -0.8,-1.2 Z" fill="rgba(230,240,255,0.35)" />
 
-      {/* invisible handoff marker (where strings meet the silk column) — measured live to pin the column */}
-      <circle ref={handoffRef} cx="105" cy="40" r="0.01" fill="none" />
+      {/* invisible geometry markers — measured live (in screen px) and handed
+          to <LiquidSeam/> so the silk strings tie exactly to these points. */}
+      {SUPPORTED_LANGUAGES.map((l, i) => (
+        <circle key={`pin-${l.code}`} ref={(el) => { pinRefs.current[i] = el; }} cx={POST_X[i]} cy={POST_Y[i]} r="0.01" fill="none" />
+      ))}
+      <circle ref={nutRef} cx={NUT_X} cy={NUT_Y} r="0.01" fill="none" />
+      <circle ref={neckLRef} cx={NUT_X - NECK_HALF_W} cy={NUT_Y} r="0.01" fill="none" />
+      <circle ref={neckRRef} cx={NUT_X + NECK_HALF_W} cy={NUT_Y} r="0.01" fill="none" />
 
-      {/* thin glowing strings to the pegs — captive in the frame, dancing, melting into the column at the border */}
-      <g mask="url(#strFade)" strokeLinecap="round" fill="none">
-        {SUPPORTED_LANGUAGES.map((l, i) => {
-          const active = selectedLang === l.code || hoveredLang === l.code;
-          return (
-            <g key={l.code}>
-              <animateTransform attributeName="transform" attributeType="XML" type="rotate"
-                values={`${-SWAY[i].ang} 110 ${PEG_Y[i]}; ${SWAY[i].ang} 110 ${PEG_Y[i]}; ${-SWAY[i].ang} 110 ${PEG_Y[i]}`}
-                dur={`${SWAY[i].dur}s`} begin={`${SWAY[i].begin}s`} repeatCount="indefinite"
-                calcMode="spline" keySplines="0.45 0 0.55 1; 0.45 0 0.55 1" />
-              <path d={STRING_D[i]} stroke={LANGUAGE_MESH[l.code]} strokeWidth={active ? 0.75 : 0.34} opacity={active ? 0.55 : 0.22} filter="url(#strGlow)" />
-              <path d={STRING_D[i]} stroke={active ? LANGUAGE_PASTEL[l.code] : LANGUAGE_MESH[l.code]} strokeWidth={active ? 0.26 : 0.16} opacity={active ? 1 : 0.72} />
-            </g>
-          );
-        })}
-      </g>
-
-      {/* one interactive group per language / tuning peg (right side) */}
+      {/* one interactive hit-group + label per language. Labels are staggered
+          to the RIGHT of each crystal knob with a CONSTANT offset, so they
+          form a clean diagonal that mirrors the pegs' own slope — each label
+          on the same Y as ITS crystal, not all on one vertical line. */}
       {SUPPORTED_LANGUAGES.map((l, i) => {
         const active = selectedLang === l.code || hoveredLang === l.code;
         const dimmed = !!selectedLang && selectedLang !== l.code;
-        const y = PEG_Y[i];
+        const y = PIN_CY[i];
+        const labelX = PIN_CX[i] + 3.5; // constant offset → diagonal staircase
         const pastel = LANGUAGE_PASTEL[l.code];
         return (
           <g
@@ -382,35 +563,33 @@ const HeadstockSelector = ({
             onMouseLeave={onLeave}
             onClick={() => onSelect(l.code)}
             data-cursor="go"
-            style={{ pointerEvents: 'auto', cursor: 'pointer', opacity: dimmed ? 0 : 1, transition: 'opacity 0.6s ease' }}
+            style={{
+              pointerEvents: 'auto', cursor: 'pointer',
+              opacity: dimmed ? 0 : 1, transition: 'opacity 0.6s ease',
+              animationName: entered ? 'labelFadeIn' : 'none',
+              animationDuration: '1.1s',
+              animationTimingFunction: 'ease',
+              animationFillMode: 'backwards',
+              animationDelay: `${0.9 + i * 0.2}s`,
+            }}
           >
-            <g transform={`rotate(-15 110 ${y})`}>
-              {active && <circle cx={KNOB_CX[i]} cy={y} r="3" fill={LANGUAGE_MESH[l.code]} opacity={0.4} filter="url(#pegGlow)" />}
-              {/* horizontal glass machine-head: short slim rod + delicate smoked-glass button */}
-              <rect x="110" y={y - 0.25} width={NECK_W[i]} height="0.5" rx="0.25" fill={active ? pastel : 'rgba(170,190,220,0.28)'} stroke="rgba(210,226,255,0.34)" strokeWidth={0.055} />
-              <circle cx="109.6" cy={y} r={active ? 0.6 : 0.52} fill={active ? pastel : 'rgba(225,235,250,0.5)'} style={{ transition: 'all 0.4s ease' }} />
-              <ellipse cx={KNOB_CX[i]} cy={y} rx={active ? 1.95 : 1.8} ry={active ? 0.82 : 0.74} fill={active ? pastel : 'url(#gknob)'} stroke="rgba(210,226,255,0.42)" strokeWidth={0.08} style={{ transition: 'all 0.4s ease' }} />
-              <ellipse cx={KNOB_CX[i]} cy={y} rx={active ? 1.42 : 1.3} ry={active ? 0.5 : 0.45} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={0.045} />
-              <ellipse cx={KNOB_CX[i] - 0.5} cy={y - 0.3} rx="0.6" ry="0.17" fill="rgba(255,255,255,0.55)" />
-              <circle cx={KNOB_CX[i] + 0.82} cy={y + 0.16} r="0.11" fill="rgba(255,255,255,0.32)" />
-              {/* label to the RIGHT, horizontal */}
-              <text
-                x="116" y={y + 0.85} textAnchor="start"
-                fontSize={active ? 2.85 : 2.45} letterSpacing={active ? 0.62 : 0.46}
-                fill={active ? pastel : 'rgba(255,255,255,0.62)'}
-                style={{
-                  fontFamily: "'Cormorant Garamond', 'Didot', Georgia, serif",
-                  fontWeight: active ? 600 : 500,
-                  fontStyle: (l.code === 'zh' || l.code === 'ja' || l.code === 'ko') ? 'normal' : 'italic',
-                  textShadow: active ? `0 0 5px ${LANGUAGE_MESH[l.code]}` : 'none',
-                  transition: 'fill 0.4s ease, font-size 0.4s ease, letter-spacing 0.4s ease',
-                }}
-              >
-                {l.label}
-              </text>
-            </g>
-            {/* invisible hit area covering tuner + label */}
-            <rect x="108" y={y - 2.2} width="44" height="4.4" fill="transparent" style={{ pointerEvents: 'all' }} />
+            {/* label to the RIGHT of the crystal knob, on its own Y */}
+            <text
+              x={labelX} y={y + 0.85} textAnchor="start"
+              fontSize={active ? 2.85 : 2.45} letterSpacing={active ? 0.62 : 0.46}
+              fill={active ? pastel : 'rgba(255,255,255,0.62)'}
+              style={{
+                fontFamily: "'Cormorant Garamond', 'Didot', Georgia, serif",
+                fontWeight: active ? 600 : 500,
+                fontStyle: (l.code === 'zh' || l.code === 'ja' || l.code === 'ko') ? 'normal' : 'italic',
+                textShadow: active ? `0 0 5px ${LANGUAGE_MESH[l.code]}` : 'none',
+                transition: 'fill 0.4s ease, font-size 0.4s ease, letter-spacing 0.4s ease',
+              }}
+            >
+              {l.label}
+            </text>
+            {/* invisible hit area covering the crystal knob + label */}
+            <rect x={PIN_CX[i] - 3} y={y - 2.6} width={labelX + 18 - (PIN_CX[i] - 3)} height="5.2" fill="transparent" style={{ pointerEvents: 'all' }} />
           </g>
         );
       })}
@@ -424,21 +603,41 @@ export const LinguisticPortal = () => {
   const { applyLanguageWorld } = useChromatic();
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
   const [hoveredLang, setHoveredLang] = useState<string | null>(null);
-  const [handoffY, setHandoffY] = useState<number>(0);
+  const [seamGeom, setSeamGeom] = useState<{ pins: SeamPin[]; nutX: number; nutY: number; neckHalfW: number } | null>(null);
   const starColorRef = useRef<string>('#FFFFFF');
   const starHoverRef = useRef<number>(0);
   const audioLevelRef = useRef<number>(0);
+  // Live cursor position (normalized −1..1) for the galaxy depth-parallax.
+  const pointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const shatterCanvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameId = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const lowEnd = typeof navigator !== 'undefined' && navigator.hardwareConcurrency < 4;
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  // Keep the mobile/desktop layout in sync when the window is resized or leaves
+  // fullscreen, so the whole composition re-lays-out (and re-measures) cleanly
+  // instead of staying frozen at the size it first loaded at.
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const [entered, setEntered] = useState(false);
   const audioStarterRef = useRef<(() => void) | null>(null);
   const audioCleanupRef = useRef<(() => void) | null>(null);
+
+  // Track the cursor (normalized −1..1) so the galaxy can drift in 3D behind
+  // the anchored instrument — gentle depth-parallax, the "alive" feel.
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      pointerRef.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointerRef.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => window.removeEventListener('pointermove', onMove);
+  }, []);
 
   // Ambient background music + live audio analysis driving the starfield pulse.
   // The analyser feeds a smoothed 0..1 energy into audioLevelRef, read by the
@@ -566,85 +765,24 @@ export const LinguisticPortal = () => {
 
   const handleLanguageSelect = useCallback((langCode: string) => {
     if (selectedLang) return;
-    setSelectedLang(langCode);
+    setSelectedLang(langCode);          // drives the treble-clef transition overlay (CSS)
     playMicroTone(langCode);
     applyLanguageWorld(langCode as any);
-
-    const rect = containerRef.current?.getBoundingClientRect();
-    const originX = rect ? rect.width / 2 : window.innerWidth / 2;
-    const originY = rect ? rect.height / 2 : window.innerHeight / 2;
-
-    if (lowEnd) {
-      setTimeout(() => {
-        setLocale(langCode as any);
-        document.documentElement.setAttribute('lang', langCode);
-        window.location.hash = '/app';
-      }, SHATTER_DURATION * 0.7);
-      return;
-    }
-
-    const canvas = shatterCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const fragmentCount = isMobile ? SHATTER_MOBILE_FRAGMENTS : SHATTER_DESKTOP_FRAGMENTS;
-
-    const fragments: { x: number; y: number; w: number; h: number; angle: number; tx: number; ty: number; scale: number; opacity: number }[] = [];
-    for (let i = 0; i < fragmentCount; i++) {
-      fragments.push({
-        x: originX + (Math.random() - 0.5) * 200,
-        y: originY + (Math.random() - 0.5) * 200,
-        w: 30 + Math.random() * 50,
-        h: 30 + Math.random() * 50,
-        angle: Math.random() * Math.PI * 2,
-        tx: (Math.random() - 0.5) * 800,
-        ty: (Math.random() - 0.5) * 800,
-        scale: 1,
-        opacity: 1,
-      });
-    }
-
-    const startTime = performance.now();
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / SHATTER_DURATION, 1);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      fragments.forEach(f => {
-        f.scale = 1 - progress * 0.8;
-        f.opacity = 1 - progress;
-        f.x += f.tx * 0.02;
-        f.y += f.ty * 0.02;
-        ctx.save();
-        ctx.translate(f.x, f.y);
-        ctx.rotate(f.angle);
-        ctx.globalAlpha = f.opacity;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-f.w / 2 * f.scale, -f.h / 2 * f.scale, f.w * f.scale, f.h * f.scale);
-        ctx.restore();
-      });
-      if (progress < 1) {
-        animFrameId.current = requestAnimationFrame(animate);
-      } else {
-        setLocale(langCode as any);
-        document.documentElement.setAttribute('lang', langCode);
-        window.location.hash = '/app';
-      }
-    };
-    animFrameId.current = requestAnimationFrame(animate);
-  }, [selectedLang, setLocale, isMobile, lowEnd, playMicroTone, applyLanguageWorld]);
+    // navigate once the clef has written itself and we've dived into its spiral
+    window.setTimeout(() => {
+      setLocale(langCode as any);
+      document.documentElement.setAttribute('lang', langCode);
+      window.location.hash = '/app';
+    }, SELECT_TRANSITION_MS);
+  }, [selectedLang, setLocale, playMicroTone, applyLanguageWorld]);
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 bg-black overflow-hidden">
-      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');" }} />
+      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'); @keyframes labelFadeIn { from { opacity: 0; } to { opacity: 1; } } }" }} />
 
       {/* The living starfield is always present — it backs both the welcome
           gate and the language portal so the transition feels continuous. */}
-      <StarfieldCanvas colorRef={starColorRef} hoverRef={starHoverRef} audioRef={audioLevelRef} />
+      <StarfieldCanvas colorRef={starColorRef} hoverRef={starHoverRef} audioRef={audioLevelRef} pointerRef={pointerRef} />
       <PortalCursor />
 
       {/* Cinematic entry curtain, shown on every load before the portal. */}
@@ -655,12 +793,65 @@ export const LinguisticPortal = () => {
         className="absolute inset-0"
         style={{
           opacity: entered ? 1 : 0,
-          transition: 'opacity 1.2s ease',
+          transition: 'opacity 1.8s ease',
           pointerEvents: entered ? 'auto' : 'none',
         }}
       >
       <PortalComposer />
-      <LiquidSeam hoveredLang={hoveredLang} rightPx={375} width={140} handoffY={handoffY} downPct={20} />
+
+      {/* The ornate NECK continuing below the headstock — fills the space down
+          toward the galaxy. Same viewBox + slice as the headstock so it tracks
+          it under every viewport; sits behind the silk strings; its top tucks
+          under the headstock and its bottom melts into the stars. */}
+      {!isMobile && (
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          viewBox="0 0 160 90"
+          preserveAspectRatio="xMaxYMin slice"
+          style={{ zIndex: 3 }}
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="neckFade" gradientUnits="userSpaceOnUse"
+              x1={NECK_CX} y1={NECK_TOP_Y} x2={NECK_CX} y2={NECK_TOP_Y + NECK_H}>
+              <stop offset="0" stopColor="#000" />
+              <stop offset={NECK_TOPIN_OFF} stopColor="#fff" />
+              <stop offset={NECK_FADE_OFF0} stopColor="#fff" />
+              <stop offset={NECK_FADE_OFF1} stopColor="#000" />
+              <stop offset="1" stopColor="#000" />
+            </linearGradient>
+            <mask id="neckMask">
+              <rect
+                x={NECK_CX - NECK_W / 2 - 2} y={NECK_TOP_Y - 2}
+                width={NECK_W + 4} height={NECK_H + 4}
+                fill="url(#neckFade)"
+              />
+            </mask>
+          </defs>
+          <image
+            href="/neck.png"
+            x={NECK_CX - NECK_W / 2} y={NECK_TOP_Y}
+            width={NECK_W} height={NECK_H}
+            preserveAspectRatio="none"
+            mask="url(#neckMask)"
+            style={{ pointerEvents: 'none' }}
+          />
+        </svg>
+      )}
+
+      {/* The silk strings: tied to the crystal pegs and pulled TAUT straight
+          down the page — only a faint living shimmer, clamped to the neck. */}
+      {entered && !isMobile && seamGeom && (
+        <LiquidSeam
+          pins={seamGeom.pins}
+          nutX={seamGeom.nutX}
+          weaveFrac={0.45}
+          weaveAmp={10}
+          bandHalfW={16}
+          laneShift={-10}
+          hoveredLang={hoveredLang}
+        />
+      )}
       {/* hover glow — fully IN FRONT of the composer (zIndex 2: above the image,
           below the column/headstock), soft and luxurious */}
       <div
@@ -715,16 +906,21 @@ export const LinguisticPortal = () => {
           onHover={handleLanguageHover}
           onLeave={handleLanguageLeave}
           onSelect={handleLanguageSelect}
-          onHandoffY={setHandoffY}
+          onGeometry={setSeamGeom}
+          entered={entered}
         />
       )}
       </div>
 
-      <canvas
-        ref={shatterCanvasRef}
-        className="absolute inset-0 pointer-events-none"
-        style={{ zIndex: 100, opacity: selectedLang ? 1 : 0 }}
-      />
+      {/* Language-pick transition: golden sparks form the clef, then burst
+          into a bloom of light + the chosen colour as we cross into the site. */}
+      {selectedLang && (
+        <MeshWipe
+          color={LANGUAGE_MESH[selectedLang] || '#F3D77E'}
+          fx={seamGeom ? seamGeom.pins.reduce((s, p) => s + p.x, 0) / Math.max(1, seamGeom.pins.length) : undefined}
+          fy={seamGeom ? seamGeom.pins.reduce((s, p) => s + p.y, 0) / Math.max(1, seamGeom.pins.length) : undefined}
+        />
+      )}
     </div>
   );
 };

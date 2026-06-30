@@ -43,7 +43,7 @@ const fragmentShader = /* glsl */ `
 const AudioSphere = () => {
   const meshRef = useRef<THREE.Points>(null);
   const { bassLevel, midLevel, highLevel } = useAudioReactive();
-  const { themeId } = useChromatic();
+  const { themeId, languageWorld } = useChromatic();
   const { particleCount } = usePerformanceGuard();
 
   const { positions, scales } = useMemo(() => {
@@ -76,7 +76,7 @@ const AudioSphere = () => {
     const root = document.documentElement;
     const color = getComputedStyle(root).getPropertyValue('--accent-color').trim() || '#D4AF37';
     return new THREE.Color(color);
-  }, [themeId]);
+  }, [themeId, languageWorld]);
 
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },

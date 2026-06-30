@@ -3,15 +3,19 @@ import { OrbitControls } from '@react-three/drei';
 import { ReactNode, Suspense } from 'react';
 import { Spinner } from '../../components/Spinner';
 import PostProcessing from './PostProcessing';
+import { useWebGLRecovery } from './useWebGLRecovery';
 
 interface SceneProps {
   children?: ReactNode;
 }
 
 const Scene = ({ children }: SceneProps) => {
+  const { canvasKey, onCreated } = useWebGLRecovery();
   return (
     <Suspense fallback={<Spinner size="lg" />}>
       <Canvas
+        key={canvasKey}
+        onCreated={onCreated}
         camera={{ position: [0, 0, 5], fov: 75 }}
         gl={{
           antialias: true,

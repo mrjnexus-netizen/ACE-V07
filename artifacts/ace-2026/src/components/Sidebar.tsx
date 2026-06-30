@@ -1,6 +1,7 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { useT } from '../context/TranslationContext';
 
 export interface SidebarItem {
   id: string;
@@ -18,6 +19,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ items, activeId, onSelect, collapsible = true, className }: SidebarProps) => {
+  const { t } = useT();
   const [collapsed, setCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState(activeId || items[0]?.id);
 
@@ -69,7 +71,7 @@ export const Sidebar = ({ items, activeId, onSelect, collapsible = true, classNa
             <button
               onClick={() => setCollapsed(!collapsed)}
               className="text-text-muted hover:text-text-color transition"
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')}
             >
               {collapsed ? '→' : '←'}
             </button>
@@ -88,7 +90,7 @@ export const Sidebar = ({ items, activeId, onSelect, collapsible = true, classNa
               )}
             >
               {item.icon && <span className="mr-3 text-xl">{item.icon}</span>}
-              {!collapsed && <span className="text-sm font-mono">{item.label}</span>}
+              {!collapsed && <span className="text-sm font-mono">{t(item.label)}</span>}
             </button>
           ))}
         </nav>
@@ -96,3 +98,4 @@ export const Sidebar = ({ items, activeId, onSelect, collapsible = true, classNa
     </aside>
   );
 };
+

@@ -1,11 +1,13 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useIdentity } from '../context/IdentityContext';
 import { useChromatic } from '../context/ChromaticContext';
+import { useT } from '../context/TranslationContext';
 import { cn } from '../lib/utils';
 
 export const Header = () => {
   const { locale, setLocale } = useIdentity();
   const { themeId, switchTheme } = useChromatic();
+  const { t } = useT();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const locales = [
@@ -60,7 +62,7 @@ export const Header = () => {
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="md:hidden text-text-color"
-          aria-label="Menu"
+          aria-label={t('Menu')}
         >
           {isMobileMenuOpen ? '✕' : '☰'}
         </button>
@@ -68,7 +70,7 @@ export const Header = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden bg-surface2 border-t border-border p-4 space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-mono text-text-muted">Language</span>
+            <span className="text-sm font-mono text-text-muted">{t('Language')}</span>
             <div className="flex flex-wrap gap-2">
               {locales.map((loc) => (
                 <button
@@ -88,7 +90,7 @@ export const Header = () => {
             </div>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm font-mono text-text-muted">Theme</span>
+            <span className="text-sm font-mono text-text-muted">{t('Theme')}</span>
             <div className="flex gap-2">
               {themes.map((t) => (
                 <button

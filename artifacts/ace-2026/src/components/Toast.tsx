@@ -1,6 +1,7 @@
-﻿import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { useT } from '../context/TranslationContext';
 
 type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
@@ -32,6 +33,7 @@ const variantStyles: Record<ToastVariant, string> = {
 };
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
+  const { t } = useT();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const addToast = useCallback((message: string, variant: ToastVariant = 'info', duration = 4000) => {
@@ -67,7 +69,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
               <button
                 onClick={() => removeToast(toast.id)}
                 className="text-current opacity-70 hover:opacity-100 transition"
-                aria-label="Close"
+                aria-label={t('Close')}
               >
                 ✕
               </button>
@@ -78,3 +80,4 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     </ToastContext.Provider>
   );
 };
+

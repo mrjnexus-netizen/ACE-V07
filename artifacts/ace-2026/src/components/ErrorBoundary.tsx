@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { T } from '../context/TranslationContext';
 
 interface Props {
   children?: ReactNode;
@@ -64,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
           }}
         >
           <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--accent-color)' }}>
-            Something went wrong
+            <T>Something went wrong</T>
           </h2>
           {isDev && this.state.error && (
             <pre
@@ -100,7 +101,7 @@ export class ErrorBoundary extends Component<Props, State> {
             onMouseOver={(e) => (e.currentTarget.style.opacity = '0.85')}
             onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
           >
-            Retry
+            <T>Retry</T>
           </button>
         </div>
       );
@@ -127,10 +128,10 @@ export const RouteErrorBoundary = () => {
         }}
       >
         <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--accent-color)' }}>
-          Application Error
+          <T>Application Error</T>
         </h1>
         <p style={{ marginBottom: '2rem', opacity: 0.8, color: 'var(--text-muted-color)' }}>
-          A route-level error occurred. Please try reloading.
+          <T>A route-level error occurred. Please try reloading.</T>
         </p>
         <button
           onClick={() => window.location.reload()}
@@ -144,7 +145,7 @@ export const RouteErrorBoundary = () => {
             cursor: 'pointer',
           }}
         >
-          Reload App
+          <T>Reload App</T>
         </button>
       </div>
     </ErrorBoundary>

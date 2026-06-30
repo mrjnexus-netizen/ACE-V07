@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion, type MotionValue } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
+import { useT } from '../context/TranslationContext';
 import { ConceptMotif, conceptTint } from './conceptArt';
 import type { AudioTrack } from '../types';
 
@@ -138,6 +139,7 @@ function PianoLane({
   isLast: boolean;
   onActivate: (label: string) => void;
 }) {
+  const { t } = useT();
   const [pressed, setPressed] = useState(false);
 
   const slice = 0.6 / total;
@@ -210,7 +212,7 @@ function PianoLane({
           cursor: 'pointer',
           transformOrigin: 'left center',
         }}
-        aria-label={`Explore ${group.label} (${count} ${count === 1 ? 'track' : 'tracks'})`}
+        aria-label={`${t('Explore')} ${t(group.label)} (${count} ${count === 1 ? t('track') : t('tracks')})`}
       >
         <svg viewBox="0 0 220 44" preserveAspectRatio="none" className="w-full h-full block"
           style={{ transform: pressed && !reduce ? 'translateX(8px)' : 'translateX(0)', transition: 'transform 0.18s cubic-bezier(0.5,0,0.2,1)' }}>
@@ -261,11 +263,11 @@ function PianoLane({
       >
         <span className="font-display font-light whitespace-nowrap"
           style={{ fontSize: 'clamp(1.1rem, 2.3vw, 1.9rem)', letterSpacing: '0.02em', lineHeight: 1, color: pressed ? 'var(--accent-color)' : 'var(--text-color)', transition: 'color 0.3s ease' }}>
-          {group.label}
+          {t(group.label)}
         </span>
         <span className="font-mono whitespace-nowrap hidden md:inline"
           style={{ fontSize: '0.62rem', letterSpacing: '0.14em', color: 'var(--text-dim-color)' }}>
-          {count > 0 ? `${String(count).padStart(2, '0')} ${count === 1 ? 'track' : 'tracks'}` : 'soon'}
+          {count > 0 ? `${String(count).padStart(2, '0')} ${count === 1 ? t('track') : t('tracks')}` : t('soon')}
         </span>
       </motion.button>
     </div>
@@ -287,6 +289,8 @@ function OverlayPanel({
   reduce: boolean;
 }) {
   const { audioState, playTrack, pauseTrack, setPlaylist } = useAudio();
+  const { t } = useT();
+  const tr = t; // alias: inside group.tracks.map((t) => ...) the param `t` shadows the translator
 
   // Lock scroll + ESC while mounted. Lenis (smooth scroll) ignores plain body
   // overflow:hidden, so we stop the instance directly via window.__lenis and
@@ -347,13 +351,13 @@ function OverlayPanel({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`${group.label} tracks`}
+      aria-label={`${t(group.label)} ${t('tracks')}`}
     >
       {/* Close */}
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t('Close')}
         data-cursor="text"
         className="absolute flex items-center justify-center rounded-full focus:outline-none transition-colors hover:bg-white/[0.06]"
         style={{
@@ -389,16 +393,16 @@ function OverlayPanel({
           {/* Header */}
           <div className="mb-14 md:mb-20">
             <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.4em', color: 'var(--accent-color)' }}>
-              Selected Works
+              {t('Selected Works')}
             </span>
             <h2 className="font-display font-light mt-5" style={{ fontSize: 'clamp(2rem, 5vw, 3.6rem)', lineHeight: 1.08, color: 'var(--text-color)' }}>
-              {group.label}
+              {t(group.label)}
             </h2>
             <p className="font-display font-light mt-5" style={{ fontSize: 'clamp(0.95rem, 1.6vw, 1.2rem)', lineHeight: 1.6, color: 'var(--text-dim-color)', maxWidth: '46ch' }}>
-              {group.blurb}
+              {t(group.blurb)}
             </p>
             <p className="font-mono mt-6" style={{ fontSize: '0.64rem', letterSpacing: '0.18em', color: 'var(--text-dim-color)' }}>
-              {count > 0 ? `${String(count).padStart(2, '0')} ${count === 1 ? 'TRACK' : 'TRACKS'}` : ''}
+              {count > 0 ? `${String(count).padStart(2, '0')} ${count === 1 ? t('TRACK') : t('TRACKS')}` : ''}
             </p>
           </div>
 
@@ -432,13 +436,13 @@ function OverlayPanel({
                       </div>
                     </div>
                     <h3 className="font-display font-light mt-4" style={{ fontSize: 'clamp(1rem, 1.5vw, 1.25rem)', lineHeight: 1.3, color: 'var(--text-color)' }}>
-                      Untitled {group.label} Score
+                      {t('Untitled {concept} Score').replace('{concept}', t(group.label))}
                     </h3>
                     <p className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)' }}>
-                      A piece still taking shape in the composer&rsquo;s studio.
+                      {t('A piece still taking shape in the composer’s studio.')}
                     </p>
                     <span className="font-mono uppercase inline-block mt-2" style={{ fontSize: '0.55rem', letterSpacing: '0.35em', color: tint }}>
-                      In composition
+                      {t('In composition')}
                     </span>
                   </motion.article>
                 );
@@ -466,7 +470,7 @@ function OverlayPanel({
                       onClick={() => onTrackClick(t)}
                       className="block w-full text-left focus:outline-none"
                       style={{ cursor: 'pointer' }}
-                      aria-label={`${isPlaying ? 'Pause' : 'Play'} ${title}`}
+                      aria-label={`${isPlaying ? tr('Pause') : tr('Play')} ${title}`}
                     >
                       <div
                         className="relative w-full overflow-hidden"
@@ -492,7 +496,7 @@ function OverlayPanel({
                             style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0))' }}
                           >
                             <span className="font-mono" style={{ fontSize: '0.58rem', letterSpacing: '0.3em', color: 'var(--text-dim-color)' }}>
-                              {group.label.toUpperCase()}
+                              {tr(group.label).toUpperCase()}
                             </span>
                           </div>
                         )}
@@ -556,6 +560,7 @@ function ConceptOverlay({
 
 export default function WorksGallery() {
   const { tracks } = useIdentity();
+  const { t } = useT();
   const reduce = useReducedMotion() ?? false;
   const sectionRef = useRef<HTMLElement>(null);
   const [active, setActive] = useState<ConceptGroup | null>(null);
@@ -596,14 +601,14 @@ export default function WorksGallery() {
       id="works"
       className="relative w-full living-veil overflow-hidden"
       style={{ color: 'var(--text-color)', padding: 'clamp(5rem, 12vw, 9rem) 0' }}
-      aria-label="Works by concept"
+      aria-label={t('Works by concept')}
     >
       <div className="mb-12 md:mb-16" style={{ padding: '0 clamp(1.5rem, 6vw, 7rem)' }}>
         <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.4em', color: 'var(--accent-color)' }}>
-          Section 03 — Selected Works
+          {t('Section 03 — Selected Works')}
         </span>
         <h2 className="font-display font-light mt-5" style={{ fontSize: 'clamp(1.6rem, 3.4vw, 2.6rem)', lineHeight: 1.2, color: 'var(--text-color)' }}>
-          Play a concept.
+          {t('Play a concept.')}
         </h2>
       </div>
 
@@ -625,10 +630,11 @@ export default function WorksGallery() {
       </div>
 
       <p className="font-mono mt-14" style={{ fontSize: '0.66rem', letterSpacing: '0.15em', color: 'var(--text-dim-color)', padding: '0 clamp(1.5rem, 6vw, 7rem)' }}>
-        SELECT A KEY TO OPEN ITS WORKS — OR KEEP SCROLLING
+        {t('SELECT A KEY TO OPEN ITS WORKS — OR KEEP SCROLLING')}
       </p>
 
       <ConceptOverlay group={active} onClose={handleClose} reduce={reduce} />
     </section>
   );
 }
+

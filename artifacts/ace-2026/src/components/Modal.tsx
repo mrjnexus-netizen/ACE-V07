@@ -1,8 +1,9 @@
-﻿import { useEffect, useRef, ReactNode } from 'react';
+import { useEffect, useRef, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { Button } from './Button';
+import { useT } from '../context/TranslationContext';
 
 interface ModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const Modal = ({
   closeOnOverlayClick = true,
 }: ModalProps) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const { t } = useT();
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -92,7 +94,7 @@ export const Modal = ({
                   <button
                     onClick={onClose}
                     className="text-text-muted hover:text-text-color transition"
-                    aria-label="Close"
+                    aria-label={t('Close')}
                   >
                     ✕
                   </button>
@@ -112,3 +114,4 @@ export const Modal = ({
     document.body
   );
 };
+

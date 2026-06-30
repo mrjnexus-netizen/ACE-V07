@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { apiPost } from '../lib/apiClient';
+import { useT } from '../context/TranslationContext';
 
 interface ChatMessage {
   role: 'bot' | 'user';
@@ -48,6 +49,7 @@ export default function ExecutiveStudioBot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const safeLocale = locale ?? 'en';
+  const { t } = useT();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -64,7 +66,7 @@ export default function ExecutiveStudioBot() {
       setInput('');
       setIsLoading(true);
       try {
-        const data = await apiPost<ChatApiResponse | null>('/api/chat', { message: text, history });
+        const data = await apiPost<ChatApiResponse | null>('/api/chat', { message: text, history, locale: safeLocale });
         const reply = data?.reply?.trim();
         setMessages((prev) => [
           ...prev,
@@ -85,7 +87,7 @@ export default function ExecutiveStudioBot() {
         setIsLoading(false);
       }
     },
-    [isLoading, messages],
+    [isLoading, messages, safeLocale],
   );
 
   // --- Persist a completed brief: POST /api/briefs (no key required) ---
@@ -179,7 +181,7 @@ export default function ExecutiveStudioBot() {
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-24 right-6 w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-lg z-50 hover:scale-105 active:scale-95 transition-all"
         style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}
-        aria-label="Studio Bot"
+        aria-label={t('Studio Bot')}
       >
         {'\uD83D\uDCAC'}
       </button>
@@ -199,10 +201,10 @@ export default function ExecutiveStudioBot() {
             }}
           >
             <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--border-color)' }}>
-              <span className="font-mono text-sm" style={{ color: 'var(--text-color)' }}>Studio Bot</span>
+              <span className="font-mono text-sm" style={{ color: 'var(--text-color)' }}>{t('Studio Bot')}</span>
               <button
                 onClick={() => setIsOpen(false)}
-                aria-label="Close"
+                aria-label={t('Close')}
                 className="text-[var(--text-muted-color)] hover:text-[var(--accent-color)]"
               >
                 {'\u2715'}
@@ -219,7 +221,7 @@ export default function ExecutiveStudioBot() {
                         : { backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)' }
                     }
                   >
-                    <p>{msg.text}</p>
+                    <p>{msg.role === 'bot' ? t(msg.text) : msg.text}</p>
                     {msg.trackId && (
                       <button
                         onClick={() => {
@@ -229,7 +231,7 @@ export default function ExecutiveStudioBot() {
                         className="mt-2 text-xs underline"
                         style={{ color: 'var(--accent-color)' }}
                       >
-                        {'\u25B6 Play Track'}
+                        {'\u25B6 ' + t('Play Track')}
                       </button>
                     )}
                     <span className="block text-[10px] mt-1 opacity-50">
@@ -254,7 +256,7 @@ export default function ExecutiveStudioBot() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type a message..."
+                placeholder={t('Type a message...')}
                 className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
                 style={{ backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
                 disabled={isLoading}
@@ -265,7 +267,7 @@ export default function ExecutiveStudioBot() {
                 className="px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40"
                 style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}
               >
-                Send
+                {t('Send')}
               </button>
             </form>
           </motion.div>

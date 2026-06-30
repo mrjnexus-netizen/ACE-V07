@@ -1,10 +1,12 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useIdentity } from '../context/IdentityContext';
 import { useAdmin } from '../context/AdminContext';
+import { useT } from '../context/TranslationContext';
 
 export const Footer = () => {
   const { composerIdentity } = useIdentity();
   const { openAdmin } = useAdmin();
+  const { t } = useT();
   const [tapCount, setTapCount] = useState(0);
   const [lastTap, setLastTap] = useState(0);
 
@@ -34,12 +36,12 @@ export const Footer = () => {
           <div
             onClick={handleTripleTap}
             className="text-2xl font-display tracking-wider text-accent cursor-pointer select-none"
-            aria-label="ACE logo (triple tap for admin)"
+            aria-label={t('ACE logo (triple tap for admin)')}
           >
             ACE
           </div>
           <div className="text-xs text-text-muted">
-            © {new Date().getFullYear()} ACE-2026. All rights reserved.
+            © {new Date().getFullYear()} ACE-2026. {t('All rights reserved.')}
           </div>
           {socialLinks && (
             <div className="flex space-x-4">

@@ -2,6 +2,7 @@ import { useRef, useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
+import { useT } from '../context/TranslationContext';
 import type { AudioTrack } from '../types';
 
 // Short, editable blurbs per genre (lowercased key).
@@ -37,6 +38,7 @@ const ROTATE_MS = 3000;
 export default function ComposerPresence() {
   const { identity, tracks, locale } = useIdentity();
   const { playTrack } = useAudio();
+  const { t } = useT();
   const reduce = useReducedMotion() ?? false;
   const sectionRef = useRef<HTMLElement>(null);
   const inView = useInView(sectionRef, { amount: 0.5 });
@@ -70,12 +72,12 @@ export default function ComposerPresence() {
 
   const nameMap = (identity?.name ?? null) as unknown as Record<string, string> | null;
   const composerName =
-    (nameMap && nameMap[locale ?? 'en']) || (nameMap && nameMap.en) || 'ACE Composer';
+    (nameMap && nameMap[locale ?? 'en']) || (nameMap && nameMap.en) || t('ACE Composer');
 
   if (groups.length === 0) {
     return (
-      <section ref={sectionRef} className="relative w-full min-h-[70vh] flex flex-col items-center justify-center overflow-hidden living-veil" aria-label="The composer">
-        <span className="font-mono uppercase" style={{ fontSize: '0.66rem', letterSpacing: '0.34em', color: 'var(--accent-color)' }}>The Composer</span>
+      <section ref={sectionRef} className="relative w-full min-h-[70vh] flex flex-col items-center justify-center overflow-hidden living-veil" aria-label={t('The composer')}>
+        <span className="font-mono uppercase" style={{ fontSize: '0.66rem', letterSpacing: '0.34em', color: 'var(--accent-color)' }}>{t('The Composer')}</span>
         <h2 className="font-display text-center mt-6" style={{ fontSize: 'clamp(2.5rem, 9vw, 8rem)', lineHeight: 0.95, color: 'var(--text-dim-color)' }}>{composerName}</h2>
       </section>
     );
@@ -88,7 +90,7 @@ export default function ComposerPresence() {
       ref={sectionRef}
       className="relative w-full overflow-hidden living-veil"
       style={{ padding: 'clamp(6rem, 14vw, 12rem) 0', minHeight: '100vh' }}
-      aria-label="The composer"
+      aria-label={t('The composer')}
     >
       {/* Heading — centred, generous breathing room above the band */}
       <div
@@ -96,13 +98,13 @@ export default function ComposerPresence() {
         style={{ padding: '0 clamp(1.5rem, 8vw, 9rem)', marginBottom: 'clamp(4rem, 9vw, 7rem)' }}
       >
         <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.45em', color: 'var(--accent-color)' }}>
-          The Composer
+          {t('The Composer')}
         </span>
         <h2
           className="font-display font-light mt-6"
           style={{ fontSize: 'clamp(1.4rem, 2.8vw, 2.4rem)', lineHeight: 1.3, color: 'var(--text-color)', maxWidth: '24ch' }}
         >
-          The worlds {composerName.split(' ')[0]} scores for.
+          {t('The worlds {name} scores for.').replace('{name}', composerName.split(' ')[0] ?? '')}
         </h2>
       </div>
 
@@ -157,13 +159,13 @@ export default function ComposerPresence() {
                   className="font-display font-light mt-3 text-white capitalize"
                   style={{ fontSize: 'clamp(2rem, 5.5vw, 4.5rem)', lineHeight: 1 }}
                 >
-                  {current.genre}
+                  {t(current.genre)}
                 </h3>
                 <p className="font-light mt-4 text-white/75" style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.05rem)', lineHeight: 1.55, maxWidth: '46ch' }}>
-                  {blurbFor(current.genre)}
+                  {t(blurbFor(current.genre))}
                 </p>
                 <span className="inline-block font-mono mt-5 text-white/50" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>
-                  {String(current.tracks.length).padStart(2, '0')} {current.tracks.length === 1 ? 'work' : 'works'}
+                  {String(current.tracks.length).padStart(2, '0')} {current.tracks.length === 1 ? t('work') : t('works')}
                 </span>
               </div>
             </div>
@@ -177,7 +179,7 @@ export default function ComposerPresence() {
           <button
             key={g.genre}
             type="button"
-            aria-label={`Show ${g.genre}`}
+            aria-label={`${t('Show')} ${g.genre}`}
             onClick={() => setActive(i)}
             className="rounded-full transition-all duration-500"
             style={{
@@ -191,3 +193,4 @@ export default function ComposerPresence() {
     </section>
   );
 }
+

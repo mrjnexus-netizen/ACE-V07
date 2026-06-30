@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useT } from '../context/TranslationContext';
 
 /**
  * WelcomeGate — a luxurious cinematic entry curtain shown before the language
@@ -11,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  */
 
 const WelcomeGate = ({ onEnter }: { onEnter: () => void }) => {
+  const { t } = useT();
   const [leaving, setLeaving] = useState(false);
 
   const handleEnter = () => {
@@ -49,7 +51,7 @@ const WelcomeGate = ({ onEnter }: { onEnter: () => void }) => {
               lineHeight: 1.3,
             }}
           >
-            Step into the sound of Amir Moslehi
+            {t('Step into the sound of Amir Moslehi')}
           </motion.div>
 
           {/* Minimal gold Enter control */}
@@ -67,7 +69,7 @@ const WelcomeGate = ({ onEnter }: { onEnter: () => void }) => {
               border: 'none',
               cursor: 'pointer',
             }}
-            aria-label="Enter"
+            aria-label={t('Enter')}
           >
             {/* thin pulsing ring */}
             <motion.span
@@ -88,7 +90,7 @@ const WelcomeGate = ({ onEnter }: { onEnter: () => void }) => {
                 color: 'rgba(247,238,200,0.95)',
               }}
             >
-              Enter
+              {t('Enter')}
             </span>
           </motion.button>
         </motion.div>
@@ -98,3 +100,4 @@ const WelcomeGate = ({ onEnter }: { onEnter: () => void }) => {
 };
 
 export default WelcomeGate;
+
