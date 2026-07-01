@@ -598,6 +598,47 @@ const HeadstockSelector = ({
   );
 };
 
+// The vertical composer name, set in the calm gap between the composer photo
+// (left) and the guitar neck (right). Champagne-gold serif, letter-by-letter
+// rise-in, quiet hairline + diamond node. Fixed gold (language not chosen yet).
+const PortalSignature = ({ dimmed }: { dimmed: boolean }) => {
+  return (
+    <div
+      aria-hidden="true"
+      className="wg-sig-wrap"
+      style={{
+        zIndex: 5,
+        paddingLeft: '54%',
+        opacity: dimmed ? 0 : 1,
+        transition: 'opacity 0.9s ease',
+      }}
+    >
+      <div className="wg-sig-col" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.1vh' }}>
+        {/* top hairline */}
+        <span className="wg-sig-rule" style={{ animationDelay: '0.2s' }} />
+        {/* AMIR */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {'AMIR'.split('').map((ch, ci) => (
+            <span key={`a-${ci}`} className="wg-sig-ch" style={{ animationDelay: `${1.2 + ci * 0.11}s` }}>{ch}</span>
+          ))}
+        </div>
+        {/* centered diamond node between the two words */}
+        <span className="wg-sig-diamond" style={{ animationDelay: '1.7s' }} />
+        {/* MOSLEHI */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {'MOSLEHI'.split('').map((ch, ci) => (
+            <span key={`m-${ci}`} className="wg-sig-ch" style={{ animationDelay: `${1.7 + ci * 0.11}s` }}>{ch}</span>
+          ))}
+        </div>
+        {/* bottom hairline */}
+        <span className="wg-sig-rule" style={{ animationDelay: '2.6s' }} />
+        {/* subtitle */}
+        <span className="wg-sig-sub" style={{ animationDelay: '2.9s' }}>THE COMPOSER</span>
+      </div>
+    </div>
+  );
+};
+
 export const LinguisticPortal = () => {
   const { setLocale } = useIdentity();
   const { applyLanguageWorld } = useChromatic();
@@ -778,7 +819,7 @@ export const LinguisticPortal = () => {
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 bg-black overflow-hidden">
-      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'); @keyframes labelFadeIn { from { opacity: 0; } to { opacity: 1; } } }" }} />
+      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'); @keyframes labelFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes wgSigRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } } @keyframes wgSigRule { from { opacity: 0; transform: scaleX(0.2); } to { opacity: 0.6; transform: scaleX(1); } } @keyframes wgSigDot { from { opacity: 0; transform: rotate(45deg) scale(0.2); } to { opacity: 0.65; transform: rotate(45deg) scale(1); } } @keyframes wgSigShimmer { 0% { background-position: 0% 0%; } 100% { background-position: 0% 200%; } } .wg-sig-wrap { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: flex-start; } .wg-sig-ch { display: flex; align-items: center; justify-content: center; width: clamp(2.2rem, 6vh, 3.4rem); height: clamp(2.3rem, 6.4vh, 3.6rem); font-family: 'Cinzel','Cormorant Garamond',Didot,Georgia,serif; font-weight: 500; font-style: normal; font-size: clamp(1.7rem, 4.6vh, 2.9rem); line-height: 1; letter-spacing: 0; text-align: center; color: #F1DFA6; background: linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%); background-size: 100% 200%; background-position: 0% 0%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 22px rgba(233,200,121,0.5)) drop-shadow(0 0 40px rgba(217,180,94,0.28)) drop-shadow(0 1px 3px rgba(0,0,0,0.55)); opacity: 0; animation: wgSigRise 1.2s cubic-bezier(0.22,1,0.36,1) both, wgSigShimmer 6.5s ease-in-out infinite; } .wg-sig-rule { display: block; width: 1px; height: clamp(14px,2.4vh,26px); background: linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%); opacity: 0; animation: wgSigRule 1.3s ease both; } .wg-sig-diamond { display: block; width: 6px; height: 6px; margin: 0.9vh 0; background: linear-gradient(135deg,#FBF0CC,#D9B45E); box-shadow: 0 0 10px rgba(233,200,121,0.6); opacity: 0; animation: wgSigDot 1s ease both; } .wg-sig-sub { margin-top: 1.1vh; font-family: 'Cinzel','Cormorant Garamond',Georgia,serif; font-weight: 400; font-size: clamp(0.5rem, 1.15vh, 0.72rem); letter-spacing: 0.42em; padding-left: 0.42em; color: #C9AC6A; text-shadow: 0 0 10px rgba(201,172,106,0.4); opacity: 0; animation: wgSigRise 1.2s ease both; } @media (max-width: 767px) { .wg-sig-wrap { display: none; } } @media (prefers-reduced-motion: reduce) { .wg-sig-ch, .wg-sig-rule, .wg-sig-diamond, .wg-sig-sub { animation: none; opacity: 1; } .wg-sig-rule { opacity: 0.6; } .wg-sig-diamond { opacity: 0.65; transform: rotate(45deg); } }" }} />
 
       {/* The living starfield is always present — it backs both the welcome
           gate and the language portal so the transition feels continuous. */}
@@ -798,6 +839,9 @@ export const LinguisticPortal = () => {
         }}
       >
       <PortalComposer />
+
+      {/* Vertical composer signature in the gap between photo and guitar. */}
+      <PortalSignature dimmed={!!selectedLang} />
 
       {/* The ornate NECK continuing below the headstock — fills the space down
           toward the galaxy. Same viewBox + slice as the headstock so it tracks

@@ -37,7 +37,7 @@ const vertexShader = /* glsl */ `
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
-    float size = aScale * (1.0 + uPulse * 1.2) * 70.0 / -mv.z;
+    float size = aScale * (1.0 + uPulse * 1.0) * 70.0 / -mv.z;
     gl_PointSize = clamp(size, 0.6, 5.0);
     vGlow = uPulse;
   }
@@ -53,7 +53,7 @@ const fragmentShader = /* glsl */ `
     float core = 1.0 - smoothstep(0.0, 0.14, d);
     float halo = 1.0 - smoothstep(0.0, 0.5, d);
     float intensity = core * 1.0 + halo * 0.55;
-    vec3 col = mix(uColor, vec3(1.0), core * (0.2 + clamp(vGlow, 0.0, 1.0) * 0.5));
+    vec3 col = mix(uColor, vec3(1.0), core * (0.25 + clamp(vGlow, 0.0, 1.0) * 0.75));
     gl_FragColor = vec4(col, intensity * uOpacity);
   }
 `;
@@ -161,9 +161,15 @@ const Orb = () => {
       b[i * 3 + 1] = R * Math.sin(ph) * Math.sin(th);
       b[i * 3 + 2] = R * Math.cos(ph);
       sc[i] = 0.5 + Math.random() * 0.8;
-      // 7 smooth sensitivity tiers → richer, softer, more cinematic layering
-      const tier = Math.floor(Math.random() * 7); // 0..6
-      se[i] = 0.2 + (tier / 6) * 0.9; // 0.2 .. 1.1 across seven steps
+      // Weighted sensitivity tiers → layered internal "entropy": most grains
+      // dance strongly, a diminishing minority move less, giving the cloud depth.
+      const rr = Math.random();
+      let s: number;
+      if (rr < 0.40) s = 1.0;         // 40% — high sensitivity
+      else if (rr < 0.70) s = 0.72;   // 30% — a step lower
+      else if (rr < 0.90) s = 0.48;   // 20% — lower still
+      else s = 0.28;                  // 10% — quietest
+      se[i] = s + (Math.random() - 0.5) * 0.06; // tiny spread so tiers don't band
     }
     return { base: b, scales: sc, sens: se };
   }, [COUNT]);
@@ -183,7 +189,7 @@ const Orb = () => {
 
   const ringColor = useMemo(() => new THREE.Color(readAccentColor() || paletteFor(genreToIndex(genreRef.current))), []);
   const targetColor = useMemo(() => new THREE.Color(), []);
-  const env = useRef({ pulse: 0, avg: 0, mx: 0, my: 0 });
+  const env = useRef({ pulse: 0, avg: 0, loud: 0, mx: 0, my: 0 });
 
   useFrame((three, delta) => {
     const pts = pointsRef.current;
@@ -195,23 +201,23 @@ const Orb = () => {
     const dt = Math.min(delta, 0.05);
     u.uTime.value = t;
 
-    const playing = playingRef.current;
     const a = audioRef.current;
-    // Instantaneous loudness across the whole spectrum.
-    const loud = playing ? a.bass * 0.5 + a.mid * 1.0 + a.high * 0.9 : 0;
-    const mid = playing ? Math.min(1, a.mid * 1.6) : 0;
+    // React across the whole spectrum now — low notes AND mid-to-high — but keep
+    // the two smoothing passes so sharp transients only ever RAISE the swell
+    // target smoothly; they can never snap the motion (that stays slow below).
+    const rawLoud = a.bass * 0.85 + a.mid * 0.65 + a.high * 0.45;
     const motion = reduced ? 0.25 : 1;
 
     const e = env.current;
     // Keep a slow running average. The PULSE is how far the instantaneous
     // loudness rises ABOVE that average — so every note pops and it falls back
     // to ~0 between notes even when the overall level stays high.
-    e.avg += (loud - e.avg) * 0.12;
-    const over = loud - e.avg;
-    // Strong, sensitive response to every note; both rises AND dips drive it.
-    const target = Math.min(1, Math.abs(over) * 9.0 + loud * 0.25);
-    // Responsive attack so it dances, eased release so it's not jittery.
-    e.pulse += (target - e.pulse) * (target > e.pulse ? 0.6 : 0.18);
+    // First smoothing pass: ease the raw loudness itself (kills the jumpiness).
+    e.loud += (rawLoud - e.loud) * 0.045;
+    const target = Math.min(1, e.loud * 1.4);
+    // Second pass: smooth the swell ENVELOPE so its size changes gradually
+    // (no per-note flicker) — the actual in/out travel speed is set by `flow`.
+    e.pulse += (target - e.pulse) * 0.028;
     u.uPulse.value = e.pulse;
 
     // ease cursor
@@ -223,38 +229,41 @@ const Orb = () => {
     const cyWorld = cursor.y * 2.2;
 
     const arr = live;
-    const pulseScale = 1 + e.pulse * 0.16; // swell stays inside the rings
-    const waveAmt = (reduced ? 0.02 : 0.06) + e.pulse * 0.14;
-    const wob = t * (reduced ? 0.3 : 1.1); // lively
+    // ── Breathing: a slow, deep swell that rises and settles along each
+    // particle's own outward direction. A gentle position-based phase means the
+    // swell isn't a hard synchronized pump — it eases across the sphere like a
+    // chest rising — but it stays RADIAL (in/out), never sideways jitter. Audio
+    // deepens the inhale. This is the 'nabs-e tanafosi'.
+    const flow = t * (reduced ? 0.5 : 0.75);                      // visible but calm (~8s breath)
+    // resting swing is small (quiet → stays central, never hits the extremes);
+    // music opens it up so the in/out clearly TOUCHES max (out) and min (in).
+    const breathAmp = (reduced ? 0.03 : 0.05) + e.pulse * 0.38;
 
     for (let i = 0; i < COUNT; i++) {
       const ix = i * 3;
       const bx = base[ix]!;
       const by = base[ix + 1]!;
       const bz = base[ix + 2]!;
-      const sv = sens[i]!; // this particle's audio sensitivity (0.3 / 0.5 / 1.0)
+      const sv = sens[i]!; // per-particle audio sensitivity
 
-      // radial breathing (whole-orb swell), scaled by this particle's sensitivity
-      const wv =
-        Math.sin(wob + bx * 1.4 + by * 1.1) *
-        Math.cos(wob * 0.8 + bz * 1.2) *
-        waveAmt * sv;
-      const s = 1 + (pulseScale - 1) * sv + wv;
+      // A dominant shared breath (clear travel to max/min) with a lighter
+      // per-particle offset so it reads as living dust, not a rigid balloon.
+      // Still purely RADIAL below — organic, but no sideways jitter.
+      const phase = bx * 0.55 + by * 0.5 + bz * 0.75;
+      const breath =
+        Math.sin(flow + phase) * 0.72 +
+        Math.sin(flow * 0.85 - phase * 1.25 + 1.5) * 0.28;
 
-      let x = bx * s;
-      let y = by * s;
-      let z = bz * s;
+      // pure radial swell — particles move only out/in along their own ray
+      const radial = 1 + breath * breathAmp * (0.35 + sv * 0.65);
+      let x = bx * radial;
+      let y = by * radial;
+      let z = bz * radial;
 
-      // per-particle dance, also scaled by sensitivity → layered, cinematic motion
-      const danceAmt = (0.03 + e.pulse * 0.32 * sv) * motion;
-      x += Math.sin(wob * 0.8 + bx * 2.0 + by * 1.3) * danceAmt;
-      y += Math.cos(wob * 0.7 + by * 2.0 + bz * 1.3) * danceAmt;
-      z += Math.sin(wob * 0.9 + bz * 2.0 + bx * 1.3) * danceAmt;
-
-      // particles lean toward the cursor (stronger near the front, z>0)
-      const lean = (0.18 + mid * 0.25) * motion * (0.5 + (bz + R) / (2 * R) * 0.5);
-      x += (cxWorld - x) * lean * dt * 2.0;
-      y += (cyWorld - y) * lean * dt * 2.0;
+      // gentle lean toward the cursor (front particles respond a little more)
+      const lean = (0.12 + e.pulse * 0.18) * motion * (0.5 + (bz + R) / (2 * R) * 0.5);
+      x += (cxWorld - x) * lean * dt * 1.6;
+      y += (cyWorld - y) * lean * dt * 1.6;
 
       arr[ix] = x;
       arr[ix + 1] = y;
@@ -275,7 +284,7 @@ const Orb = () => {
     }
     u.uColor.value.lerp(targetColor, 0.08);
     ringColor.lerp(targetColor, 0.08);
-    u.uOpacity.value = (light ? 0.62 : 0.55) + e.pulse * 0.4;
+    u.uOpacity.value = (light ? 0.6 : 0.5) + e.pulse * 0.55;
 
     // group: very slow living orientation (no fast spin)
     const g = groupRef.current;

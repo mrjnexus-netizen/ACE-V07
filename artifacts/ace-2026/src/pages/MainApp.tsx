@@ -3,6 +3,7 @@ import { useIdentity } from '../context/IdentityContext';
 import { useChromatic } from '../context/ChromaticContext';
 import { useSmoothScroll } from '../hooks/useSmoothScroll';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import BackgroundMusic from '../components/BackgroundMusic';
 
 // Lazy-loaded components for code splitting
 const LivingScore = lazy(() => import('../components/LivingScore'));
@@ -48,6 +49,9 @@ export default function MainApp() {
           <LivingScore />
         </Suspense>
       </ErrorBoundary>
+
+      {/* Per-language ambient bed (orb dances to it; ducks under site audio) */}
+      <BackgroundMusic />
 
       {/* Foreground content sits above the 3D layer */}
       <div className="relative" style={{ zIndex: 1 }}>
