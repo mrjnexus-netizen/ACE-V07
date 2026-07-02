@@ -359,18 +359,14 @@ function OverlayPanel({
         onClick={onClose}
         aria-label={t('Close')}
         data-cursor="text"
-        className="absolute flex items-center justify-center rounded-full focus:outline-none transition-colors hover:bg-white/[0.06]"
+        className="btn btn--icon absolute"
         style={{
           zIndex: 2,
           top: 'clamp(1.25rem, 3vw, 2.25rem)',
           right: 'clamp(1.25rem, 4vw, 3rem)',
-          width: '44px',
-          height: '44px',
-          border: '1px solid var(--border-color)',
-          background: 'rgba(255,255,255,0.02)',
-          color: 'var(--text-color)',
         }}
       >
+        <span className="bloom" aria-hidden="true" />
         <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden>
           <path d="M3 3 L13 13 M13 3 L3 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         </svg>

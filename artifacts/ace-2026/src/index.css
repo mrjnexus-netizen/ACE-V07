@@ -392,3 +392,368 @@ html.lenis body { height: auto; }
   backdrop-filter: saturate(115%);
   -webkit-backdrop-filter: saturate(115%);
 }
+
+/* ============================================================
+   ACE-2026 - LUXURY-NEON BUTTON SYSTEM (v1)
+   "Buttons that breathe light." Pastel-core, saturated-neon-glow
+   language, themed entirely off --accent-color / --accent-rgb so
+   every language world re-themes every button automatically.
+   Additive only - no existing rule touched. See handoff v2 SS7.
+   ============================================================ */
+
+:root {
+  --btn-ink: #0B0B0D;
+  --btn-ease: cubic-bezier(.22,1,.36,1);
+  --btn-slow: .55s;
+}
+
+.btn, .chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  border: none;
+  background: transparent;
+}
+
+.btn .bloom,
+.chip .bloom {
+  position: absolute;
+  inset: -40%;
+  border-radius: inherit;
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.55) 0%, rgba(var(--accent-rgb), 0) 70%);
+  opacity: 0;
+  transition: opacity var(--btn-slow) var(--btn-ease);
+  pointer-events: none;
+  z-index: 0;
+}
+.btn:hover .bloom,
+.chip:hover .bloom {
+  opacity: 0.55;
+}
+
+/* 1. Primary */
+@keyframes btnBreathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.65; }
+}
+.btn--primary {
+  padding: 0.85em 1.8em;
+  border-radius: 999px;
+  color: var(--btn-ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 52%, #fff 48%), color-mix(in srgb, var(--accent-color) 76%, #fff 24%));
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.35), 0 0 42px rgba(var(--accent-rgb), 0.18);
+  transition: transform var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease);
+}
+.btn--primary .aura {
+  position: absolute;
+  inset: -18%;
+  border-radius: inherit;
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.45), transparent 70%);
+  animation: btnBreathe 4.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+.btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 26px rgba(var(--accent-rgb), 0.5), 0 0 60px rgba(var(--accent-rgb), 0.28);
+}
+.btn--primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* 2. Secondary / ghost */
+.btn--ghost {
+  padding: 0.8em 1.7em;
+  border-radius: 999px;
+  color: var(--text-color, #F4F1EA);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  transition: border-color var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease), color var(--btn-slow) var(--btn-ease), transform var(--btn-slow) var(--btn-ease);
+}
+.btn--ghost:hover {
+  border-color: rgba(var(--accent-rgb), 0.85);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.3), inset 0 0 10px rgba(var(--accent-rgb), 0.08);
+  color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+/* 3. Text */
+.btn--text {
+  padding: 0.3em 0.1em;
+  color: var(--text-muted-color, #9A968E);
+  background: none;
+  font-size: 0.85em;
+  letter-spacing: 0.08em;
+  overflow: visible;
+}
+.btn--text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -2px;
+  height: 1px;
+  background: var(--accent-color);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.6);
+  transition: right var(--btn-slow) var(--btn-ease);
+}
+.btn--text:hover {
+  color: var(--accent-color);
+}
+.btn--text:hover::after {
+  right: 0;
+}
+
+/* 4. Icon */
+.btn--icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  color: var(--text-color, #F4F1EA);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  transition: border-color var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease), transform var(--btn-slow) var(--btn-ease), color var(--btn-slow) var(--btn-ease);
+}
+.btn--icon:hover {
+  border-color: rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.35);
+  transform: translateY(-1px);
+  color: var(--accent-color);
+}
+
+/* 5. Media (play / pause) */
+@keyframes btnRing {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.06); }
+}
+.btn--media {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--btn-ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 52%, #fff 48%), color-mix(in srgb, var(--accent-color) 76%, #fff 24%));
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.4);
+  transition: transform var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease);
+}
+.btn--media.btn--media-sm {
+  width: 40px;
+  height: 40px;
+}
+.btn--media .ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
+  animation: btnRing 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.btn--media:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.55);
+}
+.btn--media:active {
+  transform: scale(0.97);
+}
+
+/* 6. Chip (language-selection pill) */
+.chip {
+  padding: 0.4em 1em;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--text-muted-color, #9A968E);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: border-color var(--btn-slow) var(--btn-ease), color var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease), background-color var(--btn-slow) var(--btn-ease);
+}
+.chip[data-active="true"] {
+  color: var(--accent-color);
+  border-color: rgba(var(--accent-rgb), 0.6);
+  background: rgba(var(--accent-rgb), 0.08);
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.28);
+  z-index: 1;
+}
+.chip:hover:not([data-active="true"]) {
+  color: var(--text-color, #F4F1EA);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn--primary .aura,
+  .btn--media .ring {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ============================================================
+   ACE-2026 - SITEWIDE TYPOGRAPHY LINE-WRAP QUALITY
+   Prevents dangling "widow" words on headings and uneven
+   paragraph line breaks, across ALL languages and ALL pages
+   (including future ones) since it targets the semantic tags
+   themselves rather than per-component styling. Progressive
+   enhancement - browsers without support just ignore it, no
+   layout risk. Explicit request: this must never regress.
+   ============================================================ */
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+}
+
+p, blockquote, figcaption, .text-wrap-pretty {
+  text-wrap: pretty;
+}
+
+/* For non-semantic "title" elements (e.g. a styled <span>/<div> used as a
+   heading instead of an h-tag) - apply this class explicitly. */
+.text-wrap-balance {
+  text-wrap: balance;
+}
+
+/* ============================================================
+   FOOTER SYSTEM (2026-07-02) - luxury cinematic footer.
+   Self-contained .ftr-* classes (no Tailwind dependency for
+   critical visibility). Themed off --accent-color/--accent-rgb
+   so it re-themes per language. prefers-reduced-motion honored.
+   Additive-only block.
+   ============================================================ */
+.ftr {
+  position: relative;
+  width: 100%;
+  margin-top: auto;
+  padding: 3.25rem 1.5rem 2.5rem;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.35) 100%);
+  overflow: hidden;
+}
+/* soft luminous divider that fades toward both edges (no hard line) */
+.ftr-rule {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, 82%);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--accent-rgb, 212, 175, 55), 0.05) 18%,
+    rgba(var(--accent-rgb, 212, 175, 55), 0.55) 50%,
+    rgba(var(--accent-rgb, 212, 175, 55), 0.05) 82%,
+    transparent 100%
+  );
+  box-shadow: 0 0 12px rgba(var(--accent-rgb, 212, 175, 55), 0.35);
+}
+.ftr-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  text-align: center;
+}
+/* champagne-gold signature (matches portal signature identity type) */
+.ftr-sig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.ftr-sig-name {
+  font-family: 'Cinzel', 'Noto Serif SC', 'Noto Serif JP', 'Noto Serif KR', serif;
+  font-weight: 500;
+  font-size: clamp(1.05rem, 2.4vw, 1.5rem);
+  letter-spacing: 0.42em;
+  padding-left: 0.42em;
+  background: linear-gradient(
+    100deg,
+    #8a6a26 0%, #f6e9be 22%, #e9c879 42%, #fbf0cc 58%, #d9b45e 78%, #8a6a26 100%
+  );
+  background-size: 100% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #e9c879;
+  animation: ftrSigShimmer 7s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(233, 200, 121, 0.28));
+}
+@keyframes ftrSigShimmer {
+  0%, 100% { background-position: 50% 0%; }
+  50% { background-position: 50% 200%; }
+}
+.ftr-sig-sub {
+  font-family: 'Cinzel', serif;
+  font-weight: 400;
+  font-size: clamp(0.5rem, 1.1vw, 0.66rem);
+  letter-spacing: 0.5em;
+  padding-left: 0.5em;
+  color: rgba(201, 172, 106, 0.85);
+  text-shadow: 0 0 10px rgba(var(--accent-rgb, 212, 175, 55), 0.2);
+}
+/* social icon row */
+.ftr-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+.ftr-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(var(--accent-rgb, 212, 175, 55), 0.22);
+  color: rgba(233, 224, 200, 0.72);
+  cursor: none;
+  transition: color var(--btn-slow, 0.55s) var(--btn-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    border-color var(--btn-slow, 0.55s) var(--btn-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    transform var(--btn-slow, 0.55s) var(--btn-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.ftr-icon-svg {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  transition: transform var(--btn-slow, 0.55s) var(--btn-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.ftr-icon-bloom {
+  position: absolute;
+  inset: -30%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(var(--accent-rgb, 212, 175, 55), 0.45) 0%,
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity var(--btn-slow, 0.55s) var(--btn-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  pointer-events: none;
+}
+.ftr-icon:hover {
+  color: #fff;
+  border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.7);
+  transform: translateY(-3px);
+}
+.ftr-icon:hover .ftr-icon-bloom { opacity: 0.55; }
+.ftr-icon:hover .ftr-icon-svg { transform: scale(1.08); }
+.ftr-icon:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb, 212, 175, 55), 0.8);
+  outline-offset: 3px;
+}
+/* copyright line */
+.ftr-copy {
+  font-size: clamp(0.62rem, 1.1vw, 0.72rem);
+  letter-spacing: 0.12em;
+  color: rgba(233, 224, 200, 0.38);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ftr-sig-name { animation: none; }
+  .ftr-icon, .ftr-icon-svg, .ftr-icon-bloom { transition: none; }
+}

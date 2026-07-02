@@ -53,7 +53,7 @@ export default function PersistentAudioPlayer() {
         <div className="flex-1 h-10 cursor-pointer" onClick={handleProgressClick}><WaveformRenderer /><div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--text-muted-color)' }}><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div>
         <div className="flex items-center gap-4" style={{ color: 'var(--text-color)' }}>
           <button onClick={prevTrack} className="hover:text-[var(--accent-color)]" aria-label={t('Previous track')}><Icon d={PREV} /></button>
-          <button onClick={handlePlayPause} className="w-10 h-10 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }} aria-label={isPlaying ? t('Pause') : t('Play')}><Icon d={isPlaying ? PAUSE : PLAY} size={20} /></button>
+          <button onClick={handlePlayPause} className="btn btn--media btn--media-sm" aria-label={isPlaying ? t('Pause') : t('Play')}><span className="ring" aria-hidden="true" /><span className="bloom" aria-hidden="true" /><Icon d={isPlaying ? PAUSE : PLAY} size={20} /></button>
           <button onClick={nextTrack} className="hover:text-[var(--accent-color)]" aria-label={t('Next track')}><Icon d={NEXT} /></button>
         </div>
         <div className="flex items-center gap-2" style={{ color: 'var(--text-color)' }}>
@@ -68,7 +68,7 @@ export default function PersistentAudioPlayer() {
             {!imageLoaded && <div className="w-full h-full bg-[var(--accent-color)] opacity-10" />}
           </div>
           <div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-[10px] truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}</p></div>
-          <button onClick={handlePlayPause} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }} aria-label={isPlaying ? t('Pause') : t('Play')}><Icon d={isPlaying ? PAUSE : PLAY} size={16} /></button>
+          <button onClick={handlePlayPause} className="btn btn--media btn--media-sm" aria-label={isPlaying ? t('Pause') : t('Play')}><span className="ring" aria-hidden="true" /><span className="bloom" aria-hidden="true" /><Icon d={isPlaying ? PAUSE : PLAY} size={16} /></button>
         </div>
         {mobileExpanded && (
           <div className="flex flex-col px-3 pb-2 gap-2">

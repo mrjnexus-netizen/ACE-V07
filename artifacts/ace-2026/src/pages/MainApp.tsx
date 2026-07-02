@@ -16,6 +16,7 @@ const WorksGallery = lazy(() => import('../components/WorksGallery'));
 const PersistentAudioPlayer = lazy(() => import('../components/PersistentAudioPlayer'));
 const ExecutiveStudioBot = lazy(() => import('../components/ExecutiveStudioBot'));
 const MagneticCursor = lazy(() => import('../components/MagneticCursor'));
+const Footer = lazy(() => import('../components/Footer'));
 
 function LoadingFallback() {
   return (
@@ -92,6 +93,13 @@ export default function MainApp() {
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
             <WorksGallery />
+          </Suspense>
+        </ErrorBoundary>
+
+        {/* Footer - was defined but never mounted anywhere in the app (2026-07-02 fix) */}
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <Footer />
           </Suspense>
         </ErrorBoundary>
       </div>

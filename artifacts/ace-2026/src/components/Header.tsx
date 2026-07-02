@@ -31,13 +31,10 @@ export const Header = () => {
               <button
                 key={loc.code}
                 onClick={() => setLocale(loc.code as any)}
-                className={cn(
-                  'text-xs font-mono px-2 py-1 rounded transition',
-                  locale === loc.code
-                    ? 'text-accent bg-accent/10'
-                    : 'text-text-muted hover:text-text-color'
-                )}
+                className="chip"
+                data-active={locale === loc.code}
               >
+                <span className="bloom" aria-hidden="true" />
                 {loc.label}
               </button>
             ))}
@@ -79,11 +76,10 @@ export const Header = () => {
                     setLocale(loc.code as any);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={cn(
-                    'text-xs font-mono px-2 py-1 rounded',
-                    locale === loc.code ? 'text-accent bg-accent/10' : 'text-text-muted'
-                  )}
+                  className="chip"
+                  data-active={locale === loc.code}
                 >
+                  <span className="bloom" aria-hidden="true" />
                   {loc.label}
                 </button>
               ))}
