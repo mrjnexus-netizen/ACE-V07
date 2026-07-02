@@ -679,6 +679,10 @@ export const LinguisticPortal = () => {
   const [entered, setEntered] = useState(false);
   const audioStarterRef = useRef<(() => void) | null>(null);
   const audioCleanupRef = useRef<(() => void) | null>(null);
+  // P4: lets handleLanguageSelect fade the portal ambience OUT smoothly the
+  // instant a language is chosen, instead of it being hard-cut by pause()
+  // when the component unmounts on navigation to /app.
+  const audioFadeOutRef = useRef<(() => void) | null>(null);
 
   // Track the cursor (normalized −1..1) so the galaxy can drift in 3D behind
   // the anchored instrument — gentle depth-parallax, the "alive" feel.
@@ -759,6 +763,21 @@ export const LinguisticPortal = () => {
     };
 
     audioStarterRef.current = start;
+    audioFadeOutRef.current = () => {
+      const el = audioEl;
+      if (!el) return;
+      const from = el.volume;
+      if (from <= 0.001) { el.pause(); return; }
+      const fadeStart = performance.now();
+      const dur = 900;
+      const step = () => {
+        const p = Math.min((performance.now() - fadeStart) / dur, 1);
+        el.volume = from * (1 - p);
+        if (p < 1) requestAnimationFrame(step);
+        else el.pause();
+      };
+      step();
+    };
     audioCleanupRef.current = () => {
       if (raf) cancelAnimationFrame(raf);
       audioEl?.pause();
@@ -819,6 +838,7 @@ export const LinguisticPortal = () => {
     if (selectedLang) return;
     setSelectedLang(langCode);          // drives the treble-clef transition overlay (CSS)
     playMicroTone(langCode);
+    audioFadeOutRef.current?.();        // P4: fade the portal ambience out smoothly
     applyLanguageWorld(langCode as any);
     // navigate once the clef has written itself and we've dived into its spiral
     window.setTimeout(() => {
