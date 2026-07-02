@@ -61,6 +61,35 @@ const NOTE_HZ = [
 ];
 
 let toneCtx: AudioContext | null = null;
+
+// K1 fix (2026-07-02): pre-warm the piano's AudioContext on the FIRST
+// qualifying user gesture anywhere on the page (same gesture class the
+// shared site audio engine already listens for), instead of lazily
+// constructing + resuming it on the first key hover. A freshly-constructed
+// AudioContext usually starts 'suspended', and resume() is async - that
+// gap was the perceptible delay before the first note played. Warming it
+// up ahead of time means it's already running by the time anyone reaches
+// the piano section.
+let toneCtxWarmed = false;
+function warmToneCtx() {
+  if (toneCtxWarmed || typeof window === 'undefined') return;
+  toneCtxWarmed = true;
+  try {
+    if (!toneCtx) {
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      toneCtx = new Ctor();
+    }
+    if (toneCtx.state === 'suspended') void toneCtx.resume();
+  } catch {
+    /* non-essential */
+  }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('click', warmToneCtx, { passive: true, once: true });
+  window.addEventListener('touchstart', warmToneCtx, { passive: true, once: true });
+  window.addEventListener('keydown', warmToneCtx, { once: true });
+}
+
 function playNote(freq: number) {
   try {
     if (!toneCtx) {
