@@ -512,6 +512,17 @@ const HeadstockSelector = ({
           bottom edges (which meet empty space) fade most; the crystal pegs in
           the center/right stay fully crisp. */}
       <defs>
+        {/* P2: shared champagne-gold gradient for language labels in their
+            neutral (non-hovered, non-selected) state — matches the vertical
+            AMIR MOSLEHI signature's gradient stops exactly (§4.2-4). */}
+        <linearGradient id="hsLabelGold" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#8A6A26" />
+          <stop offset="22%" stopColor="#F6E9BE" />
+          <stop offset="42%" stopColor="#E9C879" />
+          <stop offset="58%" stopColor="#FBF0CC" />
+          <stop offset="78%" stopColor="#D9B45E" />
+          <stop offset="100%" stopColor="#8A6A26" />
+        </linearGradient>
         <filter id="hsFeather" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="2.2" />
         </filter>
@@ -577,11 +588,11 @@ const HeadstockSelector = ({
             <text
               x={labelX} y={y + 0.85} textAnchor="start"
               fontSize={active ? 2.85 : 2.45} letterSpacing={active ? 0.62 : 0.46}
-              fill={active ? pastel : 'rgba(255,255,255,0.62)'}
+              fill={active ? pastel : 'url(#hsLabelGold)'}
               style={{
-                fontFamily: "'Cormorant Garamond', 'Didot', Georgia, serif",
+                fontFamily: "'Cinzel', 'Noto Serif SC', 'Noto Serif JP', 'Noto Serif KR', serif",
                 fontWeight: active ? 600 : 500,
-                fontStyle: (l.code === 'zh' || l.code === 'ja' || l.code === 'ko') ? 'normal' : 'italic',
+                fontStyle: 'normal',
                 textShadow: active ? `0 0 5px ${LANGUAGE_MESH[l.code]}` : 'none',
                 transition: 'fill 0.4s ease, font-size 0.4s ease, letter-spacing 0.4s ease',
               }}
