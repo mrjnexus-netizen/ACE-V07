@@ -43,7 +43,7 @@ const WG_STYLES = `
 .wg-sign{
   position:relative;display:inline-block;
   clip-path:polygon(-60% -40%, 10% -40%, -54% 140%, -60% 140%);
-  animation:wgSign 5200ms cubic-bezier(.5,.08,.35,1) 1150ms forwards;
+  animation:wgSign 3400ms cubic-bezier(.5,.08,.35,1) 900ms forwards;
 }
 @keyframes wgSign{ to{ clip-path:polygon(-60% -40%, 154% -40%, 90% 140%, -60% 140%) } }
 
@@ -58,18 +58,18 @@ const WG_STYLES = `
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 1px 1px rgba(0,0,0,.5)) drop-shadow(0 0 9px rgba(220,223,227,.13));
   display:inline-block;
-  animation:wgShimmer 7s ease-in-out 6350ms infinite;
+  animation:wgShimmer 7s ease-in-out 4300ms infinite;
 }
 @keyframes wgShimmer{ 0%,100%{background-position:20% 0} 50%{background-position:80% 0} }
 
 /* gold hairline node */
 .wg-rule{
   display:flex;align-items:center;justify-content:center;gap:14px;margin-top:26px;opacity:0;
-  animation:wgFadeUp 1.1s cubic-bezier(.22,1,.36,1) 6500ms forwards;
+  animation:wgFadeUp 1.1s cubic-bezier(.22,1,.36,1) 4450ms forwards;
 }
 .wg-rule i{
   height:1px;width:0;background:linear-gradient(90deg,transparent,rgba(200,162,76,.7));
-  animation:wgRuleGrow 1.1s cubic-bezier(.22,1,.36,1) 6500ms forwards;
+  animation:wgRuleGrow 1.1s cubic-bezier(.22,1,.36,1) 4450ms forwards;
 }
 .wg-rule i:last-child{ background:linear-gradient(90deg,rgba(200,162,76,.7),transparent) }
 .wg-rule span{
@@ -79,7 +79,7 @@ const WG_STYLES = `
 @keyframes wgRuleGrow{ to{ width:clamp(70px,16vw,150px) } }
 
 /* enter */
-.wg-enter{ margin-top:52px;opacity:0;animation:wgFadeUp 1.1s cubic-bezier(.22,1,.36,1) 6850ms forwards }
+.wg-enter{ margin-top:52px;opacity:0;animation:wgFadeUp 1.1s cubic-bezier(.22,1,.36,1) 4650ms forwards }
 .wg-btn{
   position:relative;isolation:isolate;
   padding:15px 46px;border-radius:999px;
