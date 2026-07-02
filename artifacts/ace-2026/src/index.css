@@ -757,3 +757,21 @@ p, blockquote, figcaption, .text-wrap-pretty {
   .ftr-sig-name { animation: none; }
   .ftr-icon, .ftr-icon-svg, .ftr-icon-bloom { transition: none; }
 }
+
+/* ============================================================
+   G1 FIX (2026-07-02) - kill the native OS cursor everywhere,
+   permanently. Several existing rules (button{cursor:pointer},
+   .btn/.chip{cursor:pointer}, per-component inline cursor:pointer
+   styles, and any Tailwind cursor-pointer utility) were overriding
+   the inherited body{cursor:none} rule above on every interactive
+   element - which is why the native pointer kept reappearing on
+   buttons/links across the whole site. This !important rule wins
+   the cascade over all of them without editing every source file.
+   Scoped to fine-pointer (desktop/trackpad) devices only, so touch
+   devices keep their native tap behaviour untouched. Additive-only.
+   ============================================================ */
+@media (pointer: fine) {
+  *, *::before, *::after {
+    cursor: none !important;
+  }
+}
