@@ -67,7 +67,7 @@ const PortalComposer = () => {
         transition={{ duration: 2.4, ease: 'easeOut' }}
       >
         <div className="absolute inset-0 flex items-center justify-start">
-          <div style={{ position: 'relative', marginLeft: '1vw' }}>
+          <div style={{ position: 'relative', marginLeft: '16px' }}>
             <motion.img
               src="/composer.png"
               alt=""
@@ -75,7 +75,18 @@ const PortalComposer = () => {
               className="max-w-none select-none"
               style={{
                 display: 'block',
-                width: 'min(120vh, 140vw)',
+                // 2026-07-02: was `min(120vh, 140vw)` - vh/vw units are ALWAYS
+                // relative to the real browser viewport, never to a
+                // transform-scaled ancestor (ScaleStage). That meant this
+                // photo didn't shrink along with the rest of the composition
+                // at smaller window sizes, so its right-edge fade mask ended
+                // up misaligned with the (correctly-scaled) guitar next to
+                // it - visible as a hard vertical seam. Fixed size in px,
+                // computed against the SAME 1600x900 logical canvas
+                // ScaleStage uses (min(900*1.2, 1600*1.4) = 1080px), so it
+                // scales together with everything else via the one shared
+                // transform instead of drifting independently.
+                width: '1080px',
                 opacity: 0.82,
                 willChange: 'transform',
                 filter: CINEMA_FILTER,

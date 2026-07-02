@@ -7,6 +7,7 @@ import PortalCursor from './PortalCursor';
 import PortalComposer from './PortalComposer';
 import LiquidSeam, { type SeamPin } from './LiquidSeam';
 import WelcomeGate from './WelcomeGate';
+import ScaleStage from './ScaleStage';
 
 const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'ENGLISH' },
@@ -523,8 +524,14 @@ const HeadstockSelector = ({
           <stop offset="78%" stopColor="#D9B45E" />
           <stop offset="100%" stopColor="#8A6A26" />
         </linearGradient>
+        {/* 2026-07-02: stdDeviation bumped 2.2->3.2. ScaleStage now crops this
+            SVG against a FIXED 16:9 logical canvas instead of the real
+            (variable-aspect) browser viewport, which can expose a sliver of
+            this mask's edge that used to always sit safely off-frame. A
+            slightly wider blur lets any such sliver dissolve completely
+            rather than leaving a faint ring/edge visible. */}
         <filter id="hsFeather" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="2.2" />
+          <feGaussianBlur stdDeviation="3.2" />
         </filter>
         <mask id="hsMask" maskUnits="userSpaceOnUse"
               x={IMG_X - 8} y={IMG_Y - 8} width={IMG_W + 16} height={IMG_H + 16}>
@@ -869,66 +876,91 @@ export const LinguisticPortal = () => {
           pointerEvents: entered ? 'auto' : 'none',
         }}
       >
-      <PortalComposer />
-
-      {/* Vertical composer signature in the gap between photo and guitar. */}
+      {/* Vertical composer signature in the gap between photo and guitar.
+          Stays OUTSIDE ScaleStage: its own vh-based clamp() sizing already
+          locks it correctly at every viewport height (shipped + approved
+          separately - see MEGA_MASTER §4.2-4), so it doesn't need or want
+          the scale-transform treatment applied to the guitar/photo below. */}
       <PortalSignature dimmed={!!selectedLang} />
 
-      {/* The ornate NECK continuing below the headstock — fills the space down
-          toward the galaxy. Same viewBox + slice as the headstock so it tracks
-          it under every viewport; sits behind the silk strings; its top tucks
-          under the headstock and its bottom melts into the stars. */}
+      {/* G4/P1 locked composition (2026-07-02): the composer photo, guitar
+          neck, silk strings, hover glow and headstock+language-labels are
+          all SVG-geometry or percentage-based, so they scale correctly as
+          one unit inside ScaleStage's transform. Desktop only - the mobile
+          branch below keeps its own native grid layout untouched. */}
       {!isMobile && (
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          viewBox="0 0 160 90"
-          preserveAspectRatio="xMaxYMin slice"
-          style={{ zIndex: 3 }}
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="neckFade" gradientUnits="userSpaceOnUse"
-              x1={NECK_CX} y1={NECK_TOP_Y} x2={NECK_CX} y2={NECK_TOP_Y + NECK_H}>
-              <stop offset="0" stopColor="#000" />
-              <stop offset={NECK_TOPIN_OFF} stopColor="#fff" />
-              <stop offset={NECK_FADE_OFF0} stopColor="#fff" />
-              <stop offset={NECK_FADE_OFF1} stopColor="#000" />
-              <stop offset="1" stopColor="#000" />
-            </linearGradient>
-            <mask id="neckMask">
-              <rect
-                x={NECK_CX - NECK_W / 2 - 2} y={NECK_TOP_Y - 2}
-                width={NECK_W + 4} height={NECK_H + 4}
-                fill="url(#neckFade)"
-              />
-            </mask>
-          </defs>
-          <image
-            href="/neck.png"
-            x={NECK_CX - NECK_W / 2} y={NECK_TOP_Y}
-            width={NECK_W} height={NECK_H}
-            preserveAspectRatio="none"
-            mask="url(#neckMask)"
-            style={{ pointerEvents: 'none' }}
+        <ScaleStage width={1600} height={900} clip={false}>
+          <PortalComposer />
+
+          {/* The ornate NECK continuing below the headstock — fills the space down
+              toward the galaxy. Same viewBox + slice as the headstock so it tracks
+              it under every viewport; sits behind the silk strings; its top tucks
+              under the headstock and its bottom melts into the stars. */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 160 90"
+            preserveAspectRatio="xMaxYMin slice"
+            style={{ zIndex: 3 }}
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="neckFade" gradientUnits="userSpaceOnUse"
+                x1={NECK_CX} y1={NECK_TOP_Y} x2={NECK_CX} y2={NECK_TOP_Y + NECK_H}>
+                <stop offset="0" stopColor="#000" />
+                <stop offset={NECK_TOPIN_OFF} stopColor="#fff" />
+                <stop offset={NECK_FADE_OFF0} stopColor="#fff" />
+                <stop offset={NECK_FADE_OFF1} stopColor="#000" />
+                <stop offset="1" stopColor="#000" />
+              </linearGradient>
+              {/* 2026-07-02: the mask rect below only fades top/bottom (via
+                  neckFade's vertical gradient) - its left/right edges were a
+                  hard rectangular cutoff. That was invisible before ScaleStage
+                  (it sat off the visible frame); now that the composition sits
+                  more centered, the hard edge shows as an ugly line. This blur
+                  softens just the rect's boundary on all sides without eating
+                  into the neck strip itself (small stdDeviation relative to
+                  its ~9.75-unit width). */}
+              <filter id="neckFeather" x="-60%" y="-10%" width="220%" height="120%">
+                <feGaussianBlur stdDeviation="0.9" />
+              </filter>
+              <mask id="neckMask">
+                <rect
+                  x={NECK_CX - NECK_W / 2 - 2} y={NECK_TOP_Y - 2}
+                  width={NECK_W + 4} height={NECK_H + 4}
+                  fill="url(#neckFade)"
+                  filter="url(#neckFeather)"
+                />
+              </mask>
+            </defs>
+            <image
+              href="/neck.png"
+              x={NECK_CX - NECK_W / 2} y={NECK_TOP_Y}
+              width={NECK_W} height={NECK_H}
+              preserveAspectRatio="none"
+              mask="url(#neckMask)"
+              style={{ pointerEvents: 'none' }}
+            />
+          </svg>
+
+          <HeadstockSelector
+            selectedLang={selectedLang}
+            hoveredLang={hoveredLang}
+            onHover={handleLanguageHover}
+            onLeave={handleLanguageLeave}
+            onSelect={handleLanguageSelect}
+            onGeometry={setSeamGeom}
+            entered={entered}
           />
-        </svg>
+        </ScaleStage>
       )}
 
-      {/* The silk strings: tied to the crystal pegs and pulled TAUT straight
-          down the page — only a faint living shimmer, clamped to the neck. */}
-      {entered && !isMobile && seamGeom && (
-        <LiquidSeam
-          pins={seamGeom.pins}
-          nutX={seamGeom.nutX}
-          weaveFrac={0.45}
-          weaveAmp={10}
-          bandHalfW={16}
-          laneShift={-10}
-          hoveredLang={hoveredLang}
-        />
-      )}
-      {/* hover glow — fully IN FRONT of the composer (zIndex 2: above the image,
-          below the column/headstock), soft and luxurious */}
+      {/* hover glow (2026-07-02): moved OUTSIDE ScaleStage. This is an ambient
+          lighting wash, not a geometric part of the guitar, so it doesn't
+          need to scale with the composition - and being inside the scaled
+          box meant its radial-gradient got hard-cut at the box's own edge,
+          visible as a line once the mixBlendMode:screen glow was active on
+          hover. Rendered here at real full-viewport size, its soft fade has
+          plenty of room to fully dissolve with no edge to clip against. */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
@@ -943,7 +975,27 @@ export const LinguisticPortal = () => {
         }}
       />
 
-      {isMobile ? (
+      {/* The silk strings render as a viewport-`fixed` overlay using REAL
+          screen-pixel pin coordinates already measured post-scale by
+          HeadstockSelector (getBoundingClientRect accounts for the
+          ScaleStage transform automatically) - so LiquidSeam itself must
+          stay OUTSIDE ScaleStage. Nesting a `position:fixed` element inside
+          a `transform`-ed ancestor would make that ancestor its new
+          containing block (a CSS gotcha), breaking both its size and
+          position. Kept as a sibling, same as before. */}
+      {entered && !isMobile && seamGeom && (
+        <LiquidSeam
+          pins={seamGeom.pins}
+          nutX={seamGeom.nutX}
+          weaveFrac={0.45}
+          weaveAmp={10}
+          bandHalfW={16}
+          laneShift={-10}
+          hoveredLang={hoveredLang}
+        />
+      )}
+
+      {isMobile && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="grid grid-cols-2 gap-6 p-8">
             {SUPPORTED_LANGUAGES.map((lang) => {
@@ -974,16 +1026,6 @@ export const LinguisticPortal = () => {
             })}
           </div>
         </div>
-      ) : (
-        <HeadstockSelector
-          selectedLang={selectedLang}
-          hoveredLang={hoveredLang}
-          onHover={handleLanguageHover}
-          onLeave={handleLanguageLeave}
-          onSelect={handleLanguageSelect}
-          onGeometry={setSeamGeom}
-          entered={entered}
-        />
       )}
       </div>
 

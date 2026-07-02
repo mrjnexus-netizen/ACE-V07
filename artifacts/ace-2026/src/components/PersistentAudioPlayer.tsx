@@ -43,32 +43,34 @@ export default function PersistentAudioPlayer() {
 
   return (
     <div style={{ backdropFilter: 'blur(40px) saturate(200%) brightness(0.8)', WebkitBackdropFilter: 'blur(40px) saturate(200%) brightness(0.8)', background: 'rgba(var(--surface-rgb), 0.55)', borderTop: '1px solid var(--border-color)', height: mobileExpanded ? 120 : 56, boxShadow: `0 -4px 40px ${shadowColor}`, transition: 'box-shadow 800ms ease, height 300ms' }}
-      className="fixed bottom-0 left-0 right-0 z-[9999]" onClick={handleMobileExpand}>
+      className="fixed bottom-0 left-0 right-0 z-[9999]">
       <div className="hidden md:flex items-center h-[72px] px-6 gap-4">
         <div className="w-[52px] h-[52px] rounded overflow-hidden bg-[var(--surface3-color)] flex-shrink-0">
           {coverUrl && <img src={coverUrl} alt={title} className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} onLoad={() => setImageLoaded(true)} />}
           {!imageLoaded && <div className="w-full h-full bg-[var(--accent-color)] opacity-10" />}
         </div>
         <div className="min-w-0"><p className="text-sm font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-xs truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}{bpm ? ` | ${bpm}` : ''}</p></div>
-        <div className="flex-1 h-10 cursor-pointer" onClick={handleProgressClick}><WaveformRenderer /><div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--text-muted-color)' }}><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div>
-        <div className="flex items-center gap-4" style={{ color: 'var(--text-color)' }}>
+        <div className="flex-1 min-w-0 h-10 cursor-pointer" onClick={handleProgressClick}><WaveformRenderer /><div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--text-muted-color)' }}><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div>
+        <div className="flex items-center gap-4 flex-shrink-0" style={{ color: 'var(--text-color)' }}>
           <button onClick={prevTrack} className="hover:text-[var(--accent-color)]" aria-label={t('Previous track')}><Icon d={PREV} /></button>
           <button onClick={handlePlayPause} className="btn btn--media btn--media-sm" aria-label={isPlaying ? t('Pause') : t('Play')}><span className="ring" aria-hidden="true" /><span className="bloom" aria-hidden="true" /><Icon d={isPlaying ? PAUSE : PLAY} size={20} /></button>
           <button onClick={nextTrack} className="hover:text-[var(--accent-color)]" aria-label={t('Next track')}><Icon d={NEXT} /></button>
         </div>
-        <div className="flex items-center gap-2" style={{ color: 'var(--text-color)' }}>
+        <div className="flex items-center gap-2 flex-shrink-0" style={{ color: 'var(--text-color)' }}>
           <button onClick={() => setMuted(!isMuted)} className="hover:text-[var(--accent-color)]" aria-label={isMuted ? t('Unmute') : t('Mute')}><Icon d={isMuted ? MUTE : VOL} /></button>
-          <input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="w-20 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label={t('Volume')} />
+          <input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="hidden lg:block w-20 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label={t('Volume')} />
         </div>
       </div>
       <div className="flex md:hidden flex-col h-full" style={{ color: 'var(--text-color)' }}>
         <div className="flex items-center px-3 py-1 gap-3">
-          <div className="w-[36px] h-[36px] rounded overflow-hidden bg-[var(--surface3-color)] flex-shrink-0">
-            {coverUrl && <img src={coverUrl} alt={title} className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} onLoad={() => setImageLoaded(true)} />}
-            {!imageLoaded && <div className="w-full h-full bg-[var(--accent-color)] opacity-10" />}
+          <div className="flex items-center gap-3 flex-1 min-w-0" onClick={handleMobileExpand}>
+            <div className="w-[36px] h-[36px] rounded overflow-hidden bg-[var(--surface3-color)] flex-shrink-0">
+              {coverUrl && <img src={coverUrl} alt={title} className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} onLoad={() => setImageLoaded(true)} />}
+              {!imageLoaded && <div className="w-full h-full bg-[var(--accent-color)] opacity-10" />}
+            </div>
+            <div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-[10px] truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}</p></div>
           </div>
-          <div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-[10px] truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}</p></div>
-          <button onClick={handlePlayPause} className="btn btn--media btn--media-sm" aria-label={isPlaying ? t('Pause') : t('Play')}><span className="ring" aria-hidden="true" /><span className="bloom" aria-hidden="true" /><Icon d={isPlaying ? PAUSE : PLAY} size={16} /></button>
+          <button onClick={handlePlayPause} className="btn btn--media btn--media-sm flex-shrink-0" aria-label={isPlaying ? t('Pause') : t('Play')}><span className="ring" aria-hidden="true" /><span className="bloom" aria-hidden="true" /><Icon d={isPlaying ? PAUSE : PLAY} size={16} /></button>
         </div>
         {mobileExpanded && (
           <div className="flex flex-col px-3 pb-2 gap-2">
