@@ -164,9 +164,6 @@ export default function ComposerPresence() {
                 <p className="font-light mt-4 text-white/75" style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.05rem)', lineHeight: 1.55, maxWidth: '46ch' }}>
                   {t(blurbFor(current.genre))}
                 </p>
-                <span className="inline-block font-mono mt-5 text-white/50" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>
-                  {String(current.tracks.length).padStart(2, '0')} {current.tracks.length === 1 ? t('work') : t('works')}
-                </span>
               </div>
             </div>
           </motion.button>
