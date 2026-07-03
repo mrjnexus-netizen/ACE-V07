@@ -183,6 +183,10 @@ const LiquidSeam = ({
 
     const threads: Thread[] = THREAD_DEF.map((d) => ({ ...d, pal: PAL[d.lang] }));
     const boosts = new Array(threads.length).fill(0);
+    // 2026-07-02: smoothed 0..1 blend toward the hovered language's own
+    // glow color for the ambient aurora below - was previously a constant
+    // gold/cool drift with zero language reactivity.
+    let auroraBlend = 0;
     const rgba = (c: RGB, a: number) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
     // Fallback geometry if the portal hasn't measured the pegs yet.
@@ -314,22 +318,34 @@ const LiquidSeam = ({
         ctx.globalAlpha = 1;
       }
 
-      // ── Living aurora: a big, soft, very slow colour-drifting glow behind the
-      //    strands so the scene breathes with light instead of sitting on dead
-      //    black. Tiny alpha → it never blows out under 'lighter'.
+      // ── Living aurora: a big, soft glow behind the strands so the scene
+      //    breathes with light instead of sitting on dead black. When a
+      //    language is hovered, it smoothly takes on THAT language's own
+      //    glow color; otherwise it drifts gently between gold and cool
+      //    silver as before. Tiny alpha → it never blows out under 'lighter'.
       {
         const ax = clampCenter || W * 0.5;
         const ay = H * 0.30;
+        const hovNow = hoverRef.current;
+        const target = hovNow && PAL[hovNow] ? 1 : 0;
+        auroraBlend += (target - auroraBlend) * 0.06; // slow, dreamy transition
         const ph = (Math.sin(t * 0.06) + 1) / 2; // 0..1, a very slow breath
         const cool: RGB = [120, 165, 255];
-        const aur: RGB = [
+        const ambient: RGB = [
           Math.round(GOLD[0] + (cool[0] - GOLD[0]) * ph * 0.6),
           Math.round(GOLD[1] + (cool[1] - GOLD[1]) * ph * 0.6),
           Math.round(GOLD[2] + (cool[2] - GOLD[2]) * ph * 0.6),
         ];
+        const langColor: RGB = (hovNow && PAL[hovNow]?.glow) || ambient;
+        const aur: RGB = [
+          Math.round(ambient[0] + (langColor[0] - ambient[0]) * auroraBlend),
+          Math.round(ambient[1] + (langColor[1] - ambient[1]) * auroraBlend),
+          Math.round(ambient[2] + (langColor[2] - ambient[2]) * auroraBlend),
+        ];
+        const auroraAlphaBoost = 1 + auroraBlend * 0.8; // a touch brighter while a language glows
         const ag = ctx.createRadialGradient(ax, ay, 0, ax, ay, Math.max(W, H) * 0.45);
-        ag.addColorStop(0, rgba(aur, 0.055));
-        ag.addColorStop(0.5, rgba(aur, 0.022));
+        ag.addColorStop(0, rgba(aur, 0.055 * auroraAlphaBoost));
+        ag.addColorStop(0.5, rgba(aur, 0.022 * auroraAlphaBoost));
         ag.addColorStop(1, rgba(aur, 0));
         ctx.fillStyle = ag;
         ctx.fillRect(0, 0, W, H);

@@ -101,6 +101,19 @@ const NECK_TOPIN_OFF = 4 / NECK_H;                       // soft tuck-in at the 
 const NECK_FADE_OFF0 = (NECK_FADE_TOP - NECK_TOP_Y) / NECK_H;
 const NECK_FADE_OFF1 = (NECK_FADE_BOT - NECK_TOP_Y) / NECK_H;
 
+// 2026-07-02 v3: instead of cropping via the wrapping DIV's aspect (which
+// only crops the BOX, leaving the guitar hugging its right edge - not
+// actually centered), the guitar's own SVG now uses a TIGHT custom viewBox
+// ("95 0 65 90" - just the headstock+neck+labels region, not the full empty
+// 160-wide canvas) with preserveAspectRatio="xMidYMid meet", which centers
+// that region within whatever box it's given, by definition. The wrapping
+// box can then just be centered normally like anything else.
+const MOBILE_W = 900;
+const MOBILE_GUITAR_VIEWBOX = '85 0 65 90'; // 2026-07-02 v2: my previous shift (95->109) moved minX the WRONG direction - INCREASING minX pushes content LEFT within the box, not right (the window moves toward the content, content ends up nearer the window's own left edge). Corrected: decreased minX (95->85) to shift the guitar rightward as actually requested.
+const MOBILE_GUITAR_W = 520;
+const MOBILE_GUITAR_H = Math.round((MOBILE_GUITAR_W * 90) / 65); // matches the 65x90 crop's own aspect
+const MOBILE_H = 1150 + MOBILE_GUITAR_H + 40; // signature(420) + photo(730) + guitar + margin
+
 // Derived absolute coords (viewBox units).
 const PIN_CX = CRYSTAL_NORM.map(([nx]) => IMG_X + nx * IMG_W); // crystal centers
 const PIN_CY = CRYSTAL_NORM.map(([, ny]) => IMG_Y + ny * IMG_H);
@@ -462,6 +475,7 @@ const MeshWipe = ({ color, fx, fy }: { color: string; fx?: number; fy?: number }
 
 const HeadstockSelector = ({
   selectedLang, hoveredLang, onHover, onLeave, onSelect, onGeometry, entered,
+  viewBox = '0 0 160 90', preserveAspectRatio = 'xMaxYMin slice',
 }: {
   selectedLang: string | null;
   hoveredLang: string | null;
@@ -470,6 +484,8 @@ const HeadstockSelector = ({
   onSelect: (code: string) => void;
   onGeometry: (g: { pins: SeamPin[]; nutX: number; nutY: number; neckHalfW: number }) => void;
   entered: boolean;
+  viewBox?: string;
+  preserveAspectRatio?: string;
 }) => {
   const pinRefs = useRef<(SVGCircleElement | null)[]>([]);
   const nutRef = useRef<SVGCircleElement | null>(null);
@@ -496,16 +512,33 @@ const HeadstockSelector = ({
     measure();
     const id = window.setTimeout(measure, 350);
     const id2 = window.setTimeout(measure, 900);
-    window.addEventListener('resize', measure);
-    return () => { window.clearTimeout(id); window.clearTimeout(id2); window.removeEventListener('resize', measure); };
+    // 2026-07-02: during a continuous drag-resize, the browser fires many
+    // 'resize' events in a burst; measuring on every single one is fine for
+    // the FINAL value, but a short settle-delay re-measure after the burst
+    // stops catches the case where layout hasn't fully reflowed yet at the
+    // instant a given resize event fires (silk strings lagging/detaching
+    // from the guitar pegs while actively dragging the window edge).
+    let settleId: number | null = null;
+    const onResize = () => {
+      measure();
+      if (settleId !== null) window.clearTimeout(settleId);
+      settleId = window.setTimeout(measure, 120);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.clearTimeout(id);
+      window.clearTimeout(id2);
+      if (settleId !== null) window.clearTimeout(settleId);
+      window.removeEventListener('resize', onResize);
+    };
   }, [onGeometry]);
 
   return (
     <svg
       className="absolute inset-0 w-full h-full"
-      viewBox="0 0 160 90"
-      preserveAspectRatio="xMaxYMin slice"
-      style={{ zIndex: 7, pointerEvents: 'none' }}
+      viewBox={viewBox}
+      preserveAspectRatio={preserveAspectRatio}
+      style={{ zIndex: 7, pointerEvents: 'auto' }}
       aria-hidden="true"
     >
       {/* Feather mask: melts the photo's rectangular edges into the galaxy so
@@ -606,8 +639,11 @@ const HeadstockSelector = ({
             >
               {l.label}
             </text>
-            {/* invisible hit area covering the crystal knob + label */}
-            <rect x={PIN_CX[i] - 3} y={y - 2.6} width={labelX + 18 - (PIN_CX[i] - 3)} height="5.2" fill="transparent" style={{ pointerEvents: 'all' }} />
+            {/* invisible hit area covering the crystal knob + label - padded
+                generously since compounding scale factors (ScaleStage +
+                mobile's tighter crop) can make the effective on-screen
+                target quite small otherwise */}
+            <rect x={PIN_CX[i] - 5} y={y - 4.2} width={labelX + 22 - (PIN_CX[i] - 5)} height="8.4" fill="transparent" style={{ pointerEvents: 'all' }} />
           </g>
         );
       })}
@@ -619,43 +655,59 @@ const HeadstockSelector = ({
 // The vertical composer name, set in the calm gap between the composer photo
 // (left) and the guitar neck (right). Champagne-gold serif, letter-by-letter
 // rise-in, quiet hairline + diamond node. Fixed gold (language not chosen yet).
-const PortalSignature = ({ dimmed }: { dimmed: boolean }) => {
+// 2026-07-02: LockedSignature replaces the old vh-based PortalSignature.
+// vh/rem-clamp sizing doesn't respect a transform-scaled ancestor (the same
+// class of bug fixed on PortalComposer's photo earlier) - that's why the
+// signature drifted out of position/overlapped the photo once the rest of
+// the composition was locked into ScaleStage. This version is sized entirely
+// in fixed px relative to whatever logical canvas it's placed in, so it
+// scales together with the photo/guitar as ONE unit, on both the desktop
+// (wide) and mobile (stacked) scenes - no more independent drift.
+function LetterGlyph({ ch, size }: { ch: string; size: number }) {
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: size * 0.82, height: size * 0.86,
+        fontFamily: "'Cinzel','Noto Serif SC','Noto Serif JP','Noto Serif KR',serif",
+        fontWeight: 500, fontStyle: 'normal',
+        fontSize: size * 0.64, lineHeight: 1,
+        color: '#F1DFA6',
+        background: 'linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%)',
+        backgroundSize: '100% 200%',
+        WebkitBackgroundClip: 'text',
+        backgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        filter: 'drop-shadow(0 0 18px rgba(233,200,121,0.4)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+        animation: 'wgSigShimmer 6.5s ease-in-out infinite',
+      }}
+    >
+      {ch}
+    </div>
+  );
+}
+
+function LockedSignature({ letterSize, dimmed }: { letterSize: number; dimmed: boolean }) {
   return (
     <div
       aria-hidden="true"
-      className="wg-sig-wrap"
       style={{
-        zIndex: 5,
-        paddingLeft: '54%',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
         opacity: dimmed ? 0 : 1,
         transition: 'opacity 0.9s ease',
       }}
     >
-      <div className="wg-sig-col" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.1vh' }}>
-        {/* top hairline */}
-        <span className="wg-sig-rule" style={{ animationDelay: '0.2s' }} />
-        {/* AMIR */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {'AMIR'.split('').map((ch, ci) => (
-            <span key={`a-${ci}`} className="wg-sig-ch" style={{ animationDelay: `${1.2 + ci * 0.11}s` }}>{ch}</span>
-          ))}
-        </div>
-        {/* centered diamond node between the two words */}
-        <span className="wg-sig-diamond" style={{ animationDelay: '1.7s' }} />
-        {/* MOSLEHI */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {'MOSLEHI'.split('').map((ch, ci) => (
-            <span key={`m-${ci}`} className="wg-sig-ch" style={{ animationDelay: `${1.7 + ci * 0.11}s` }}>{ch}</span>
-          ))}
-        </div>
-        {/* bottom hairline */}
-        <span className="wg-sig-rule" style={{ animationDelay: '2.6s' }} />
-        {/* subtitle */}
-        <span className="wg-sig-sub" style={{ animationDelay: '2.9s' }}>THE COMPOSER</span>
+      <div style={{ width: 1, height: letterSize * 0.55, background: 'linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%)' }} />
+      {'AMIR'.split('').map((ch, ci) => <LetterGlyph key={`a-${ci}`} ch={ch} size={letterSize} />)}
+      <div style={{ width: 6, height: 6, margin: `${letterSize * 0.28}px 0`, background: 'linear-gradient(135deg,#FBF0CC,#D9B45E)', boxShadow: '0 0 10px rgba(233,200,121,0.6)', transform: 'rotate(45deg)' }} />
+      {'MOSLEHI'.split('').map((ch, ci) => <LetterGlyph key={`m-${ci}`} ch={ch} size={letterSize} />)}
+      <div style={{ width: 1, height: letterSize * 0.55, background: 'linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%)' }} />
+      <div style={{ marginTop: letterSize * 0.32, fontFamily: "'Cinzel',serif", fontWeight: 400, fontSize: letterSize * 0.24, letterSpacing: '0.42em', paddingLeft: '0.42em', color: '#C9AC6A', textShadow: '0 0 10px rgba(201,172,106,0.4)' }}>
+        THE COMPOSER
       </div>
     </div>
   );
-};
+}
 
 export const LinguisticPortal = () => {
   const { setLocale } = useIdentity();
@@ -881,16 +933,21 @@ export const LinguisticPortal = () => {
           locks it correctly at every viewport height (shipped + approved
           separately - see MEGA_MASTER §4.2-4), so it doesn't need or want
           the scale-transform treatment applied to the guitar/photo below. */}
-      <PortalSignature dimmed={!!selectedLang} />
-
-      {/* G4/P1 locked composition (2026-07-02): the composer photo, guitar
-          neck, silk strings, hover glow and headstock+language-labels are
-          all SVG-geometry or percentage-based, so they scale correctly as
-          one unit inside ScaleStage's transform. Desktop only - the mobile
-          branch below keeps its own native grid layout untouched. */}
+      {/* DESKTOP (>=768px), 2026-07-02 FINAL: everything (photo, signature,
+          neck, headstock/labels) inside ONE ScaleStage(1920,1080) - one
+          rigid unit, zero deformation on manual resize. Wider 16:9 canvas
+          + explicit px gives real breathing room: photo left (980px wide,
+          right edge ~1020), signature centered in the gap at x=1180 (well
+          clear of the photo), guitar hugs the right edge via its own slice svg. */}
       {!isMobile && (
-        <ScaleStage width={1600} height={900} clip={false}>
-          <PortalComposer />
+        <ScaleStage width={1920} height={1080} clip={false}>
+          <div style={{ position: 'absolute', top: '50%', left: 40, transform: 'translateY(-50%)', width: 980, height: 1080 }}>
+            <PortalComposer widthCss="980px" marginLeftCss="0px" />
+          </div>
+
+          <div style={{ position: 'absolute', top: '50%', left: 1180, transform: 'translate(-50%, -50%)', zIndex: 5, pointerEvents: 'none' }}>
+            <LockedSignature letterSize={50} dimmed={!!selectedLang} />
+          </div>
 
           {/* The ornate NECK continuing below the headstock — fills the space down
               toward the galaxy. Same viewBox + slice as the headstock so it tracks
@@ -912,14 +969,6 @@ export const LinguisticPortal = () => {
                 <stop offset={NECK_FADE_OFF1} stopColor="#000" />
                 <stop offset="1" stopColor="#000" />
               </linearGradient>
-              {/* 2026-07-02: the mask rect below only fades top/bottom (via
-                  neckFade's vertical gradient) - its left/right edges were a
-                  hard rectangular cutoff. That was invisible before ScaleStage
-                  (it sat off the visible frame); now that the composition sits
-                  more centered, the hard edge shows as an ugly line. This blur
-                  softens just the rect's boundary on all sides without eating
-                  into the neck strip itself (small stdDeviation relative to
-                  its ~9.75-unit width). */}
               <filter id="neckFeather" x="-60%" y="-10%" width="220%" height="120%">
                 <feGaussianBlur stdDeviation="0.9" />
               </filter>
@@ -954,20 +1003,92 @@ export const LinguisticPortal = () => {
         </ScaleStage>
       )}
 
-      {/* hover glow (2026-07-02): moved OUTSIDE ScaleStage. This is an ambient
-          lighting wash, not a geometric part of the guitar, so it doesn't
-          need to scale with the composition - and being inside the scaled
-          box meant its radial-gradient got hard-cut at the box's own edge,
-          visible as a line once the mixBlendMode:screen glow was active on
-          hover. Rendered here at real full-viewport size, its soft fade has
-          plenty of room to fully dissolve with no edge to clip against. */}
+      {/* MOBILE (<768px), 2026-07-02: same principle as desktop above - one
+          ScaleStage, signature INCLUDED, so the whole stacked composition
+          (signature top, photo middle, guitar bottom) scales as a single
+          rigid unit with zero deformation risk, on any phone/tablet size. */}
+      {isMobile && (
+        <ScaleStage width={MOBILE_W} height={MOBILE_H} clip={false}>
+          <div style={{ position: 'absolute', top: 55, left: '50%', transform: 'translateX(-50%)', zIndex: 6 }}>
+            <LockedSignature letterSize={30} dimmed={!!selectedLang} />
+          </div>
+
+          <div style={{ position: 'absolute', top: 420, left: 0, width: MOBILE_W, height: 720 }}>
+            <PortalComposer widthCss={`${MOBILE_W}px`} marginLeftCss="0px" />
+          </div>
+
+          {/* 2026-07-02 v3: the neck+headstock svgs now use a TIGHT custom
+              viewBox covering just the guitar+labels region (not the full
+              empty 160-wide canvas) with "xMidYMid meet" - that centers the
+              guitar within this box BY DEFINITION, so the wrapping div just
+              needs simple, ordinary centering below. Strings are measured
+              from the same real elements, so they follow automatically. */}
+          <div style={{ position: 'absolute', top: 1150, left: (MOBILE_W - MOBILE_GUITAR_W) / 2, width: MOBILE_GUITAR_W, height: MOBILE_GUITAR_H, overflow: 'hidden' }}>
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              viewBox={MOBILE_GUITAR_VIEWBOX}
+              preserveAspectRatio="xMidYMid meet"
+              style={{ zIndex: 3 }}
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient id="neckFadeM" gradientUnits="userSpaceOnUse"
+                  x1={NECK_CX} y1={NECK_TOP_Y} x2={NECK_CX} y2={NECK_TOP_Y + NECK_H}>
+                  <stop offset="0" stopColor="#000" />
+                  <stop offset={NECK_TOPIN_OFF} stopColor="#fff" />
+                  <stop offset={NECK_FADE_OFF0} stopColor="#fff" />
+                  <stop offset={NECK_FADE_OFF1} stopColor="#000" />
+                  <stop offset="1" stopColor="#000" />
+                </linearGradient>
+                <filter id="neckFeatherM" x="-60%" y="-10%" width="220%" height="120%">
+                  <feGaussianBlur stdDeviation="0.9" />
+                </filter>
+                <mask id="neckMaskM">
+                  <rect
+                    x={NECK_CX - NECK_W / 2 - 2} y={NECK_TOP_Y - 2}
+                    width={NECK_W + 4} height={NECK_H + 4}
+                    fill="url(#neckFadeM)"
+                    filter="url(#neckFeatherM)"
+                  />
+                </mask>
+              </defs>
+              <image
+                href="/neck.png"
+                x={NECK_CX - NECK_W / 2} y={NECK_TOP_Y}
+                width={NECK_W} height={NECK_H}
+                preserveAspectRatio="none"
+                mask="url(#neckMaskM)"
+                style={{ pointerEvents: 'none' }}
+              />
+            </svg>
+
+            <HeadstockSelector
+              selectedLang={selectedLang}
+              hoveredLang={hoveredLang}
+              onHover={handleLanguageHover}
+              onLeave={handleLanguageLeave}
+              onSelect={handleLanguageSelect}
+              onGeometry={setSeamGeom}
+              entered={entered}
+              viewBox={MOBILE_GUITAR_VIEWBOX}
+              preserveAspectRatio="xMidYMid meet"
+            />
+          </div>
+        </ScaleStage>
+      )}
+
+      {/* hover glow: ambient lighting wash behind the guitar, at real
+          viewport size. Its anchor point must match wherever the guitar
+          actually sits - which is a totally different screen location on
+          mobile (bottom, centered) vs desktop (right side) since they're
+          different scenes/layouts. */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
         style={{
           zIndex: 2,
           background: hoveredLang
-            ? `radial-gradient(ellipse 80% 70% at 68% 44%, ${LANGUAGE_MESH[hoveredLang]}, transparent 62%)`
+            ? `radial-gradient(ellipse 80% 70% at ${isMobile ? '50% 82%' : '68% 44%'}, ${LANGUAGE_MESH[hoveredLang]}, transparent 62%)`
             : 'transparent',
           opacity: hoveredLang ? 0.07 : 0,
           transition: 'opacity 1s ease',
@@ -983,50 +1104,27 @@ export const LinguisticPortal = () => {
           a `transform`-ed ancestor would make that ancestor its new
           containing block (a CSS gotcha), breaking both its size and
           position. Kept as a sibling, same as before. */}
-      {entered && !isMobile && seamGeom && (
+      {/* 2026-07-02: re-enabled on mobile. Strings are measured from the
+          same real guitar elements, which are now correctly centered (the
+          earlier "poking out" issue was very likely a symptom of the guitar
+          box being mis-positioned at the time, not a separate string bug).
+          Worth testing again now that the guitar position is confirmed. */}
+      {entered && seamGeom && (
         <LiquidSeam
           pins={seamGeom.pins}
           nutX={seamGeom.nutX}
           weaveFrac={0.45}
-          weaveAmp={10}
-          bandHalfW={16}
-          laneShift={-10}
+          // 2026-07-02: mobile gets a tighter weave (smaller guitar = less
+          // visual room for wide swings) and a rightward nudge of the LOWER
+          // run only - laneShift never touches the pin tie-point at the top,
+          // exactly as requested.
+          weaveAmp={isMobile ? 4 : 10}
+          bandHalfW={isMobile ? 6 : 16}
+          laneShift={isMobile ? 3 : -10}
           hoveredLang={hoveredLang}
         />
       )}
 
-      {isMobile && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="grid grid-cols-2 gap-6 p-8">
-            {SUPPORTED_LANGUAGES.map((lang) => {
-              const active = selectedLang === lang.code || hoveredLang === lang.code;
-              return (
-                <button
-                  key={lang.code}
-                  onClick={() => handleLanguageSelect(lang.code)}
-                  onMouseEnter={() => handleLanguageHover(lang.code)}
-                  onMouseLeave={handleLanguageLeave}
-                  data-cursor="go"
-                  className={`
-                    font-display transition-all duration-300 ease-out
-                    text-6xl tracking-[0.15em]
-                    min-h-[52px] min-w-[52px] flex items-center justify-center
-                    ${selectedLang === lang.code ? 'scale-150 opacity-100' : ''}
-                    ${selectedLang && selectedLang !== lang.code ? 'opacity-0 translate-y-[-20px]' : ''}
-                    ${!selectedLang && hoveredLang && hoveredLang !== lang.code ? 'opacity-20' : ''}
-                  `}
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    color: active ? LANGUAGE_PASTEL[lang.code] : 'rgba(255,255,255,0.45)',
-                  }}
-                >
-                  {lang.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
       </div>
 
       {/* Language-pick transition: golden sparks form the clef, then burst

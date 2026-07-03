@@ -36,7 +36,10 @@ const TRANS: Transition = {
 const CINEMA_FILTER =
   'url(#composerSharp) contrast(1.08) saturate(1.16) brightness(1.20)';
 
-const PortalComposer = () => {
+const PortalComposer = ({
+  widthCss = 'min(120vh, 140vw)',
+  marginLeftCss = '1vw',
+}: { widthCss?: string; marginLeftCss?: string } = {}) => {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -67,7 +70,7 @@ const PortalComposer = () => {
         transition={{ duration: 2.4, ease: 'easeOut' }}
       >
         <div className="absolute inset-0 flex items-center justify-start">
-          <div style={{ position: 'relative', marginLeft: '16px' }}>
+          <div style={{ position: 'relative', marginLeft: marginLeftCss }}>
             <motion.img
               src="/composer.png"
               alt=""
@@ -86,7 +89,7 @@ const PortalComposer = () => {
                 // ScaleStage uses (min(900*1.2, 1600*1.4) = 1080px), so it
                 // scales together with everything else via the one shared
                 // transform instead of drifting independently.
-                width: '1080px',
+                width: widthCss,
                 opacity: 0.82,
                 willChange: 'transform',
                 filter: CINEMA_FILTER,
