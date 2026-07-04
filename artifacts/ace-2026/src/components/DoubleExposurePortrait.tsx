@@ -1,23 +1,42 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useBalancedText } from '../hooks/useBalancedText';
 import {
   motion,
   useScroll,
   useTransform,
   useSpring,
   useReducedMotion,
+  type MotionValue,
 } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
 import type { Locale } from '../types';
+import ScaleStage from './ScaleStage';
 
 /**
- * Cinematic portrait scene.
- * The composer's portrait is revealed as you scroll: it rises with a slow
- * parallax, sharpens out of blur, and scales gently into place. Edges are
- * feathered (no hard rectangle), and a short pull-quote / tagline sits beside
- * it. Shares the visual language of SpatialScrollEngine so the page reads as
- * one continuous, deliberate experience.
+ * Cinematic portrait scene — LOCKED COMPOSITION (blueprint G4 / H12).
+ *
+ * The section is a fixed 100vh stage. Inside it, the whole composition
+ * (portrait + text block) lives on a ScaleStage logical canvas and scales
+ * as ONE unit at any window size — the layout can never re-flow ("image
+ * stays up, texts fall down" is impossible by construction).
+ *
+ *   - Desktop (>=768px): 1600x900 canvas — portrait left, text right,
+ *     exactly the approved fullscreen composition.
+ *   - Mobile  (<768px):  720x1240 canvas — portrait top, text underneath,
+ *     a deliberate vertical composition (not a shrunk desktop).
+ *
+ * All approved effects are preserved: scroll parallax on the image, blur
+ * reveal, spring scale, feathered radial mask, sheen, text slide-up/fade.
+ * Sizing inside the stage is FIXED PX against the logical canvas — never
+ * vw/vh (they ignore ancestor transform scale; portal lesson #1).
  */
+
+const DESK_W = 1600;
+const DESK_H = 900;
+const MOB_W = 720;
+const MOB_H = 1280;
+
 function localText(
   identity: ReturnType<typeof useIdentity>['composerIdentity'],
   locale: Locale,
@@ -29,12 +48,157 @@ function localText(
   const rec = ml as unknown as Record<string, string>; return rec[locale] || rec.en || '';
 }
 
+function useIsMobile(): boolean {
+  const [m, setM] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    const on = () => setM(window.innerWidth < 768);
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  return m;
+}
+
+/** The portrait artwork with all its approved effects, filling its parent box. */
+function PortraitArt({
+  url,
+  name,
+  imgY,
+  blur,
+  sScale,
+  placeholder,
+}: {
+  url: string | undefined;
+  name: string;
+  imgY: MotionValue<string>;
+  blur: MotionValue<string>;
+  sScale: MotionValue<number>;
+  placeholder: string;
+}) {
+  return (
+    <motion.div
+      style={{ scale: sScale, filter: blur, borderRadius: 24 }}
+      className="relative w-full h-full overflow-hidden"
+    >
+      <div className="absolute inset-0">
+        {url ? (
+          <motion.img
+            src={url}
+            alt={name}
+            crossOrigin="anonymous"
+            style={{
+              y: imgY,
+              WebkitMaskImage:
+                'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
+              maskImage:
+                'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
+            }}
+            className="absolute inset-0 w-full h-[124%] -top-[12%] object-cover will-change-transform"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-[var(--text-muted-color)] text-xs font-mono uppercase tracking-[0.15em]">
+            {placeholder}
+          </div>
+        )}
+        {/* soft sheen + bottom legibility veil, feathered */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(125deg, rgba(255,255,255,0.08), transparent 40%), linear-gradient(to top, rgba(var(--surface-rgb),0.55), transparent 55%)',
+          }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+/** The text block (kicker / name / tagline / bio) at fixed logical-px sizes. */
+function AboutText({
+  name,
+  tagline,
+  bio,
+  kicker,
+  textY,
+  textOpacity,
+  nameSize,
+  taglineSize,
+  bioSize,
+  bioMaxWidth,
+}: {
+  name: string;
+  tagline: string;
+  bio: string;
+  kicker: string;
+  textY: MotionValue<string>;
+  textOpacity: MotionValue<number>;
+  nameSize: number;
+  taglineSize: number;
+  bioSize: number;
+  bioMaxWidth: number;
+}) {
+  // G5/H13: even wrap + widow-kill, cross-browser (v4: transform-aware).
+  const taglineRef = useBalancedText<HTMLParagraphElement>();
+  const bioRef = useBalancedText<HTMLParagraphElement>();
+  return (
+    <motion.div style={{ y: textY, opacity: textOpacity }}>
+      <span
+        className="font-mono uppercase"
+        style={{ fontSize: 12, letterSpacing: '0.25em', color: 'var(--accent-color)' }}
+      >
+        {kicker}
+      </span>
+      <h2
+        className="font-display"
+        style={{
+          fontSize: nameSize,
+          lineHeight: 1.02,
+          marginTop: 12,
+          marginBottom: 20,
+          color: 'var(--text-color)',
+        }}
+      >
+        {name}
+      </h2>
+      {tagline && (
+        <p
+          ref={taglineRef}
+          style={{
+            fontSize: taglineSize,
+            lineHeight: 1.35,
+            opacity: 0.9,
+            marginBottom: 16,
+            color: 'var(--text-color)',
+          }}
+        >
+          {tagline}
+        </p>
+      )}
+      {bio && (
+        <p
+          ref={bioRef}
+          style={{
+            fontSize: bioSize,
+            lineHeight: 1.6,
+            maxWidth: bioMaxWidth,
+            color: 'var(--text-muted-color)',
+          }}
+        >
+          {bio}
+        </p>
+      )}
+    </motion.div>
+  );
+}
+
 export default function DoubleExposurePortrait() {
   const sectionRef = useRef<HTMLElement>(null);
   const { composerIdentity, locale } = useIdentity();
   const { t } = useT();
   const safeLocale = (locale ?? 'en') as Locale;
   const reduced = useReducedMotion() ?? false;
+  const isMobile = useIsMobile();
 
   const portraitUrl = composerIdentity?.portrait?.url;
   const name = localText(composerIdentity, safeLocale, 'name') || 'Amir Moslehi';
@@ -74,76 +238,99 @@ export default function DoubleExposurePortrait() {
   );
   const textOpacity = useTransform(scrollYProgress, [0.15, 0.45], [0, 1]);
 
+  const kicker = t('The Composer');
+  const trTagline = tagline ? t(tagline) : '';
+  const trBio = bio ? t(bio) : '';
+
   return (
     <section
       ref={sectionRef}
-      className="relative w-full min-h-screen flex items-center py-24 overflow-hidden"
+      className="relative w-full overflow-visible"
+      style={isMobile ? { padding: '2.5rem 0' } : { height: '100vh' }}
+      aria-label={kicker}
     >
-      <div className="w-full max-w-6xl mx-auto px-6 md:px-12 grid md:grid-cols-12 gap-10 items-center">
-        {/* Portrait — feathered, parallaxing, aspect-correct */}
-        <div className="md:col-span-7">
-          <motion.div
-            style={{ scale: sScale, filter: blur }}
-            className="relative w-full overflow-hidden rounded-3xl"
+      {!isMobile ? (
+        /* ---------- DESKTOP locked scene: 1600x900, portrait left / text right ---------- */
+        <ScaleStage width={DESK_W} height={DESK_H} clip={false}>
+          <div style={{ position: 'absolute', left: 120, top: 62, width: 620, height: 776 }}>
+            <PortraitArt
+              url={portraitUrl}
+              name={name}
+              imgY={imgY}
+              blur={blur}
+              sScale={sScale}
+              placeholder={t('Portrait')}
+            />
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              left: 830,
+              top: 0,
+              width: 650,
+              height: DESK_H,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              paddingRight: 60,
+            }}
           >
-            <div className="relative" style={{ aspectRatio: '4 / 5' }}>
-              {portraitUrl ? (
-                <motion.img
-                  src={portraitUrl}
-                  alt={name}
-                  crossOrigin="anonymous"
-                  style={{
-                    y: imgY,
-                    WebkitMaskImage:
-                      'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
-                    maskImage:
-                      'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
-                  }}
-                  className="absolute inset-0 w-full h-[124%] -top-[12%] object-cover will-change-transform"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-[var(--text-muted-color)] text-xs font-mono uppercase tracking-[0.15em]">
-                  {t('Portrait')}
-                </div>
-              )}
-              {/* soft sheen + bottom legibility veil, feathered */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background:
-                    'linear-gradient(125deg, rgba(255,255,255,0.08), transparent 40%), linear-gradient(to top, rgba(var(--surface-rgb),0.55), transparent 55%)',
-                }}
+            <AboutText
+              name={name}
+              tagline={trTagline}
+              bio={trBio}
+              kicker={kicker}
+              textY={textY}
+              textOpacity={textOpacity}
+              nameSize={64}
+              taglineSize={23}
+              bioSize={20}
+              bioMaxWidth={540}
+            />
+          </div>
+        </ScaleStage>
+      ) : (
+        /* ---------- MOBILE locked scene: 720x1280, portrait top / text below.
+           Wrapper's aspect-ratio matches the canvas exactly (no forced 100vh),
+           so ScaleStage's scale is never letterboxed - zero dead space above
+           or below the photo, and no extra pre-scroll gap before it appears. */
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: 560,
+            margin: '0 auto',
+            aspectRatio: `${MOB_W} / ${MOB_H}`,
+          }}
+        >
+          <ScaleStage width={MOB_W} height={MOB_H} clip={false}>
+            <div style={{ position: 'absolute', left: 100, top: 40, width: 520, height: 650 }}>
+              <PortraitArt
+                url={portraitUrl}
+                name={name}
+                imgY={imgY}
+                blur={blur}
+                sScale={sScale}
+                placeholder={t('Portrait')}
               />
             </div>
-          </motion.div>
+            <div style={{ position: 'absolute', left: 70, top: 750, width: 580 }}>
+              <AboutText
+                name={name}
+                tagline={trTagline}
+                bio={trBio}
+                kicker={kicker}
+                textY={textY}
+                textOpacity={textOpacity}
+                nameSize={58}
+                taglineSize={23}
+                bioSize={19}
+                bioMaxWidth={560}
+              />
+            </div>
+          </ScaleStage>
         </div>
-
-        {/* Text */}
-        <motion.div
-          style={{ y: textY, opacity: textOpacity }}
-          className="md:col-span-5"
-        >
-          <span className="text-xs uppercase tracking-[0.25em] text-[var(--accent-color)] font-mono">
-            {t('The Composer')}
-          </span>
-          <h2
-            className="font-display text-[var(--text-color)] leading-[1.02] mt-3 mb-5"
-            style={{ fontSize: 'clamp(2.25rem, 5vw, 4.5rem)' }}
-          >
-            {name}
-          </h2>
-          {tagline && (
-            <p className="text-lg md:text-xl text-[var(--text-color)] opacity-90 mb-4 leading-snug">
-              {t(tagline)}
-            </p>
-          )}
-          {bio && (
-            <p className="text-sm md:text-base text-[var(--text-muted-color)] leading-relaxed max-w-md">
-              {t(bio)}
-            </p>
-          )}
-        </motion.div>
-      </div>
+      )}
     </section>
   );
 }

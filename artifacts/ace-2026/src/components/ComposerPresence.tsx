@@ -4,6 +4,7 @@ import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
 import type { AudioTrack } from '../types';
+import { useBalancedText } from '../hooks/useBalancedText';
 
 // Short, editable blurbs per genre (lowercased key).
 const GENRE_BLURBS: Record<string, string> = {
@@ -85,6 +86,11 @@ export default function ComposerPresence() {
 
   const current = groups[active]!;
 
+  // G5: force even wrap + no widow last-word on the rotating genre blurb,
+  // cross-browser. Re-balance whenever the active genre (and its text)
+  // changes.
+  const blurbRef = useBalancedText<HTMLParagraphElement>();
+
   return (
     <section
       ref={sectionRef}
@@ -161,7 +167,7 @@ export default function ComposerPresence() {
                 >
                   {t(current.genre)}
                 </h3>
-                <p className="font-light mt-4 text-white/75" style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.05rem)', lineHeight: 1.55, maxWidth: '46ch' }}>
+                <p ref={blurbRef} className="font-light mt-4 text-white/75" style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.05rem)', lineHeight: 1.55, maxWidth: '46ch' }}>
                   {t(blurbFor(current.genre))}
                 </p>
               </div>

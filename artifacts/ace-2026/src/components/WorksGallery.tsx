@@ -5,6 +5,7 @@ import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
 import { ConceptMotif, conceptTint } from './conceptArt';
+import { useBalancedText } from '../hooks/useBalancedText';
 import type { AudioTrack } from '../types';
 
 // Section 03 - Works as a VERTICAL PIANO anchored to the left edge.
@@ -113,6 +114,17 @@ function playNote(freq: number) {
   } catch {
     /* non-essential */
   }
+}
+
+// One track card's caption, balanced independently (each card needs its own
+// hook instance — cannot call useBalancedText conditionally inside a .map).
+function TrackCaption({ text }: { text: string }) {
+  const ref = useBalancedText<HTMLParagraphElement>();
+  return (
+    <p ref={ref} className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)' }}>
+      {text}
+    </p>
+  );
 }
 
 // Luxe "now playing" equaliser — five slim gold bars gently rising/falling.
@@ -350,6 +362,10 @@ function OverlayPanel({
   const ease: [number, number, number, number] = [0.4, 0, 0.2, 1];
   const count = group.tracks.length;
 
+  // G5: force even wrap + no widow last-word on the concept blurb,
+  // cross-browser. Re-balance when the open concept changes.
+  const blurbBalanceRef = useBalancedText<HTMLParagraphElement>();
+
   const gridV = {
     hidden: {},
     show: { transition: { staggerChildren: reduce ? 0 : 0.06, delayChildren: reduce ? 0 : 0.18 } },
@@ -423,7 +439,7 @@ function OverlayPanel({
             <h2 className="font-display font-light mt-5" style={{ fontSize: 'clamp(2rem, 5vw, 3.6rem)', lineHeight: 1.08, color: 'var(--text-color)' }}>
               {t(group.label)}
             </h2>
-            <p className="font-display font-light mt-5" style={{ fontSize: 'clamp(0.95rem, 1.6vw, 1.2rem)', lineHeight: 1.6, color: 'var(--text-dim-color)', maxWidth: '46ch' }}>
+            <p ref={blurbBalanceRef} className="font-display font-light mt-5" style={{ fontSize: 'clamp(0.95rem, 1.6vw, 1.2rem)', lineHeight: 1.6, color: 'var(--text-dim-color)', maxWidth: '46ch' }}>
               {t(group.blurb)}
             </p>
             <p className="font-mono mt-6" style={{ fontSize: '0.64rem', letterSpacing: '0.18em', color: 'var(--text-dim-color)' }}>
@@ -463,9 +479,7 @@ function OverlayPanel({
                     <h3 className="font-display font-light mt-4" style={{ fontSize: 'clamp(1rem, 1.5vw, 1.25rem)', lineHeight: 1.3, color: 'var(--text-color)' }}>
                       {t('Untitled {concept} Score').replace('{concept}', t(group.label))}
                     </h3>
-                    <p className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)' }}>
-                      {t('A piece still taking shape in the composer’s studio.')}
-                    </p>
+                    <TrackCaption text={t('A piece still taking shape in the composer’s studio.')} />
                     <span className="font-mono uppercase inline-block mt-2" style={{ fontSize: '0.55rem', letterSpacing: '0.35em', color: tint }}>
                       {t('In composition')}
                     </span>
@@ -549,9 +563,7 @@ function OverlayPanel({
                         {title}
                       </h3>
                       {caption && (
-                        <p className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)' }}>
-                          {caption}
-                        </p>
+                        <TrackCaption text={caption} />
                       )}
                     </button>
                   </motion.article>

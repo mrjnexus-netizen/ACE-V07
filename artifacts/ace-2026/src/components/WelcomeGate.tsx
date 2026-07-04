@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useT } from '../context/TranslationContext';
 
@@ -13,6 +13,12 @@ import { useT } from '../context/TranslationContext';
  * through untouched. The Enter click is the user gesture that unlocks audio,
  * so onEnter() both starts the ambient music and dismisses the gate into the
  * language portal (the smooth fade/hand-off is preserved).
+ *
+ * W2: a near-silent synthesized ambient drone (Web Audio oscillators, no
+ * external asset — no license risk) fades in to a very low ceiling on the
+ * first qualifying user gesture (pointerdown/keydown/touchstart — mousemove
+ * does NOT count under browser autoplay policy), and fades out over ~1.2s
+ * the moment Enter is pressed, handing off to the portal's own ambience.
  *
  * All styles are namespaced under .wg- to avoid colliding with site CSS.
  */
@@ -112,13 +118,123 @@ const WG_STYLES = `
 }
 `;
 
+/* ---------- W2: gate ambience — synthesized, module-level singleton ---------- */
+
+const GATE_CEILING = 0.12;
+const GATE_FADE_IN_MS = 2200;
+const GATE_FADE_OUT_MS = 1200;
+
+let gateCtx: AudioContext | null = null;
+let gateMasterGain: GainNode | null = null;
+let gateOscillators: OscillatorNode[] = [];
+let gateStarted = false;
+let gateFadedOut = false;
+
+function startGateAmbience() {
+  if (gateStarted) return;
+  gateStarted = true;
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    gateCtx = ctx;
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 0;
+    masterGain.connect(ctx.destination);
+    gateMasterGain = masterGain;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 460;
+    filter.Q.value = 0.3;
+    filter.connect(masterGain);
+
+    // two deep, gently detuned sines — a calm, wordless breath under the gate
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.value = 55; // A1
+    const g1 = ctx.createGain();
+    g1.gain.value = 0.6;
+    osc1.connect(g1).connect(filter);
+
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = 55 * 1.006; // slight detune -> slow, gentle beating
+    const g2 = ctx.createGain();
+    g2.gain.value = 0.5;
+    osc2.connect(g2).connect(filter);
+
+    // very slow LFO breathing the filter cutoff so it never feels static
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.045;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 110;
+    lfo.connect(lfoGain).connect(filter.frequency);
+
+    osc1.start();
+    osc2.start();
+    lfo.start();
+    gateOscillators = [osc1, osc2, lfo];
+
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+    const now = ctx.currentTime;
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(GATE_CEILING, now + GATE_FADE_IN_MS / 1000);
+  } catch {
+    // ambience is a nicety, never a blocker — fail silently
+  }
+}
+
+function stopGateAmbience() {
+  if (!gateCtx || !gateMasterGain || gateFadedOut) return;
+  gateFadedOut = true;
+  const ctx = gateCtx;
+  const masterGain = gateMasterGain;
+  const oscillators = gateOscillators;
+  try {
+    const now = ctx.currentTime;
+    masterGain.gain.cancelScheduledValues(now);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+    masterGain.gain.linearRampToValueAtTime(0, now + GATE_FADE_OUT_MS / 1000);
+  } catch {
+    // ignore
+  }
+  setTimeout(() => {
+    try {
+      oscillators.forEach((o) => o.stop());
+      ctx.close();
+    } catch {
+      // ignore
+    }
+  }, GATE_FADE_OUT_MS + 150);
+}
+
+/* ------------------------------------------------------------------------ */
+
 const WelcomeGate = ({ onEnter }: { onEnter: () => void }) => {
   const { t } = useT();
   const [leaving, setLeaving] = useState(false);
 
+  useEffect(() => {
+    const onGesture = () => startGateAmbience();
+    // qualifying user-activation events only — mousemove does NOT count
+    window.addEventListener('pointerdown', onGesture, { once: true });
+    window.addEventListener('keydown', onGesture, { once: true });
+    window.addEventListener('touchstart', onGesture, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
+      window.removeEventListener('touchstart', onGesture);
+    };
+  }, []);
+
   const handleEnter = () => {
     if (leaving) return;
     setLeaving(true);
+    stopGateAmbience();
     // let the fade play, then hand off to the portal
     setTimeout(onEnter, 1100);
   };
