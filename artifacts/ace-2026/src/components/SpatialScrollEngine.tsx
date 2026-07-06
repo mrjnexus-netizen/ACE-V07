@@ -397,12 +397,31 @@ export default function SpatialScrollEngine() {
                 {activeDesc}
               </p>
             )}
-            <p ref={lineRef} className="font-display italic" style={{ fontSize: 'clamp(0.95rem, 1.2vw, 1.1rem)', lineHeight: 1.5, color: 'rgba(var(--accent-rgb),0.92)', borderLeft: '1px solid rgba(var(--accent-rgb),0.4)', paddingLeft: 13 }}>
-              {t(activeLine)}
-            </p>
             {!activeCard.track && (
               <p className="text-[0.64rem] uppercase tracking-[0.26em] text-[var(--text-dim-color)] font-mono mt-4">{t('In composition')}</p>
             )}
+          </motion.div>
+        </div>
+
+        {/* Mirror panel — the poetic line, symmetric on the right (was
+            previously bundled under the left panel; now its own quiet
+            counterweight, echoing the cylinder's centre).
+            - Width matches the left panel EXACTLY (true mirror symmetry).
+            - The accent border lives on this FIXED outer box, not on the
+              paragraph itself — different quotes balance to different
+              widths, and a border attached to the text was visibly sliding
+              left/right as it changed (the reported X-axis jitter). The box
+              itself never moves; only the text inside re-balances.
+            - marginLeft:'auto' keeps the (possibly narrower) balanced text
+              flush against the box's own right edge, next to the border. */}
+        <div className="absolute z-20 text-right" style={{ top: '50%', right: '5%', transform: 'translateY(-50%)', width: 'min(21vw, 310px)', borderRight: '1px solid rgba(var(--accent-rgb),0.4)', paddingRight: 13 }}>
+          <motion.div key={`line-${frontIndex}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}>
+            <p ref={lineRef} className="font-display italic" style={{ fontSize: 'clamp(0.95rem, 1.2vw, 1.1rem)', lineHeight: 1.5, color: 'rgba(var(--accent-rgb),0.92)', marginLeft: 'auto' }}>
+              {t(activeLine)}
+            </p>
+            <span className="font-mono uppercase" style={{ display: 'block', marginTop: 8, fontSize: '0.62rem', letterSpacing: '0.22em', color: 'var(--text-dim-color)' }}>
+              {t('— Amir Moslehi')}
+            </span>
           </motion.div>
         </div>
 

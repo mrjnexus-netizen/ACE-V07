@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
+import type { PointerEvent as RPointerEvent, KeyboardEvent as RKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useScroll, useTransform, useReducedMotion, type MotionValue } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
@@ -120,8 +121,11 @@ function playNote(freq: number) {
 // hook instance — cannot call useBalancedText conditionally inside a .map).
 function TrackCaption({ text }: { text: string }) {
   const ref = useBalancedText<HTMLParagraphElement>();
+  // marginLeft/Right auto: the balance hook narrows this block's max-width,
+  // and a narrowed block otherwise hugs its parent's LEFT edge — which read
+  // as the caption "bunching to one side" under the carousel's focus card.
   return (
-    <p ref={ref} className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)' }}>
+    <p ref={ref} className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)', marginLeft: 'auto', marginRight: 'auto' }}>
       {text}
     </p>
   );
@@ -315,6 +319,314 @@ function PianoLane({
   );
 }
 
+// C1-C3: circular scroll carousel replacing the concept grid. The reference
+// CSS demo (`animation-timeline: scroll()` + `offset-path: circle`) is
+// Chromium-only, so this reimplements the identical feel with a JS driver.
+//
+// GEOMETRY (the root-cause fix): with a fixed 24-degree step, any list of
+// more than 15 items spans past 360 degrees — items were literally landing
+// ON TOP of each other (card 15 at the exact angle of card 0, etc.), which
+// buried the sharp focus card under blurred duplicates and destroyed the
+// layout/size/highlight. Angles are therefore computed with MOD-N index
+// arithmetic relative to the continuous centre index: every card always has
+// a UNIQUE slot in [-n/2, n/2) steps, and the wheel loops infinitely with no
+// collision, for any item count.
+//
+// INPUT: React 17+ registers `wheel` listeners passively, so a synthetic
+// onWheel's preventDefault() is silently ignored — the page scrolled instead
+// of the wheel stepping. The wheel handler is attached NATIVELY with
+// { passive: false } so detent stepping actually receives the gesture.
+interface CarouselItem {
+  key: string;
+  cover: string;
+  title: string;
+  caption: string;
+  concept: string;
+  isCurrent: boolean;
+  isPlaying: boolean;
+  placeholder: boolean;
+  tint?: string;
+  onSelectPlay?: () => void;
+}
+
+const STEP_DEG = 24;
+const VISIBLE_CUTOFF_DEG = 60; // exactly 5 slots on screen: centre, +-1, +-2
+
+function CarouselCard({
+  item,
+  angleDeg,
+  radius,
+  isFocus,
+  instant,
+  onSelect,
+}: {
+  item: CarouselItem;
+  angleDeg: number; // ALREADY signed + unique (mod-n relative angle)
+  radius: number;
+  // Focus/position/highlight are ALL derived from the same single rotation
+  // value every render — there is no separate "target" anything could lag
+  // behind, so this is always exactly in sync with what's on screen.
+  isFocus: boolean;
+  // true while the user is actively dragging: the CSS transition below is
+  // switched off during a drag (position updates 1:1 with the pointer every
+  // frame; a transition here would itself reintroduce a lag, chasing the
+  // cursor). It switches back on the instant the drag ends, for one smooth
+  // luxury glide into the snapped position.
+  instant: boolean;
+  onSelect: () => void;
+}) {
+  const rad = (angleDeg * Math.PI) / 180;
+  const gap = Math.abs(angleDeg);
+  const dist = Math.min(1, gap / VISIBLE_CUTOFF_DEG); // 0 (focus) .. 1 (edge)
+  const hidden = gap > VISIBLE_CUTOFF_DEG;
+  const x = radius * Math.sin(rad);
+  const y = radius * (1 - Math.cos(rad)) * 0.8; // arc dip, like the reference
+  const tilt = angleDeg * 0.3;
+
+  if (hidden) return null; // never mount far-side slots at all
+
+  return (
+    <button
+      type="button"
+      data-cursor={item.placeholder ? undefined : 'play'}
+      onClick={onSelect}
+      className="absolute focus:outline-none rounded-2xl overflow-hidden group"
+      style={{
+        width: 172,
+        height: 252,
+        left: '50%',
+        top: '36%',
+        marginLeft: -86,
+        marginTop: -126,
+        // STRONG, UNMISTAKABLE contrast — independent of the underlying
+        // artwork (placeholder motifs are moody/dark by design, so filters
+        // alone weren't proof enough that the focus card is "the one"; a
+        // real scale jump + a hard accent ring + a solid glow behind it now
+        // make it obvious regardless of content).
+        transform: `translate3d(${x}px, ${y}px, 0px) rotate(${tilt}deg) scale(${isFocus ? 1.18 : 1 - dist * 0.3})`,
+        filter: `blur(${dist * 10}px) grayscale(${Math.min(1, dist * 1.6) * 100}%) brightness(${1 - dist * 0.78})`,
+        opacity: 1 - dist * 0.15,
+        boxShadow: isFocus
+          ? '0 0 0 3px rgba(var(--accent-rgb),0.9), 0 0 70px 14px rgba(var(--accent-rgb),0.55), 0 20px 50px rgba(0,0,0,0.6)'
+          : 'none',
+        zIndex: Math.round((1 - dist) * 100) + (isFocus ? 50 : 0),
+        willChange: 'transform, filter',
+        transition: instant
+          ? 'filter 0.12s linear, opacity 0.2s ease'
+          : 'transform 0.9s cubic-bezier(0.22,1,0.36,1), filter 0.7s cubic-bezier(0.22,1,0.36,1), opacity 0.55s ease, box-shadow 0.6s ease',
+        cursor: 'pointer',
+      }}
+      aria-label={item.placeholder ? item.title : `${item.isPlaying ? 'Pause' : 'Play'} ${item.title}`}
+      aria-current={isFocus || undefined}
+    >
+      <div
+        className="relative w-full h-full"
+        style={{
+          borderRadius: 10,
+          border: item.isCurrent ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
+          background: 'rgba(255,255,255,0.02)',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+        }}
+      >
+        {item.cover ? (
+          <img src={item.cover} alt={item.title} loading="lazy" className="w-full h-full object-cover" />
+        ) : (
+          <ConceptMotif concept={item.concept} />
+        )}
+        {item.isCurrent && <NowPlaying active={item.isPlaying} />}
+        {item.placeholder && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span
+              className="flex items-center justify-center rounded-full transition-opacity duration-500 opacity-40 group-hover:opacity-70"
+              style={{ width: '40px', height: '40px', border: '1px solid rgba(255,255,255,0.35)', background: 'rgba(0,0,0,0.18)', backdropFilter: 'blur(2px)' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16"><path d="M5 3 L13 8 L5 13 Z" fill="rgba(255,255,255,0.7)" /></svg>
+            </span>
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function WorkCarousel({ items }: { items: CarouselItem[] }) {
+  const { t } = useT();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef<{ x: number; startRotation: number } | null>(null);
+  const wheelAccRef = useRef(0);
+  // ROTATION IS THE SINGLE SOURCE OF TRUTH — no separate "target" chased by
+  // an animation loop. Every input (wheel/drag/click/keys) sets it directly,
+  // synchronously, the instant it happens. There is no time/delay concept
+  // left anywhere in this cycle: the highlighted card and the visual
+  // position are, by construction, always the exact same value at the exact
+  // same instant — they cannot go out of sync or lag behind each other the
+  // way a chased/eased target could.
+  const [rotation, setRotation] = useState(0);
+  const [containerW, setContainerW] = useState(900);
+  const [isDragging, setIsDragging] = useState(false);
+  const n = items.length;
+  const step = STEP_DEG;
+  const radius = Math.min(containerW * 0.66, 740);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setContainerW(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // NATIVE non-passive wheel (React 17+ registers wheel passively, which
+  // silently ignores preventDefault) + capture phase (this app runs Lenis
+  // smooth-scroll globally, which can otherwise grab the gesture first).
+  // Works identically in BOTH directions — deltaY/deltaX can each be
+  // positive or negative and Math.sign handles either sign symmetrically.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || n === 0) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      wheelAccRef.current += e.deltaY + e.deltaX;
+      const TH = 60;
+      let delta = 0;
+      while (Math.abs(wheelAccRef.current) >= TH) {
+        delta += Math.sign(wheelAccRef.current) * step;
+        wheelAccRef.current -= Math.sign(wheelAccRef.current) * TH;
+      }
+      if (delta !== 0) setRotation((r) => r + delta);
+    };
+    el.addEventListener('wheel', handler, { passive: false, capture: true });
+    return () => el.removeEventListener('wheel', handler, { capture: true } as EventListenerOptions);
+  }, [n, step]);
+
+  // Continuous index (used only for angle math / relAngle); the focused
+  // card is the nearest whole step to the CURRENT rotation, computed fresh
+  // on every render — there is nothing else it could lag behind.
+  const virt = -rotation / step;
+  const focusIndex = n > 0 ? ((Math.round(virt) % n) + n) % n : 0;
+  const focusItem = items[focusIndex];
+
+  const relAngle = (i: number): number => {
+    let rel = (i - virt) % n;
+    if (rel > n / 2) rel -= n;
+    if (rel < -n / 2) rel += n;
+    return rel * step;
+  };
+
+  const onPointerDown = (e: RPointerEvent) => {
+    draggingRef.current = { x: e.clientX, startRotation: rotation };
+    setIsDragging(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: RPointerEvent) => {
+    const d = draggingRef.current;
+    if (!d) return;
+    // 1:1 direct tracking while dragging — no CSS transition is active here
+    // (see isDragging below), so this never lags behind the real cursor.
+    setRotation(d.startRotation - (e.clientX - d.x) * 0.5);
+  };
+  const onPointerUp = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = null;
+    setIsDragging(false);
+    // Snap to the nearest card on release — the CSS transition re-enables
+    // the instant isDragging flips false, giving one smooth luxury glide
+    // into place.
+    setRotation((r) => Math.round(r / step) * step);
+  };
+  const onKeyDown = (e: RKeyboardEvent) => {
+    if (e.key === 'ArrowRight') { setRotation((r) => r + step); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { setRotation((r) => r - step); e.preventDefault(); }
+  };
+  const goTo = (i: number) => {
+    // Bring card i to front via the shortest path from the CURRENT position.
+    setRotation((r) => r - relAngle(i));
+  };
+
+  if (n === 0) return null;
+
+  return (
+    <div className="w-full flex flex-col items-center">
+      <div
+        ref={containerRef}
+        role="listbox"
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onKeyDown={onKeyDown}
+        className="relative focus:outline-none"
+        style={{
+          width: '100%',
+          maxWidth: '96vw',
+          margin: '0 auto',
+          height: 'min(62vh, 560px)',
+          touchAction: 'pan-y',
+          cursor: 'grab',
+        }}
+        aria-label={t('Circular works carousel — scroll, drag, or use arrow keys')}
+      >
+        {/* No hard clip here: far-side cards are never even mounted
+            (returns null past VISIBLE_CUTOFF_DEG), so there's nothing left
+            to clip — and a hard overflow:hidden box was slicing the focus
+            card's accent glow/ring wherever it touched the boundary,
+            producing stray thin line artifacts. The outer scroll area still
+            has overflowX:hidden as a page-level safety net. */}
+        <div className="absolute inset-0" style={{ overflow: 'visible' }}>
+          {items.map((item, i) => (
+            <CarouselCard
+              key={item.key}
+              item={item}
+              angleDeg={relAngle(i)}
+              radius={radius}
+              isFocus={i === focusIndex}
+              instant={isDragging}
+              onSelect={() => {
+                goTo(i);
+                item.onSelectPlay?.();
+              }}
+            />
+          ))}
+        </div>
+
+      {/* Caption — right beneath the FOCUS card. Positioning lives on this
+          PLAIN div (framer-motion rewrites transforms on its own elements). */}
+      {focusItem && (
+        <div
+          className="absolute text-center"
+          style={{ maxWidth: 420, width: '100%', left: '50%', transform: 'translateX(-50%)', top: 'calc(36% + 146px)', zIndex: 200, pointerEvents: 'none' }}
+        >
+        <motion.div
+          key={focusItem.key}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <span className="font-mono uppercase inline-block mb-1" style={{ fontSize: '0.6rem', letterSpacing: '0.3em', color: focusItem.tint || 'var(--accent-color)' }}>
+            {t(focusItem.concept)}
+          </span>
+          <h3 className="font-display font-light" style={{ fontSize: 'clamp(1.05rem, 1.8vw, 1.3rem)', color: focusItem.isCurrent ? 'var(--accent-color)' : 'var(--text-color)' }}>
+            {focusItem.title}
+          </h3>
+          {focusItem.caption && <TrackCaption text={focusItem.caption} />}
+          {focusItem.placeholder && focusItem.tint && (
+            <span className="font-mono uppercase inline-block mt-2" style={{ fontSize: '0.55rem', letterSpacing: '0.35em', color: focusItem.tint }}>
+              {t('In composition')}
+            </span>
+          )}
+        </motion.div>
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}
 // Full-screen concept overlay. Rendered via portal to document.body so it
 // escapes the section's overflow-hidden + living-veil stacking context (the
 // particle sphere / backdrop-filter cannot leak over it). Soft fade in/out,
@@ -331,7 +643,6 @@ function OverlayPanel({
 }) {
   const { audioState, playTrack, pauseTrack, setPlaylist } = useAudio();
   const { t } = useT();
-  const tr = t; // alias: inside group.tracks.map((t) => ...) the param `t` shadows the translator
 
   // Lock scroll + ESC while mounted. Lenis (smooth scroll) ignores plain body
   // overflow:hidden, so we stop the instance directly via window.__lenis and
@@ -365,15 +676,6 @@ function OverlayPanel({
   // G5: force even wrap + no widow last-word on the concept blurb,
   // cross-browser. Re-balance when the open concept changes.
   const blurbBalanceRef = useBalancedText<HTMLParagraphElement>();
-
-  const gridV = {
-    hidden: {},
-    show: { transition: { staggerChildren: reduce ? 0 : 0.06, delayChildren: reduce ? 0 : 0.18 } },
-  };
-  const cardV = {
-    hidden: { opacity: 0, y: reduce ? 0 : 18 },
-    show: { opacity: 1, y: 0, transition: { duration: reduce ? 0 : 0.55, ease } },
-  };
 
   const onTrackClick = useCallback((t: AudioTrack) => {
     const isThis = audioState.currentTrack?.id === t.id;
@@ -417,160 +719,73 @@ function OverlayPanel({
         </svg>
       </button>
 
-      {/* Scroll area — clicks on empty space bubble up to close */}
-      <div className="flex-1 min-h-0 w-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-        {/* Content block — interactive, does not close on click */}
+      {/* Simple, fluid, fills the real screen at any size — no locked/scaled
+          canvas. Header and carousel just size themselves off vw/vh like the
+          rest of the site's responsive sections. */}
+      <div
+        className="flex-1 min-h-0 w-full overflow-y-auto"
+        style={{ WebkitOverflowScrolling: 'touch', overflowX: 'hidden' }}
+        onClick={onClose}
+      >
         <motion.div
-          className="mx-auto"
-          style={{
-            maxWidth: '1180px',
-            padding: 'clamp(5rem, 11vh, 7.5rem) clamp(1.5rem, 4vw, 4rem) clamp(4rem, 8vh, 6rem)',
-          }}
+          className="w-full h-full flex flex-col"
+          style={{ padding: 'clamp(1.5rem, 4vh, 3.5rem) clamp(1.5rem, 4vw, 4rem)' }}
           onClick={(e) => e.stopPropagation()}
           initial={{ opacity: 0, y: reduce ? 0 : 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduce ? 0 : 0.5, ease, delay: reduce ? 0 : 0.05 }}
         >
           {/* Header */}
-          <div className="mb-14 md:mb-20">
+          <div className="mb-4 md:mb-6" style={{ flexShrink: 0 }}>
             <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.4em', color: 'var(--accent-color)' }}>
               {t('Selected Works')}
             </span>
-            <h2 className="font-display font-light mt-5" style={{ fontSize: 'clamp(2rem, 5vw, 3.6rem)', lineHeight: 1.08, color: 'var(--text-color)' }}>
+            <h2 className="font-display font-light mt-2" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', lineHeight: 1.08, color: 'var(--text-color)' }}>
               {t(group.label)}
             </h2>
-            <p ref={blurbBalanceRef} className="font-display font-light mt-5" style={{ fontSize: 'clamp(0.95rem, 1.6vw, 1.2rem)', lineHeight: 1.6, color: 'var(--text-dim-color)', maxWidth: '46ch' }}>
+            <p ref={blurbBalanceRef} className="font-display font-light mt-2" style={{ fontSize: 'clamp(0.9rem, 1.4vw, 1.05rem)', lineHeight: 1.5, color: 'var(--text-dim-color)', maxWidth: '46ch' }}>
               {t(group.blurb)}
             </p>
-            <p className="font-mono mt-6" style={{ fontSize: '0.64rem', letterSpacing: '0.18em', color: 'var(--text-dim-color)' }}>
-              {count > 0 ? `${String(count).padStart(2, '0')} ${count === 1 ? t('TRACK') : t('TRACKS')}` : ''}
-            </p>
+            {count > 0 && (
+              <p className="font-mono mt-3" style={{ fontSize: '0.66rem', letterSpacing: '0.18em', color: 'var(--text-dim-color)' }}>
+                {`${String(count).padStart(2, '0')} ${count === 1 ? t('TRACK') : t('TRACKS')}`}
+              </p>
+            )}
           </div>
 
-          {/* Grid OR elegant schematic placeholders (3 cards) */}
-          {count === 0 ? (
-            <motion.div
-              className="flex flex-wrap justify-center"
-              style={{ gap: 'clamp(1.5rem, 3vw, 2.5rem)', width: '100%', display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}
-              variants={gridV}
-              initial="hidden"
-              animate="show"
-            >
-              {[0, 1, 2].map((i) => {
-                const tint = conceptTint(group.label);
-                return (
-                  <motion.article key={`ph-${i}`} variants={cardV} className="group" style={{ flex: '0 1 300px', maxWidth: '340px', minWidth: '240px' }}>
-                    <div
-                      className="relative w-full overflow-hidden"
-                      style={{ aspectRatio: '4 / 3', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}
-                    >
-                      <ConceptMotif concept={group.label} />
-                      {/* Sample (inactive) play affordance — shows the final
-                          feel; real tracks get a live play/pause button. */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <span
-                          className="flex items-center justify-center rounded-full transition-opacity duration-500 opacity-40 group-hover:opacity-70"
-                          style={{ width: '46px', height: '46px', border: '1px solid rgba(255,255,255,0.35)', background: 'rgba(0,0,0,0.18)', backdropFilter: 'blur(2px)' }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 16 16"><path d="M5 3 L13 8 L5 13 Z" fill="rgba(255,255,255,0.7)" /></svg>
-                        </span>
-                      </div>
-                    </div>
-                    <h3 className="font-display font-light mt-4" style={{ fontSize: 'clamp(1rem, 1.5vw, 1.25rem)', lineHeight: 1.3, color: 'var(--text-color)' }}>
-                      {t('Untitled {concept} Score').replace('{concept}', t(group.label))}
-                    </h3>
-                    <TrackCaption text={t('A piece still taking shape in the composer’s studio.')} />
-                    <span className="font-mono uppercase inline-block mt-2" style={{ fontSize: '0.55rem', letterSpacing: '0.35em', color: tint }}>
-                      {t('In composition')}
-                    </span>
-                  </motion.article>
-                );
-              })}
-            </motion.div>
-          ) : (
-            <motion.div
-              className="flex flex-wrap justify-center"
-              style={{ gap: 'clamp(1.5rem, 3vw, 2.5rem)', width: '100%', display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}
-              variants={gridV}
-              initial="hidden"
-              animate="show"
-            >
-              {group.tracks.map((t) => {
-                const cover = trackCover(t);
-                const title = trackTitle(t);
-                const caption = trackCaption(t);
-                const isCurrent = audioState.currentTrack?.id === t.id;
-                const isPlaying = isCurrent && audioState.isPlaying;
-                return (
-                  <motion.article key={t.id} variants={cardV} className="group" style={{ flex: '0 1 300px', maxWidth: '340px', minWidth: '240px' }}>
-                    <button
-                      type="button"
-                      data-cursor="play"
-                      onClick={() => onTrackClick(t)}
-                      className="block w-full text-left focus:outline-none"
-                      style={{ cursor: 'pointer' }}
-                      aria-label={`${isPlaying ? tr('Pause') : tr('Play')} ${title}`}
-                    >
-                      <div
-                        className="relative w-full overflow-hidden"
-                        style={{
-                          aspectRatio: '4 / 3',
-                          borderRadius: '6px',
-                          border: isCurrent ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
-                          background: 'rgba(255,255,255,0.02)',
-                          boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-                          transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
-                        }}
-                      >
-                        {cover ? (
-                          <img
-                            src={cover}
-                            alt={title}
-                            loading="lazy"
-                            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                          />
-                        ) : (
-                          <div
-                            className="w-full h-full flex items-center justify-center"
-                            style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0))' }}
-                          >
-                            <span className="font-mono" style={{ fontSize: '0.58rem', letterSpacing: '0.3em', color: 'var(--text-dim-color)' }}>
-                              {tr(group.label).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Now-playing equaliser (also shows, paused, on the current track) */}
-                        {isCurrent && <NowPlaying active={isPlaying} />}
-
-                        {/* Hover play hint when nothing is playing on this card */}
-                        {!isCurrent && (
-                          <div
-                            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100"
-                            style={{ background: 'rgba(0,0,0,0.28)', transition: 'opacity 0.4s ease' }}
-                            aria-hidden
-                          >
-                            <span
-                              className="flex items-center justify-center rounded-full"
-                              style={{ width: '46px', height: '46px', border: '1px solid rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.25)' }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 16 16"><path d="M5 3 L13 8 L5 13 Z" fill="#fff" /></svg>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <h3 className="font-display font-light mt-4" style={{ fontSize: 'clamp(1rem, 1.5vw, 1.25rem)', lineHeight: 1.3, color: isCurrent ? 'var(--accent-color)' : 'var(--text-color)', transition: 'color 0.3s ease' }}>
-                        {title}
-                      </h3>
-                      {caption && (
-                        <TrackCaption text={caption} />
-                      )}
-                    </button>
-                  </motion.article>
-                );
-              })}
-            </motion.div>
-          )}
+          {/* C1-C3: circular scroll carousel — fills remaining space */}
+          <div className="flex-1 min-h-0 flex items-center justify-center">
+            <WorkCarousel
+              items={
+                count === 0
+                  ? Array.from({ length: 20 }, (_, i) => i).map((i) => ({
+                      key: `ph-${i}`,
+                      cover: '',
+                      title: t('Untitled {concept} Score').replace('{concept}', t(group.label)),
+                      caption: t('A piece still taking shape in the composer’s studio.'),
+                      concept: group.label,
+                      isCurrent: false,
+                      isPlaying: false,
+                      placeholder: true,
+                      tint: conceptTint(group.label),
+                    }))
+                  : group.tracks.map((tk) => {
+                      const isCurrent = audioState.currentTrack?.id === tk.id;
+                      return {
+                        key: tk.id,
+                        cover: trackCover(tk),
+                        title: trackTitle(tk),
+                        caption: trackCaption(tk),
+                        concept: group.label,
+                        isCurrent,
+                        isPlaying: isCurrent && audioState.isPlaying,
+                        placeholder: false,
+                        onSelectPlay: () => onTrackClick(tk),
+                      };
+                    })
+              }
+            />
+          </div>
         </motion.div>
       </div>
     </motion.div>
