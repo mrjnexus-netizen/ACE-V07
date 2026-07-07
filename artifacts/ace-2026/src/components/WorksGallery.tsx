@@ -198,15 +198,16 @@ function PianoLane({
 
   const press = useCallback(() => { setPressed(true); playNote(freq); }, [freq]);
 
-  // Longest key ~ 46vw, shortest ~ 11.5vw (4:1 ratio). Clamped for sanity.
-  const minVW = 11.5;
-  const maxVW = 46;
+  // Longest key ~ 32vw, shortest ~ 8vw (4:1 ratio, scaled down with the
+  // shorter lane height so keys keep their proportions). Clamped for sanity.
+  const minVW = 8;
+  const maxVW = 32;
   const widthVW = minVW + (maxVW - minVW) * lengthPct;
 
   const count = group.tracks.length;
 
   return (
-    <div className="relative flex items-center" style={{ height: 'clamp(2.4rem, 4.6vh, 3.2rem)' }}>
+    <div className="relative flex items-center" style={{ height: 'clamp(1.7rem, 3.4vh, 2.3rem)' }}>
       {/* Decorative black key nestled in the gap to the NEXT white key
           (shorter than the white key, 3D, like a real piano). Not for last. */}
       {!isLast && (
@@ -216,8 +217,8 @@ function PianoLane({
           style={{
             left: 0,
             bottom: 'calc(-1 * clamp(0.15rem, 0.35vh, 0.25rem) - 0.5px)',
-            width: `clamp(3.6rem, ${widthVW * 0.6}vw, ${widthVW * 0.25}rem)`,
-            height: 'clamp(1.92rem, 3.68vh, 2.56rem)',
+            width: `clamp(2rem, ${widthVW * 0.6}vw, ${widthVW * 0.4}rem)`,
+            height: 'clamp(1.36rem, 2.72vh, 1.84rem)',
             transform: 'translateY(50%)',
             opacity,
           }}
@@ -253,7 +254,7 @@ function PianoLane({
         style={{
           x,
           opacity,
-          width: `clamp(6rem, ${widthVW}vw, ${widthVW * 0.42}rem)`,
+          width: `clamp(3rem, ${widthVW}vw, ${widthVW * 0.6}rem)`,
           cursor: 'pointer',
           transformOrigin: 'left center',
         }}
@@ -817,9 +818,15 @@ export default function WorksGallery() {
   const sectionRef = useRef<HTMLElement>(null);
   const [active, setActive] = useState<ConceptGroup | null>(null);
 
+  // Reza (2026-07-07): the reveal must be COMPLETE by the time the section
+  // settles into its natural reading position — not still opening keys
+  // several scrolls later, by which point the heading has scrolled off the
+  // top. Range now spans only the section's ENTRANCE (top hits viewport
+  // bottom -> top hits viewport top), not its entire transit through the
+  // viewport, so progress reaches 1 right as it arrives, not long after.
   const { scrollYProgress } = useScroll({
     target: sectionRef,
-    offset: ['start end', 'end start'],
+    offset: ['start end', 'start start'],
   });
 
   // ALWAYS build all 12 concepts (+ Other Works). Each gets the live tracks
@@ -852,10 +859,10 @@ export default function WorksGallery() {
       ref={sectionRef}
       id="works"
       className="relative w-full living-veil overflow-hidden"
-      style={{ color: 'var(--text-color)', padding: 'clamp(5rem, 12vw, 9rem) 0' }}
+      style={{ color: 'var(--text-color)', padding: 'clamp(1rem, 2vh, 1.75rem) 0 clamp(0.75rem, 1.75vh, 1.5rem)' }}
       aria-label={t('Works by concept')}
     >
-      <div className="mb-12 md:mb-16" style={{ padding: '0 clamp(1.5rem, 6vw, 7rem)' }}>
+      <div style={{ padding: '0 clamp(1.5rem, 6vw, 7rem)', marginBottom: 'clamp(0.5rem, 1.5vh, 1rem)' }}>
         <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.4em', color: 'var(--accent-color)' }}>
           {t('Section 03 — Selected Works')}
         </span>

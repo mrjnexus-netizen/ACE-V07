@@ -47,6 +47,37 @@ export default function ComposerPresence() {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
 
+  // Curtain-peel reveal on the "The Composer" heading (reference:
+  // codepen.io/shahidshaikhs/pen/JjGoaOz, adapted) — stacked dark panels
+  // sit over the heading and peel away once when it first scrolls into
+  // view. Lives directly on the existing heading (no separate section, no
+  // extra scroll stop) — plain CSS transitions driven by one state flip,
+  // no new dependency.
+  const headingRef = useRef<HTMLDivElement>(null);
+  const revealedOnceRef = useRef(false);
+  const revealTimeoutRef = useRef<number | null>(null);
+  const [peeled, setPeeled] = useState(reduce);
+
+  useEffect(() => {
+    if (reduce) return;
+    const el = headingRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && !revealedOnceRef.current) {
+          revealedOnceRef.current = true;
+          revealTimeoutRef.current = window.setTimeout(() => setPeeled(true), 150);
+        }
+      },
+      { threshold: 0.4 }
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      if (revealTimeoutRef.current) window.clearTimeout(revealTimeoutRef.current);
+    };
+  }, [reduce]);
+
   // Group tracks by genre automatically.
   const groups = useMemo<GenreGroup[]>(() => {
     const map = new Map<string, AudioTrack[]>();
@@ -95,13 +126,14 @@ export default function ComposerPresence() {
     <section
       ref={sectionRef}
       className="relative w-full overflow-hidden living-veil"
-      style={{ padding: 'clamp(6rem, 14vw, 12rem) 0', minHeight: '100vh' }}
+      style={{ padding: 'clamp(1.5rem, 3vh, 2.5rem) 0 clamp(0.5rem, 1.5vh, 1rem)' }}
       aria-label={t('The composer')}
     >
       {/* Heading — centred, generous breathing room above the band */}
       <div
-        className="flex flex-col items-center text-center"
-        style={{ padding: '0 clamp(1.5rem, 8vw, 9rem)', marginBottom: 'clamp(4rem, 9vw, 7rem)' }}
+        ref={headingRef}
+        className="relative flex flex-col items-center text-center overflow-hidden"
+        style={{ padding: '0 clamp(1.5rem, 8vw, 9rem)', marginBottom: 'clamp(1rem, 3vh, 2rem)' }}
       >
         <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.45em', color: 'var(--accent-color)' }}>
           {t('The Composer')}
@@ -112,12 +144,27 @@ export default function ComposerPresence() {
         >
           {t('The worlds {name} scores for.').replace('{name}', composerName.split(' ')[0] ?? '')}
         </h2>
+
+        {/* stacked cover panels — peel away once, staggered, revealing the heading above */}
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundColor: `rgba(8,8,10,${1 - i * 0.1})`,
+              zIndex: 5 - i,
+              transform: peeled ? 'translateX(-100%)' : 'translateX(0)',
+              transition: `transform 0.9s cubic-bezier(0.22,1,0.36,1) ${i * 0.15}s`,
+            }}
+          />
+        ))}
       </div>
 
       {/* The rotating band — curved like a strap around a cylinder */}
       <div
         className="relative w-full"
-        style={{ perspective: '1400px', height: 'clamp(220px, 34vh, 360px)' }}
+        style={{ perspective: '1400px', height: 'clamp(160px, 28vh, 300px)' }}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -177,7 +224,7 @@ export default function ComposerPresence() {
       </div>
 
       {/* progress dots */}
-      <div className="flex items-center justify-center gap-2.5" style={{ marginTop: 'clamp(3rem, 6vw, 5rem)' }}>
+      <div className="flex items-center justify-center gap-2.5" style={{ marginTop: 'clamp(0.5rem, 1.5vh, 1rem)' }}>
         {groups.map((g, i) => (
           <button
             key={g.genre}

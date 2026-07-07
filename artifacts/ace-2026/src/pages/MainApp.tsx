@@ -10,6 +10,7 @@ const LivingScore = lazy(() => import('../components/LivingScore'));
 const LinguisticPortal = lazy(() => import('../components/LinguisticPortal'));
 const GridLayoutEngine = lazy(() => import('../components/GridLayoutEngine'));
 const ComposerPresence = lazy(() => import('../components/ComposerPresence'));
+const MusicTime = lazy(() => import('../components/MusicTime'));
 const DoubleExposurePortrait = lazy(() => import('../components/DoubleExposurePortrait'));
 const SpatialScrollEngine = lazy(() => import('../components/SpatialScrollEngine'));
 const WorksGallery = lazy(() => import('../components/WorksGallery'));
@@ -67,6 +68,13 @@ export default function MainApp() {
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
             <ComposerPresence />
+          </Suspense>
+        </ErrorBoundary>
+
+        {/* Music Time interlude (blueprint M1-M6) — standalone, own IntersectionObserver */}
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <MusicTime />
           </Suspense>
         </ErrorBoundary>
 
