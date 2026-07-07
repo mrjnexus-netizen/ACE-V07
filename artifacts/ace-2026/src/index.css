@@ -589,6 +589,71 @@ html.lenis body { height: auto; }
 }
 
 /* ============================================================
+   ACE-2026 - CONTACT BAR (T1-T3)
+   Thin fixed luxury top bar, post-locale persistent. Icon pills
+   built on the same Button System language (.bloom-style hover,
+   accent-glow) but with a per-network hue tint on hover instead
+   of a brand-color fill block, and a CSS-only expand-on-hover
+   label reveal (width transition, no JS state). Themed off
+   --accent-rgb by default; --pill-hue overrides it per channel.
+   ============================================================ */
+.contactbar-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--text-color, #F4F1EA);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease), background-color var(--btn-slow) var(--btn-ease);
+}
+.contactbar-pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: color var(--btn-slow) var(--btn-ease);
+}
+.contactbar-pill-label {
+  display: inline-block;
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: max-width 0.45s var(--btn-ease), opacity 0.35s var(--btn-ease), margin-left 0.45s var(--btn-ease);
+}
+.contactbar-pill:hover {
+  border-color: rgba(var(--pill-hue, var(--accent-rgb)), 0.65);
+  box-shadow: 0 0 14px rgba(var(--pill-hue, var(--accent-rgb)), 0.3);
+  background: rgba(var(--pill-hue, var(--accent-rgb)), 0.07);
+}
+.contactbar-pill:hover .contactbar-pill-icon {
+  color: rgb(var(--pill-hue, var(--accent-rgb)));
+}
+.contactbar-pill:hover .contactbar-pill-label {
+  max-width: 120px;
+  margin-left: 8px;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .contactbar-pill,
+  .contactbar-pill-label {
+    transition: none;
+  }
+}
+
+/* ============================================================
    ACE-2026 - SITEWIDE TYPOGRAPHY LINE-WRAP QUALITY
    Prevents dangling "widow" words on headings and uneven
    paragraph line breaks, across ALL languages and ALL pages

@@ -18,6 +18,7 @@ const PersistentAudioPlayer = lazy(() => import('../components/PersistentAudioPl
 const ExecutiveStudioBot = lazy(() => import('../components/ExecutiveStudioBot'));
 const MagneticCursor = lazy(() => import('../components/MagneticCursor'));
 const Footer = lazy(() => import('../components/Footer'));
+const ContactBar = lazy(() => import('../components/ContactBar'));
 
 function LoadingFallback() {
   return (
@@ -111,6 +112,13 @@ export default function MainApp() {
           </Suspense>
         </ErrorBoundary>
       </div>
+
+      {/* Fixed UI: Contact bar (T1-T3) — thin luxury bar, post-locale persistent */}
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <ContactBar />
+        </Suspense>
+      </ErrorBoundary>
 
       {/* Fixed UI: Persistent Audio Player */}
       <ErrorBoundary>
