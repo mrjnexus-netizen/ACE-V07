@@ -54,10 +54,13 @@ body {
 }
 
 /* ------------------------------------------------------------------
-   Cursor - MagneticCursor replaces OS pointer on desktop
+   Cursor - MagneticCursor replaces OS pointer on desktop.
+   Scoped to .ace-main-shell (MainApp's root) — NOT global `body` — so
+   pages that don't mount MagneticCursor (e.g. /admin) keep the normal
+   OS cursor instead of hiding it with nothing to replace it.
    ------------------------------------------------------------------ */
 @media (pointer: fine) {
-  body {
+  .ace-main-shell {
     cursor: none;
   }
 }
@@ -654,6 +657,32 @@ html.lenis body { height: auto; }
 }
 
 /* ============================================================
+   ACE-2026 - ADMIN LOGIN INPUTS
+   Matches the luxury dark ground + accent-glow language used
+   everywhere else (ContactBar pills, chips) instead of the
+   generic placeholder styling the login form started with.
+   ============================================================ */
+.admin-login-input {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--text-color, #F4F1EA);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  outline: none;
+  transition: border-color var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease), background-color var(--btn-slow) var(--btn-ease);
+}
+.admin-login-input::placeholder {
+  color: var(--text-dim-color, #6B6862);
+}
+.admin-login-input:focus {
+  border-color: rgba(var(--accent-rgb), 0.6);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12), 0 0 16px rgba(var(--accent-rgb), 0.2);
+  background: rgba(var(--accent-rgb), 0.04);
+}
+
+/* ============================================================
    ACE-2026 - SITEWIDE TYPOGRAPHY LINE-WRAP QUALITY
    Prevents dangling "widow" words on headings and uneven
    paragraph line breaks, across ALL languages and ALL pages
@@ -834,9 +863,18 @@ p, blockquote, figcaption, .text-wrap-pretty {
    the cascade over all of them without editing every source file.
    Scoped to fine-pointer (desktop/trackpad) devices only, so touch
    devices keep their native tap behaviour untouched. Additive-only.
+
+   FIX (2026-07-07): scoped to `.ace-main-shell *` — was previously
+   a bare `*` universal selector, so it silently re-hid the cursor
+   on EVERY page (including /admin, which never mounts
+   MagneticCursor) regardless of the body-level fix above, since a
+   higher-specificity !important rule wins the cascade either way.
    ============================================================ */
 @media (pointer: fine) {
-  *, *::before, *::after {
+  .ace-main-shell,
+  .ace-main-shell *,
+  .ace-main-shell *::before,
+  .ace-main-shell *::after {
     cursor: none !important;
   }
 }

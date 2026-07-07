@@ -22,7 +22,7 @@ const ContactBar = lazy(() => import('../components/ContactBar'));
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--surface-color)' }}>
+    <div className="ace-main-shell min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--surface-color)' }}>
       <div className="w-12 h-12 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--accent-color)', borderTopColor: 'transparent' }} />
     </div>
   );
@@ -38,14 +38,16 @@ export default function MainApp() {
   // Show Linguistic Portal if locale not yet selected
   if (!locale) {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <LinguisticPortal />
-      </Suspense>
+      <div className="ace-main-shell">
+        <Suspense fallback={<LoadingFallback />}>
+          <LinguisticPortal />
+        </Suspense>
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>
+    <div className="ace-main-shell min-h-screen relative" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>
       {/* Living Score â€” global fixed 3D particle field behind all content (S5) */}
       <ErrorBoundary>
         <Suspense fallback={null}>
