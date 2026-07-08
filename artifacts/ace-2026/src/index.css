@@ -683,6 +683,89 @@ html.lenis body { height: auto; }
 }
 
 /* ============================================================
+   ACE-2026 - EDITABLE CONTENT (G2 / A3a visual editor)
+   Hover toolbar for EditableText/EditableImage — only ever mounted
+   while ContentContext.editMode is true (the real site, opened from
+   the admin dashboard). Deliberately utilitarian, not luxury-themed:
+   this is an admin tool overlaid on the site, not part of the site's
+   own design language, so it should read as clearly "not the real
+   thing visitors see".
+   ============================================================ */
+.ace-editable-wrap {
+  position: relative;
+  display: inline-block;
+}
+.ace-editable-toolbar {
+  /* position/top/left are set inline (position:fixed, computed from the
+     wrapper's real getBoundingClientRect) — NOT here — specifically so
+     this toolbar escapes any ancestor `overflow:hidden` (very common
+     across this site's sections for their own reveal animations). */
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: rgba(8, 8, 10, 0.95);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 300;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.ace-editable-btn {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.ace-editable-btn:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent-color);
+}
+.ace-editable-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ace-editable-btn--save {
+  background: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent-color);
+}
+.ace-editable-editform {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ace-editable-textarea {
+  min-width: 220px;
+  font-size: 0.75rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-color, #F4F1EA);
+  resize: vertical;
+}
+.ace-editable-editform-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.ace-editable-notice {
+  display: block;
+  font-size: 0.6rem;
+  color: rgba(233, 180, 120, 0.9);
+  margin-top: 4px;
+  max-width: 220px;
+  white-space: normal;
+}
+
+/* ============================================================
    ACE-2026 - SITEWIDE TYPOGRAPHY LINE-WRAP QUALITY
    Prevents dangling "widow" words on headings and uneven
    paragraph line breaks, across ALL languages and ALL pages

@@ -62,3 +62,28 @@ export const apiDelete = <T>(path: string): Promise<T> => {
   if (DEMO_MODE) return Promise.resolve(null as unknown as T);
   return request<T>('DELETE', path);
 };
+
+/**
+ * /api/translate is the one endpoint that returns a raw `{ translation }`
+ * body instead of the wrapped `{ success, data }` envelope every other
+ * route uses — going through apiPost()/unwrap() would (and did) throw a
+ * false "Request failed" on a genuinely successful 200. Talks to it
+ * directly instead, matching its actual response shape.
+ */
+export const apiTranslate = async (text: string, targetLang: string): Promise<string> => {
+  if (DEMO_MODE) return Promise.resolve(text);
+  const res = await fetch(`${API_BASE_URL}/api/translate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ text, targetLang }),
+  });
+  if (!res.ok) {
+    throw new Error(`[apiClient] translate ${res.status}: request failed`);
+  }
+  const parsed: { translation?: unknown } = await res.json();
+  if (typeof parsed.translation !== 'string') {
+    throw new Error('[apiClient] translate: unexpected response shape');
+  }
+  return parsed.translation;
+};

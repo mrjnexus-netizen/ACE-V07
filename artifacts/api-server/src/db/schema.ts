@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { pgTable, uuid, jsonb, text, integer, boolean, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, jsonb, text, integer, boolean, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const composerIdentity = pgTable(
   'composer_identity',
@@ -154,6 +154,29 @@ export const stagingDrafts = pgTable(
   })
 );
 
+// Blueprint §6.4 — the "everything is admin-editable" backbone. One row per
+// (key, locale) override. Resolution order (done in routes/content.ts, not
+// here): override(locale) -> override('en') -> compiled-in default living
+// in the component itself. type distinguishes how EditableX should render/
+// edit the value (text is plain, image/audio are asset URLs, link is a URL
+// meant for hrefs). A row's mere EXISTENCE is the override; deleting it
+// ("Set-to-default") falls back to the compiled default automatically.
+export const contentEntries = pgTable(
+  'content_entries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    key: text('key').notNull(),
+    locale: text('locale').notNull(),
+    type: text('type').notNull().default('text'), // 'text' | 'image' | 'audio' | 'link'
+    value: text('value').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+    updatedBy: uuid('updated_by').references(() => adminUsers.id, { onDelete: 'set null' }),
+  },
+  (table) => ({
+    keyLocaleUnique: uniqueIndex('idx_content_entries_key_locale_unique').on(table.key, table.locale),
+  })
+);
+
 // Relations
 export const composerIdentityRelations = relations(composerIdentity, ({ many }) => ({
   projects: many(projects),
@@ -179,6 +202,10 @@ export const stagingDraftsRelations = relations(stagingDrafts, ({ one }) => ({
   adminUser: one(adminUsers, { fields: [stagingDrafts.createdBy], references: [adminUsers.id] }),
 }));
 
+export const contentEntriesRelations = relations(contentEntries, ({ one }) => ({
+  updatedByUser: one(adminUsers, { fields: [contentEntries.updatedBy], references: [adminUsers.id] }),
+}));
+
 // Infer types for Drizzle
 export type ComposerIdentityRow = typeof composerIdentity.$inferSelect;
 export type NewComposerIdentity = typeof composerIdentity.$inferInsert;
@@ -192,3 +219,5 @@ export type AdminUserRow = typeof adminUsers.$inferSelect;
 export type BriefRow = typeof briefs.$inferSelect;
 export type StagingDraftRow = typeof stagingDrafts.$inferSelect;
 export type NewStagingDraft = typeof stagingDrafts.$inferInsert;
+export type ContentEntryRow = typeof contentEntries.$inferSelect;
+export type NewContentEntry = typeof contentEntries.$inferInsert;

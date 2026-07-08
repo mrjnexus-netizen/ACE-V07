@@ -19,6 +19,7 @@ const ExecutiveStudioBot = lazy(() => import('../components/ExecutiveStudioBot')
 const MagneticCursor = lazy(() => import('../components/MagneticCursor'));
 const Footer = lazy(() => import('../components/Footer'));
 const ContactBar = lazy(() => import('../components/ContactBar'));
+const EditModeIndicator = lazy(() => import('../components/EditModeIndicator'));
 
 function LoadingFallback() {
   return (
@@ -119,6 +120,13 @@ export default function MainApp() {
       <ErrorBoundary>
         <Suspense fallback={null}>
           <ContactBar />
+        </Suspense>
+      </ErrorBoundary>
+
+      {/* Fixed UI: A3a visual editor exit indicator — only renders when editMode is on */}
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <EditModeIndicator />
         </Suspense>
       </ErrorBoundary>
 

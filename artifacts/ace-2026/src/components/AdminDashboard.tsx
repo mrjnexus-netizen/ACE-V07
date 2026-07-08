@@ -5,7 +5,9 @@ import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
 import { apiPost, apiGet, apiPut } from '../lib/apiClient';
 import { usePipeline } from '../context/PipelineContext';
-import type { ComposerIdentity, AudioTrack, MultiLingual } from '../types';
+import StagingPreview from './StagingPreview';
+import { useContent } from '../context/ContentContext';
+import type { ComposerIdentity, AudioTrack, MultiLingual, ThemeId } from '../types';
 
 // ---------- shared helpers ----------
 const emptyMultiLingual = (): MultiLingual => ({ en: '', es: '', fr: '', zh: '', ja: '', ko: '' });
@@ -242,39 +244,84 @@ const TabGatekeeperHub = () => {
 };
 
 const TabStagingEngine = () => {
-  const { composerIdentity, updateIdentity } = useIdentity();
-  const [editMode, setEditMode] = useState(false);
-  const [draft, setDraft] = useState<ComposerIdentity | null>(null);
   const { themeId, switchTheme } = useChromatic();
+  const [editMode, setEditMode] = useState(false);
+  const [pendingTheme, setPendingTheme] = useState<ThemeId>(themeId);
 
-  useEffect(() => { if (composerIdentity) setDraft(composerIdentity); }, [composerIdentity]);
+  // Keep the staged pick in sync with the live theme whenever we're not
+  // actively editing (e.g. someone changed it elsewhere).
+  useEffect(() => {
+    if (!editMode) setPendingTheme(themeId);
+  }, [editMode, themeId]);
 
-  const handlePublish = async () => {
-    if (!draft) return;
-    await updateIdentity(draft);
+  const hasPendingChange = editMode && pendingTheme !== themeId;
+
+  const handleEnterEdit = () => {
+    setPendingTheme(themeId);
+    setEditMode(true);
+  };
+
+  const handlePublish = () => {
+    switchTheme(pendingTheme);
+    setEditMode(false);
+  };
+
+  const handleDiscard = () => {
+    setPendingTheme(themeId);
     setEditMode(false);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex gap-4 items-center">
-        <button onClick={() => setEditMode(!editMode)}
+        <button
+          onClick={() => (editMode ? handleDiscard() : handleEnterEdit())}
           className={`px-4 py-2 rounded ${editMode ? 'bg-[var(--accent-color)] text-[var(--surface-color)]' : 'bg-[var(--surface3-color)]'}`}
-        >{editMode ? 'Editing' : 'Live Mode'}</button>
-        {editMode && <button onClick={handlePublish} className="px-4 py-2 bg-green-600 text-white rounded">Publish</button>}
+        >
+          {editMode ? 'Editing (draft)' : 'Live Mode'}
+        </button>
+        {editMode && (
+          <>
+            <button
+              onClick={handlePublish}
+              disabled={!hasPendingChange}
+              className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-40"
+            >
+              Publish
+            </button>
+            <button onClick={handleDiscard} className="px-4 py-2 bg-[var(--surface3-color)] rounded">
+              Discard
+            </button>
+          </>
+        )}
       </div>
-      <div className="flex gap-4">
-        {(['onyx','cyber','minimal'] as const).map(t => (
-          <button key={t} onClick={() => switchTheme(t)}
-            className={`px-3 py-1 text-xs rounded ${themeId === t ? 'bg-[var(--accent-color)]' : 'bg-[var(--surface3-color)]'}`}
-          >{t}</button>
-        ))}
-      </div>
-      {editMode && draft && (
-        <div className="p-4 border border-dashed border-[var(--accent-color)] rounded">
-          <p className="text-xs text-[var(--text-muted-color)]">Editing mode - changes not live until published.</p>
+
+      {editMode ? (
+        <div className="p-4 border border-dashed border-[var(--accent-color)] rounded space-y-3">
+          <p className="text-xs text-[var(--text-muted-color)]">
+            Pick a theme below — it previews everywhere in the grid, live site untouched until you hit Publish.
+          </p>
+          <div className="flex gap-4">
+            {(['onyx', 'cyber', 'minimal'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setPendingTheme(t)}
+                className={`px-3 py-1 text-xs rounded ${pendingTheme === t ? 'bg-[var(--accent-color)] text-[var(--surface-color)]' : 'bg-[var(--surface3-color)]'}`}
+              >
+                {t}
+                {t === themeId && <span className="ml-1 opacity-60">(live)</span>}
+              </button>
+            ))}
+          </div>
         </div>
+      ) : (
+        <p className="text-xs text-[var(--text-muted-color)]">
+          Currently live: <span style={{ color: 'var(--accent-color)' }}>{themeId}</span>. Enter Editing to stage a
+          different theme and preview it safely before publishing.
+        </p>
       )}
+
+      <StagingPreview />
     </div>
   );
 };
@@ -352,6 +399,7 @@ const TabDocumentAssistant = () => {
 // ---------- Main Dashboard Component ----------
 export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: () => void; initialTab?: number }) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const { enterEditMode } = useContent();
   const tabs = [
     { id: 1, label: 'Identity Matrix' },
     { id: 2, label: 'Media Pipeline' },
@@ -359,6 +407,11 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
     { id: 4, label: 'Staging Engine' },
     { id: 5, label: 'Document Assistant' },
   ];
+
+  const handleOpenVisualEditor = () => {
+    enterEditMode();
+    window.location.href = '/';
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -371,16 +424,25 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-56 border-r p-4 space-y-2" style={{ borderColor: 'var(--border-color)' }}>
-          {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`w-full text-left px-3 py-2 rounded text-sm font-mono transition-all ${
-                activeTab === tab.id
-                  ? 'bg-[var(--accent-color)] text-[var(--surface-color)]'
-                  : 'hover:bg-[var(--surface3-color)]'
-              }`}
-            >{tab.label}</button>
-          ))}
+        <div className="w-56 border-r p-4 space-y-2 flex flex-col" style={{ borderColor: 'var(--border-color)' }}>
+          <button
+            onClick={handleOpenVisualEditor}
+            className="w-full text-left px-3 py-2 rounded text-sm font-mono border"
+            style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}
+          >
+            ✎ Visual Editor
+          </button>
+          <div className="pt-2 space-y-2">
+            {tabs.map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`w-full text-left px-3 py-2 rounded text-sm font-mono transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-[var(--accent-color)] text-[var(--surface-color)]'
+                    : 'hover:bg-[var(--surface3-color)]'
+                }`}
+              >{tab.label}</button>
+            ))}
+          </div>
         </div>
 
         <div className="flex-1 p-6 overflow-y-auto">

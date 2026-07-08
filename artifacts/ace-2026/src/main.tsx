@@ -4,9 +4,10 @@
 // Order (outer → inner):
 //   1. ChromaticProvider  — theme must be outermost
 //   2. IdentityProvider   — locale + composer data
-//   3. AudioProvider      — singleton audio engine
-//   4. PipelineProvider   — AI pipeline state machine
-//   5. StagingProvider    — draft / live toggle
+//   3. ContentProvider    — G2 content overrides (reads locale)
+//   4. AudioProvider      — singleton audio engine
+//   5. PipelineProvider   — AI pipeline state machine
+//   6. StagingProvider    — draft / live toggle
 // ============================================================
 
 import React from 'react';
@@ -15,6 +16,7 @@ import ReactDOM from 'react-dom/client';
 import { ChromaticProvider } from './context/ChromaticContext';
 import { IdentityProvider } from './context/IdentityContext';
 import { TranslationProvider } from './context/TranslationContext';
+import { ContentProvider } from './context/ContentContext';
 import { AudioProvider } from './context/AudioContext';
 import { PipelineProvider } from './context/PipelineContext';
 import { StagingProvider } from './context/StagingContext';
@@ -29,15 +31,17 @@ ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ChromaticProvider>
       <IdentityProvider>
-        <TranslationProvider>
-          <AudioProvider>
-          <PipelineProvider>
-            <StagingProvider>
-              <AppRouter />
-            </StagingProvider>
-          </PipelineProvider>
-          </AudioProvider>
-        </TranslationProvider>
+        <ContentProvider>
+          <TranslationProvider>
+            <AudioProvider>
+            <PipelineProvider>
+              <StagingProvider>
+                <AppRouter />
+              </StagingProvider>
+            </PipelineProvider>
+            </AudioProvider>
+          </TranslationProvider>
+        </ContentProvider>
       </IdentityProvider>
     </ChromaticProvider>
   </React.StrictMode>,

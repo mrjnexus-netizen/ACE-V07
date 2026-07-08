@@ -14,6 +14,7 @@ import { requestTracer } from "./middleware/requestTracer";
 import authRoutes from "./routes/auth";
 import briefsRoutes from "./routes/briefs";
 import chatRoutes from "./routes/chat";
+import contentRoutes from "./routes/content";
 import documentsRoutes from "./routes/documents";
 import healthRoutes from "./routes/health";
 import identityRoutes from "./routes/identity";
@@ -62,6 +63,7 @@ app.use(globalRateLimiter);
 // Route mounts
 app.use("/api/auth", authRoutes);
 app.use("/api/identity", identityRoutes);
+app.use("/api/content", contentRoutes);
 app.use("/api/tracks", tracksRoutes);
 app.use("/api/translate", translateRoutes);
 app.use("/api/pipeline", pipelineRoutes);

@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useInView, useReducedMotion } from 'framer-mot
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
+import EditableText from './EditableText';
 import type { AudioTrack } from '../types';
 import { useBalancedText } from '../hooks/useBalancedText';
 
@@ -138,12 +139,13 @@ export default function ComposerPresence() {
         <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.45em', color: 'var(--accent-color)' }}>
           {t('The Composer')}
         </span>
-        <h2
+        <EditableText
+          contentKey="composer.tagline"
+          defaultValue={t('The worlds {name} scores for.').replace('{name}', composerName.split(' ')[0] ?? '')}
+          as="h2"
           className="font-display font-light mt-6"
           style={{ fontSize: 'clamp(1.4rem, 2.8vw, 2.4rem)', lineHeight: 1.3, color: 'var(--text-color)', maxWidth: '24ch' }}
-        >
-          {t('The worlds {name} scores for.').replace('{name}', composerName.split(' ')[0] ?? '')}
-        </h2>
+        />
 
         {/* stacked cover panels — peel away once, staggered, revealing the heading above */}
         {[0, 1, 2].map((i) => (
