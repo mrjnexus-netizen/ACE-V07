@@ -4,6 +4,7 @@ import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
 import { useBalancedText } from '../hooks/useBalancedText';
+import EditableText from './EditableText';
 import type { AudioTrack, Locale } from '../types';
 
 /**
@@ -417,10 +418,10 @@ export default function SpatialScrollEngine() {
         <div className="absolute z-20 text-right" style={{ top: '50%', right: '5%', transform: 'translateY(-50%)', width: 'min(21vw, 310px)', borderRight: '1px solid rgba(var(--accent-rgb),0.4)', paddingRight: 13 }}>
           <motion.div key={`line-${frontIndex}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}>
             <p ref={lineRef} className="font-display italic" style={{ fontSize: 'clamp(0.95rem, 1.2vw, 1.1rem)', lineHeight: 1.5, color: 'rgba(var(--accent-rgb),0.92)', marginLeft: 'auto' }}>
-              {t(activeLine)}
+              <EditableText contentKey={`works.quote.${frontIndex}`} defaultValue={t(activeLine)} as="span" />
             </p>
             <span className="font-mono uppercase" style={{ display: 'block', marginTop: 8, fontSize: '0.62rem', letterSpacing: '0.22em', color: 'var(--text-dim-color)' }}>
-              {t('— Amir Moslehi')}
+              — <EditableText contentKey="identity.name" defaultValue="Amir Moslehi" as="span" />
             </span>
           </motion.div>
         </div>

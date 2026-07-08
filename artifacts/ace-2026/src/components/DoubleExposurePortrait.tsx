@@ -10,6 +10,7 @@ import {
 } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
+import EditableText from './EditableText';
 import type { Locale } from '../types';
 import ScaleStage from './ScaleStage';
 
@@ -147,7 +148,7 @@ function AboutText({
         className="font-mono uppercase"
         style={{ fontSize: 12, letterSpacing: '0.25em', color: 'var(--accent-color)' }}
       >
-        {kicker}
+        <EditableText contentKey="about.kicker" defaultValue={kicker} as="span" />
       </span>
       <h2
         className="font-display"
@@ -159,35 +160,31 @@ function AboutText({
           color: 'var(--text-color)',
         }}
       >
-        {name}
+        <EditableText contentKey="identity.name" defaultValue={name} as="span" />
       </h2>
-      {tagline && (
-        <p
-          ref={taglineRef}
-          style={{
-            fontSize: taglineSize,
-            lineHeight: 1.35,
-            opacity: 0.9,
-            marginBottom: 16,
-            color: 'var(--text-color)',
-          }}
-        >
-          {tagline}
-        </p>
-      )}
-      {bio && (
-        <p
-          ref={bioRef}
-          style={{
-            fontSize: bioSize,
-            lineHeight: 1.6,
-            maxWidth: bioMaxWidth,
-            color: 'var(--text-muted-color)',
-          }}
-        >
-          {bio}
-        </p>
-      )}
+      <p
+        ref={taglineRef}
+        style={{
+          fontSize: taglineSize,
+          lineHeight: 1.35,
+          opacity: 0.9,
+          marginBottom: 16,
+          color: 'var(--text-color)',
+        }}
+      >
+        <EditableText contentKey="identity.tagline" defaultValue={tagline} as="span" />
+      </p>
+      <p
+        ref={bioRef}
+        style={{
+          fontSize: bioSize,
+          lineHeight: 1.6,
+          maxWidth: bioMaxWidth,
+          color: 'var(--text-muted-color)',
+        }}
+      >
+        <EditableText contentKey="identity.biography" defaultValue={bio} as="span" />
+      </p>
     </motion.div>
   );
 }

@@ -138,7 +138,7 @@ export default function GridLayoutEngine() {
           className="font-display text-white font-light"
           style={{ fontSize: 'clamp(2.75rem, 9vw, 9rem)', letterSpacing: '0.04em', lineHeight: 1.02 }}
         >
-          {name}
+          <EditableText contentKey="identity.name" defaultValue={name} as="span" />
         </motion.h1>
 
         {/* thin decorative rule */}
@@ -150,17 +150,15 @@ export default function GridLayoutEngine() {
           style={{ width: 'clamp(80px, 14vw, 200px)', background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.6), transparent)' }}
         />
 
-        {tagline && (
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2, ease, delay: 1.15 }}
-            className="text-white/65 max-w-lg font-light"
-            style={{ fontSize: 'clamp(0.95rem, 1.5vw, 1.25rem)', letterSpacing: '0.02em' }}
-          >
-            {t(tagline)}
-          </motion.p>
-        )}
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.2, ease, delay: 1.15 }}
+          className="text-white/65 max-w-lg font-light"
+          style={{ fontSize: 'clamp(0.95rem, 1.5vw, 1.25rem)', letterSpacing: '0.02em' }}
+        >
+          <EditableText contentKey="identity.tagline" defaultValue={tagline ? t(tagline) : ''} as="span" />
+        </motion.p>
       </motion.div>
 
       {/* Scroll cue */}

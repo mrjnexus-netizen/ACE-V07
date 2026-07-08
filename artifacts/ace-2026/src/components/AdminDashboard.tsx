@@ -61,7 +61,14 @@ const TabIdentityMatrix = () => {
         ))}
       </div>
 
-      {(['name','tagline','biography','studioAddress'] as (keyof ComposerIdentity)[]).map(field => (
+      <p className="text-xs text-[var(--text-muted-color)]" style={{ maxWidth: 480 }}>
+        Name, tagline, and biography moved to inline editing — open the ✎ Visual
+        Editor and edit them directly on the Hero/About sections (auto-translates
+        to all 5 languages on save). Only studio address and social links stay
+        here for now.
+      </p>
+
+      {(['studioAddress'] as (keyof ComposerIdentity)[]).map(field => (
         <div key={field}>
           <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1 capitalize">{field}</label>
           <textarea

@@ -1,5 +1,6 @@
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
+import EditableText from './EditableText';
 
 // Luxury cinematic footer (2026-07-02 redesign). Self-contained .ftr-* classes
 // (see the Footer block appended to index.css) so it never depends on the
@@ -51,8 +52,12 @@ export const Footer = () => {
       <div className="ftr-rule" aria-hidden="true" />
       <div className="ftr-inner">
         <div className="ftr-sig">
-          <span className="ftr-sig-name">AMIR MOSLEHI</span>
-          <span className="ftr-sig-sub">{t('THE COMPOSER')}</span>
+          <span className="ftr-sig-name">
+            <EditableText contentKey="identity.name" defaultValue="Amir Moslehi" as="span" />
+          </span>
+          <span className="ftr-sig-sub">
+            <EditableText contentKey="footer.subtitle" defaultValue={t('THE COMPOSER')} as="span" />
+          </span>
         </div>
 
         {active.length > 0 && (
@@ -77,7 +82,8 @@ export const Footer = () => {
         )}
 
         <div className="ftr-copy">
-          © {new Date().getFullYear()} Amir Moslehi. {t('All rights reserved.')}
+          © {new Date().getFullYear()} <EditableText contentKey="identity.name" defaultValue="Amir Moslehi" as="span" />.{' '}
+          <EditableText contentKey="footer.rights" defaultValue={t('All rights reserved.')} as="span" />
         </div>
       </div>
     </footer>
