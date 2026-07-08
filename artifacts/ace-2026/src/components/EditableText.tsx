@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useContent } from '../context/ContentContext';
 import { useIdentity } from '../context/IdentityContext';
 import type { Locale } from '../types';
@@ -185,80 +186,82 @@ export default function EditableText({ contentKey, defaultValue, as = 'span', cl
         {displayValue || <span style={{ opacity: 0.4 }}>({contentKey})</span>}
       </Tag>
 
-      {(hovering || editing || notice) && toolbarPos && (
-        <span
-          className="ace-editable-toolbar"
-          onMouseDown={(e) => e.stopPropagation()}
-          onMouseEnter={cancelHide}
-          onMouseLeave={scheduleHide}
-          style={{
-            position: 'fixed',
-            top: toolbarPos.top,
-            left: toolbarPos.left,
-            transform: 'translateY(-100%)',
-          }}
-        >
-          {!editing ? (
-            <>
-              {isMaster ? (
-                <>
-                  <button type="button" className="ace-editable-btn" onClick={() => setEditing(true)}>
-                    Edit
+      {(hovering || editing || notice) && toolbarPos &&
+        createPortal(
+          <span
+            className="ace-editable-toolbar"
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseEnter={cancelHide}
+            onMouseLeave={scheduleHide}
+            style={{
+              position: 'fixed',
+              top: toolbarPos.top,
+              left: toolbarPos.left,
+              transform: 'translateY(-100%)',
+            }}
+          >
+            {!editing ? (
+              <>
+                {isMaster ? (
+                  <>
+                    <button type="button" className="ace-editable-btn" onClick={() => setEditing(true)}>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="ace-editable-btn"
+                      onClick={() => setNotice('AI rewrite is coming soon (needs an A3b model selected).')}
+                    >
+                      Generate
+                    </button>
+                    <button type="button" className="ace-editable-btn" onClick={handleDelete} disabled={busy}>
+                      Delete
+                    </button>
+                  </>
+                ) : (
+                  <span className="ace-editable-notice" style={{ margin: 0 }}>
+                    Switch to English to edit — this language updates automatically.
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="ace-editable-btn"
+                  onClick={handleReset}
+                  disabled={busy || resolved === null}
+                >
+                  Set to default
+                </button>
+              </>
+            ) : (
+              <span className="ace-editable-editform">
+                <textarea
+                  className="ace-editable-textarea"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={2}
+                  autoFocus
+                />
+                <span className="ace-editable-editform-actions">
+                  <button type="button" className="ace-editable-btn ace-editable-btn--save" onClick={handleSave} disabled={busy}>
+                    Save
                   </button>
                   <button
                     type="button"
                     className="ace-editable-btn"
-                    onClick={() => setNotice('AI rewrite is coming soon (needs an A3b model selected).')}
+                    onClick={() => {
+                      setDraft(displayValue);
+                      setEditing(false);
+                    }}
                   >
-                    Generate
+                    Cancel
                   </button>
-                  <button type="button" className="ace-editable-btn" onClick={handleDelete} disabled={busy}>
-                    Delete
-                  </button>
-                </>
-              ) : (
-                <span className="ace-editable-notice" style={{ margin: 0 }}>
-                  Switch to English to edit — this language updates automatically.
                 </span>
-              )}
-              <button
-                type="button"
-                className="ace-editable-btn"
-                onClick={handleReset}
-                disabled={busy || resolved === null}
-              >
-                Set to default
-              </button>
-            </>
-          ) : (
-            <span className="ace-editable-editform">
-              <textarea
-                className="ace-editable-textarea"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                rows={2}
-                autoFocus
-              />
-              <span className="ace-editable-editform-actions">
-                <button type="button" className="ace-editable-btn ace-editable-btn--save" onClick={handleSave} disabled={busy}>
-                  Save
-                </button>
-                <button
-                  type="button"
-                  className="ace-editable-btn"
-                  onClick={() => {
-                    setDraft(displayValue);
-                    setEditing(false);
-                  }}
-                >
-                  Cancel
-                </button>
               </span>
-            </span>
-          )}
-          {notice && <span className="ace-editable-notice">{notice}</span>}
-        </span>
-      )}
+            )}
+            {notice && <span className="ace-editable-notice">{notice}</span>}
+          </span>,
+          document.body
+        )}
     </span>
   );
 }

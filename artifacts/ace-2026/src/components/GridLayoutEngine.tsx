@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
+import EditableText from './EditableText';
 import type { ComposerIdentity, Locale } from '../types';
 
 function localText(
@@ -127,7 +128,7 @@ export default function GridLayoutEngine() {
           className="text-[0.7rem] md:text-xs uppercase text-white/70 font-mono mb-8"
           style={{ letterSpacing: '0.42em' }}
         >
-          {t('Cinematic Composer')}
+          <EditableText contentKey="hero.kicker" defaultValue={t('Cinematic Composer')} as="span" />
         </motion.span>
 
         <motion.h1
@@ -170,7 +171,12 @@ export default function GridLayoutEngine() {
         style={{ opacity: contentOpacity }}
         className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
       >
-        <span className="text-[0.6rem] font-mono uppercase tracking-[0.35em] text-white/45">{t('Scroll')}</span>
+        <EditableText
+          contentKey="hero.scrollLabel"
+          defaultValue={t('Scroll')}
+          as="span"
+          className="text-[0.6rem] font-mono uppercase tracking-[0.35em] text-white/45"
+        />
         <motion.div
           animate={reduced ? {} : { scaleY: [1, 0.4, 1], opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
