@@ -56,7 +56,7 @@ export default function BackgroundMusic() {
   };
 
   const allowed = (): boolean =>
-    !!locale && !audioState.isPlaying && typeof document !== 'undefined' && !document.hidden;
+    !!locale && !audioState.isPlaying && !audioState.isMuted && typeof document !== 'undefined' && !document.hidden;
 
   // 1) Wire bgEl -> bgGain -> analyser (once the engine's context exists).
   useEffect(() => {
@@ -123,7 +123,7 @@ export default function BackgroundMusic() {
     document.addEventListener('visibilitychange', apply);
     return () => document.removeEventListener('visibilitychange', apply);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, locale, trackPlaying]);
+  }, [ready, locale, trackPlaying, audioState.isMuted]);
 
   return <audio ref={elRef} loop preload="auto" aria-hidden="true" />;
 }

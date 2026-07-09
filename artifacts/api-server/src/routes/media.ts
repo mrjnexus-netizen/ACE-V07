@@ -27,9 +27,23 @@ const upload = multer({
     const allowedMimes = [
       'audio/mpeg',
       'audio/wav',
+      'audio/x-wav',
+      'audio/mp4',
+      // images — all common formats, not just the original three
       'image/webp',
       'image/jpeg',
       'image/png',
+      'image/gif',
+      'image/svg+xml',
+      'image/heic',
+      'image/heif',
+      'image/bmp',
+      'image/tiff',
+      // video — for future video-source uploads (works pipeline, H9)
+      'video/mp4',
+      'video/quicktime',
+      'video/webm',
+      'video/x-matroska',
     ];
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);

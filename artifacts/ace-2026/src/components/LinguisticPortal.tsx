@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useIdentity } from '../context/IdentityContext';
+import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
 import PortalCursor from './PortalCursor';
 import PortalComposer from './PortalComposer';
@@ -742,6 +743,15 @@ export const LinguisticPortal = () => {
   // instant a language is chosen, instead of it being hard-cut by pause()
   // when the component unmounts on navigation to /app.
   const audioFadeOutRef = useRef<(() => void) | null>(null);
+  // Global sound toggle (per Reza, 2026-07-08): this portal's ambient
+  // track runs through its OWN separate AudioContext (not the shared
+  // one), so it must independently respect the site-wide mute — a plain
+  // .volume/.muted on the source element stops reliably muting anything
+  // once createMediaElementSource has captured it (same issue fixed in
+  // the shared AudioContext.tsx). A real GainNode is the fix here too.
+  const { audioState: globalAudioState } = useAudio();
+  const ambientGainRef = useRef<GainNode | null>(null);
+  const ambientActxRef = useRef<AudioContext | null>(null);
 
   // Track the cursor (normalized −1..1) so the galaxy can drift in 3D behind
   // the anchored instrument — gentle depth-parallax, the "alive" feel.
@@ -788,7 +798,12 @@ export const LinguisticPortal = () => {
         analyser = actx.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.82;
-        srcNode.connect(analyser);
+        const gainNode = actx.createGain();
+        gainNode.gain.value = globalAudioState.isMuted ? 0 : 1;
+        ambientGainRef.current = gainNode;
+        ambientActxRef.current = actx;
+        srcNode.connect(gainNode);
+        gainNode.connect(analyser);
         analyser.connect(actx.destination);
         freqData = new Uint8Array(analyser.frequencyBinCount);
 
@@ -841,10 +856,23 @@ export const LinguisticPortal = () => {
       if (raf) cancelAnimationFrame(raf);
       audioEl?.pause();
       actx?.close();
+      ambientGainRef.current = null;
+      ambientActxRef.current = null;
     };
 
     return () => { audioCleanupRef.current?.(); };
   }, []);
+
+  // Reacts to the global mute toggle without restarting the whole ambient
+  // audio setup — just updates the gain node already in place.
+  useEffect(() => {
+    if (ambientGainRef.current && ambientActxRef.current) {
+      ambientGainRef.current.gain.setValueAtTime(
+        globalAudioState.isMuted ? 0 : 1,
+        ambientActxRef.current.currentTime
+      );
+    }
+  }, [globalAudioState.isMuted]);
 
   const handleEnter = useCallback(() => {
     audioStarterRef.current?.();

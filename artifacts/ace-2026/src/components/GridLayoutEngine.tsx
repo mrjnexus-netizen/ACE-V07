@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
 import EditableText from './EditableText';
+import EditableImage from './EditableImage';
 import type { ComposerIdentity, Locale } from '../types';
 
 function localText(
@@ -65,23 +66,29 @@ export default function GridLayoutEngine() {
           }}
         >
           {portraitUrl ? (
-            <img
-              src={portraitUrl}
-              alt=""
-              crossOrigin="anonymous"
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{
-                WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 60%, transparent 96%)',
-                maskImage: 'linear-gradient(to bottom, #000 0%, #000 60%, transparent 96%)',
-              }}
-            />
+            <EditableImage contentKey="hero.backgroundImage" defaultUrl={portraitUrl}>
+              {(url) => (
+                <img
+                  src={url}
+                  alt=""
+                  crossOrigin="anonymous"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  style={{
+                    WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, #000 60%, transparent 96%)',
+                    maskImage: 'linear-gradient(to bottom, #000 0%, #000 60%, transparent 96%)',
+                  }}
+                />
+              )}
+            </EditableImage>
           ) : (
             <div className="absolute inset-0" style={{ backgroundColor: 'var(--surface-color)' }} />
           )}
         </motion.div>
-        {/* Soft cinematic vignette — even darkening + a long smooth fade to black at the bottom (no hard edge) */}
+        {/* Soft cinematic vignette — even darkening + a long smooth fade to black at the bottom (no hard edge).
+            pointer-events:none: purely decorative, was previously eating every hover/click over the whole
+            image (including the edit-mode toolbar trigger) since it fully covers the image on top of it. */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background:
               'radial-gradient(120% 90% at 50% 45%, transparent 30%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.8) 100%), linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.3) 65%)',
@@ -89,7 +96,7 @@ export default function GridLayoutEngine() {
         />
         {/* dedicated long fade-out to pure black at the very bottom — removes any hard seam */}
         <div
-          className="absolute bottom-0 left-0 right-0"
+          className="absolute bottom-0 left-0 right-0 pointer-events-none"
           style={{ height: '40%', background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.6) 55%, #000 100%)' }}
         />
       </motion.div>
@@ -118,7 +125,7 @@ export default function GridLayoutEngine() {
 
       {/* Centered, luxurious composition */}
       <motion.div
-        style={{ y: contentY, opacity: contentOpacity }}
+        style={{ y: contentY, opacity: contentOpacity, pointerEvents: 'none' }}
         className="absolute inset-0 flex flex-col items-center justify-center text-center px-6"
       >
         <motion.span
@@ -126,7 +133,7 @@ export default function GridLayoutEngine() {
           animate={{ opacity: 1, y: 0, letterSpacing: '0.42em' }}
           transition={{ duration: 1.2, ease, delay: 0.3 }}
           className="text-[0.7rem] md:text-xs uppercase text-white/70 font-mono mb-8"
-          style={{ letterSpacing: '0.42em' }}
+          style={{ letterSpacing: '0.42em', pointerEvents: 'auto' }}
         >
           <EditableText contentKey="hero.kicker" defaultValue={t('Cinematic Composer')} as="span" />
         </motion.span>
@@ -136,7 +143,7 @@ export default function GridLayoutEngine() {
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           transition={{ duration: 1.6, ease, delay: 0.5 }}
           className="font-display text-white font-light"
-          style={{ fontSize: 'clamp(2.75rem, 9vw, 9rem)', letterSpacing: '0.04em', lineHeight: 1.02 }}
+          style={{ fontSize: 'clamp(2.75rem, 9vw, 9rem)', letterSpacing: '0.04em', lineHeight: 1.02, pointerEvents: 'auto' }}
         >
           <EditableText contentKey="identity.name" defaultValue={name} as="span" />
         </motion.h1>
@@ -155,7 +162,7 @@ export default function GridLayoutEngine() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.2, ease, delay: 1.15 }}
           className="text-white/65 max-w-lg font-light"
-          style={{ fontSize: 'clamp(0.95rem, 1.5vw, 1.25rem)', letterSpacing: '0.02em' }}
+          style={{ fontSize: 'clamp(0.95rem, 1.5vw, 1.25rem)', letterSpacing: '0.02em', pointerEvents: 'auto' }}
         >
           <EditableText contentKey="identity.tagline" defaultValue={tagline ? t(tagline) : ''} as="span" />
         </motion.p>

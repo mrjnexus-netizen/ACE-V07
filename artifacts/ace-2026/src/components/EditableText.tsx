@@ -76,14 +76,15 @@ export default function EditableText({ contentKey, defaultValue, as = 'span', cl
   // sections on this site use `overflow: hidden` (for their own reveal/
   // curtain animations), which would silently clip an absolutely
   // positioned toolbar sitting above the text. position:fixed escapes
-  // that entirely, so this works inside any section without needing to
-  // know its overflow settings.
+  // that entirely. Always centered directly over the text itself
+  // (not floating above/below it) — guaranteed visible regardless of
+  // scroll position, no viewport-edge cases to chase.
   useEffect(() => {
     if (!hovering && !editing && !notice) return;
     const update = () => {
       const rect = wrapRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setToolbarPos({ top: Math.max(8, rect.top - 8), left: rect.left });
+      setToolbarPos({ top: rect.top + rect.height / 2, left: rect.left + rect.width / 2 });
     };
     update();
     window.addEventListener('scroll', update, true);
@@ -197,7 +198,7 @@ export default function EditableText({ contentKey, defaultValue, as = 'span', cl
               position: 'fixed',
               top: toolbarPos.top,
               left: toolbarPos.left,
-              transform: 'translateY(-100%)',
+              transform: 'translate(-50%, -50%)',
             }}
           >
             {!editing ? (

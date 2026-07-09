@@ -11,6 +11,7 @@ import {
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
 import EditableText from './EditableText';
+import EditableImage from './EditableImage';
 import type { Locale } from '../types';
 import ScaleStage from './ScaleStage';
 
@@ -84,19 +85,23 @@ function PortraitArt({
     >
       <div className="absolute inset-0">
         {url ? (
-          <motion.img
-            src={url}
-            alt={name}
-            crossOrigin="anonymous"
-            style={{
-              y: imgY,
-              WebkitMaskImage:
-                'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
-              maskImage:
-                'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
-            }}
-            className="absolute inset-0 w-full h-[124%] -top-[12%] object-cover will-change-transform"
-          />
+          <EditableImage contentKey="about.portraitImage" defaultUrl={url}>
+            {(resolvedUrl) => (
+              <motion.img
+                src={resolvedUrl}
+                alt={name}
+                crossOrigin="anonymous"
+                style={{
+                  y: imgY,
+                  WebkitMaskImage:
+                    'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
+                  maskImage:
+                    'radial-gradient(125% 120% at 50% 42%, #000 55%, transparent 100%)',
+                }}
+                className="absolute inset-0 w-full h-[124%] -top-[12%] object-cover will-change-transform"
+              />
+            )}
+          </EditableImage>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-[var(--text-muted-color)] text-xs font-mono uppercase tracking-[0.15em]">
             {placeholder}

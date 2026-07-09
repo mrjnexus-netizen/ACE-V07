@@ -217,35 +217,176 @@ const TabMediaPipeline = () => {
 const TabGatekeeperHub = () => {
   const [keys, setKeys] = useState({ AI_IMAGE_GENERATION_KEY: '', LLM_NARRATIVE_API_KEY: '', YOUTUBE_API_DATA_V3: '' });
   const [show, setShow] = useState<Record<string, boolean>>({});
+  const [status, setStatus] = useState<Record<string, { isConfigured: boolean; testedAt: string | null }>>({});
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [notice, setNotice] = useState<Record<string, string>>({});
+
+  const [aws, setAws] = useState({ accessKeyId: '', secretAccessKey: '', region: 'us-east-1', bucket: '', tier: 'free' as 'free' | 'paid' });
+  const [awsShowSecret, setAwsShowSecret] = useState(false);
+
+  const fetchStatus = async () => {
+    try {
+      const rows = await apiGet<Array<{ keyName: string; isConfigured: boolean; testedAt: string | null }>>('/api/keys/status');
+      const map: typeof status = {};
+      rows.forEach((r) => { map[r.keyName] = { isConfigured: r.isConfigured, testedAt: r.testedAt }; });
+      setStatus(map);
+    } catch {
+      // status is a nicety, not a blocker
+    }
+  };
+  useEffect(() => { fetchStatus(); }, []);
 
   const toggleShow = (key: string) => setShow(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const handleTest = async (keyName: string) => {
-    // POST /api/keys/test
-    await apiPost('/api/keys/test', { keyName });
+  const handleTest = async (keyName: string, keyValue: string) => {
+    setBusy(prev => ({ ...prev, [keyName]: true }));
+    setNotice(prev => ({ ...prev, [keyName]: '' }));
+    try {
+      const res = await apiPost<{ message?: string }>('/api/keys/test', { keyName, keyValue });
+      setNotice(prev => ({ ...prev, [keyName]: res.message || 'Connected.' }));
+    } catch (err) {
+      setNotice(prev => ({ ...prev, [keyName]: err instanceof Error ? err.message : 'Test failed.' }));
+    } finally {
+      setBusy(prev => ({ ...prev, [keyName]: false }));
+    }
   };
 
-  const handleSave = async (keyName: string) => {
-    // POST /api/keys
-    await apiPost('/api/keys', { keyName, value: keys[keyName as keyof typeof keys] });
+  const handleSave = async (keyName: string, keyValue: string) => {
+    setBusy(prev => ({ ...prev, [keyName]: true }));
+    setNotice(prev => ({ ...prev, [keyName]: '' }));
+    try {
+      await apiPost('/api/keys', { keyName, keyValue });
+      setNotice(prev => ({ ...prev, [keyName]: 'Saved.' }));
+      await fetchStatus();
+    } catch (err) {
+      setNotice(prev => ({ ...prev, [keyName]: err instanceof Error ? err.message : 'Save failed.' }));
+    } finally {
+      setBusy(prev => ({ ...prev, [keyName]: false }));
+    }
   };
+
+  const awsJson = () => JSON.stringify(aws);
 
   return (
-    <div className="space-y-4">
-      {Object.entries(keys).map(([keyName, value]) => (
-        <div key={keyName}>
-          <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">{keyName}</label>
-          <div className="flex gap-2">
-            <input type={show[keyName] ? 'text' : 'password'} value={value}
-              onChange={e => setKeys(prev => ({ ...prev, [keyName]: e.target.value }))}
-              className="flex-1 bg-[var(--surface3-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
-            />
-            <button onClick={() => toggleShow(keyName)} className="px-2 py-1 text-xs bg-[var(--surface3-color)] rounded">{show[keyName] ? 'Hide' : 'Show'}</button>
-            <button onClick={() => handleTest(keyName)} className="px-2 py-1 text-xs bg-[var(--surface3-color)] rounded">Test</button>
-            <button onClick={() => handleSave(keyName)} className="px-2 py-1 text-xs bg-[var(--accent-color)] text-[var(--surface-color)] rounded">Save</button>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        {Object.entries(keys).map(([keyName, value]) => (
+          <div key={keyName}>
+            <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">
+              {keyName} {status[keyName]?.isConfigured && <span style={{ color: 'var(--accent-color)' }}>· configured</span>}
+            </label>
+            <div className="flex gap-2">
+              <input type={show[keyName] ? 'text' : 'password'} value={value}
+                onChange={e => setKeys(prev => ({ ...prev, [keyName]: e.target.value }))}
+                className="flex-1 bg-[var(--surface3-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+              />
+              <button onClick={() => toggleShow(keyName)} className="px-2 py-1 text-xs bg-[var(--surface3-color)] rounded">{show[keyName] ? 'Hide' : 'Show'}</button>
+              <button onClick={() => handleTest(keyName, value)} disabled={busy[keyName] || !value} className="px-2 py-1 text-xs bg-[var(--surface3-color)] rounded disabled:opacity-40">Test</button>
+              <button onClick={() => handleSave(keyName, value)} disabled={busy[keyName] || !value} className="px-2 py-1 text-xs bg-[var(--accent-color)] text-[var(--surface-color)] rounded disabled:opacity-40">Save</button>
+            </div>
+            {notice[keyName] && <p className="text-xs mt-1 text-[var(--text-muted-color)]">{notice[keyName]}</p>}
           </div>
+        ))}
+      </div>
+
+      {/* External service accounts — structured credentials (AWS S3 first;
+          add more the same way: a small fixed-fields form + a JSON blob
+          under one keyName in the same encrypted api_keys table). */}
+      <div className="pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
+        <h3 className="text-sm font-mono uppercase tracking-wide mb-1" style={{ color: 'var(--accent-color)' }}>
+          External Service Accounts
+        </h3>
+        <p className="text-xs text-[var(--text-muted-color)] mb-4" style={{ maxWidth: 520 }}>
+          Credentials for outside services this site depends on (storage, APIs). Encrypted at rest, same as the keys
+          above. Anyone with the admin login can recreate these with their own account — just re-enter fresh
+          credentials here.
+        </p>
+
+        <div className="space-y-3 p-4 rounded" style={{ backgroundColor: 'var(--surface3-color)', border: '1px solid var(--border-color)' }}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">AWS S3 (file storage)</span>
+            <div className="flex items-center gap-2">
+              {status.AWS_S3_CREDENTIALS?.isConfigured && <span className="text-xs" style={{ color: 'var(--accent-color)' }}>✓ configured</span>}
+              <select
+                value={aws.tier}
+                onChange={e => setAws(prev => ({ ...prev, tier: e.target.value as 'free' | 'paid' }))}
+                className="text-xs bg-[var(--surface-color)] border border-[var(--border-color)] rounded px-2 py-1"
+                title="Not verified against AWS billing — just a note for yourself"
+              >
+                <option value="free">Free tier</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">Access Key ID</label>
+              <input type="text" value={aws.accessKeyId} autoComplete="off" name="aws-access-key-id-field"
+                onChange={e => setAws(prev => ({ ...prev, accessKeyId: e.target.value }))}
+                className="w-full bg-[var(--surface-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">Secret Access Key</label>
+              <div className="flex gap-2">
+                <input type={awsShowSecret ? 'text' : 'password'} value={aws.secretAccessKey} autoComplete="new-password" name="aws-secret-key-field"
+                  onChange={e => setAws(prev => ({ ...prev, secretAccessKey: e.target.value }))}
+                  className="flex-1 bg-[var(--surface-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+                />
+                <button onClick={() => setAwsShowSecret(v => !v)} className="px-2 py-1 text-xs bg-[var(--surface-color)] border border-[var(--border-color)] rounded">
+                  {awsShowSecret ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">Region</label>
+              <input type="text" value={aws.region} placeholder="us-east-2" autoComplete="off" name="ace-aws-region-field"
+                onChange={e => setAws(prev => ({ ...prev, region: e.target.value }))}
+                className="w-full bg-[var(--surface-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono text-[var(--text-muted-color)] mb-1">Bucket Name</label>
+              <input type="text" value={aws.bucket} placeholder="amirmoslehiace2026" autoComplete="off" name="ace-aws-bucket-field"
+                onChange={e => setAws(prev => ({ ...prev, bucket: e.target.value }))}
+                className="w-full bg-[var(--surface-color)] border border-[var(--border-color)] rounded p-2 text-sm text-[var(--text-color)]"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => handleTest('AWS_S3_CREDENTIALS', awsJson())}
+              disabled={busy.AWS_S3_CREDENTIALS || !aws.accessKeyId || !aws.secretAccessKey || !aws.bucket}
+              className="px-3 py-1.5 text-xs bg-[var(--surface-color)] border border-[var(--border-color)] rounded disabled:opacity-40"
+            >
+              Test Connection
+            </button>
+            <button
+              onClick={() => handleSave('AWS_S3_CREDENTIALS', awsJson())}
+              disabled={busy.AWS_S3_CREDENTIALS || !aws.accessKeyId || !aws.secretAccessKey || !aws.bucket}
+              className="px-3 py-1.5 text-xs bg-[var(--accent-color)] text-[var(--surface-color)] rounded disabled:opacity-40"
+            >
+              Save
+            </button>
+          </div>
+          {/* Live diagnostic — shows exactly what the app currently sees
+              in each field (character counts), so a stuck "disabled"
+              button is instantly self-diagnosable without DevTools. */}
+          <p className="text-xs" style={{ color: 'var(--text-dim-color)', opacity: 0.85 }}>
+            Access Key ID: {aws.accessKeyId.length} chars · Secret Access Key: {aws.secretAccessKey.length} chars ·
+            Bucket: {aws.bucket.length} chars · Region: {aws.region.length} chars
+            {busy.AWS_S3_CREDENTIALS ? ' · busy=true (a request is stuck — refresh the page)' : ''}
+          </p>
+          {notice.AWS_S3_CREDENTIALS && <p className="text-xs text-[var(--text-muted-color)]">{notice.AWS_S3_CREDENTIALS}</p>}
+          <p className="text-xs text-[var(--text-dim-color)]" style={{ opacity: 0.7 }}>
+            Note: "Free tier" above is a note you set yourself — AWS doesn't expose a simple way to check billing
+            status from here. "Test Connection" for real (attempts to reach the bucket with these credentials) still
+            works regardless of tier.
+          </p>
         </div>
-      ))}
+      </div>
     </div>
   );
 };

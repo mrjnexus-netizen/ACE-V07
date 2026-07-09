@@ -111,6 +111,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const actxRef      = useRef<globalThis.AudioContext | null>(null);
   const analyserRef  = useRef<AnalyserNode | null>(null);
   const sourceRef    = useRef<MediaElementAudioSourceNode | null>(null);
+  const gainRef      = useRef<GainNode | null>(null);
   // Track whether source node has been created (can only be created once per element)
   const sourceCreated = useRef(false);
 
@@ -148,11 +149,22 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       analyser.smoothingTimeConstant = 0.85;
       analyserRef.current = analyser;
 
-      // Wire audio element → analyser → destination (only once per element)
+      // Wire audio element → gain → analyser → destination (only once per element).
+      // The GainNode is what actually controls audible volume/mute from here on —
+      // once createMediaElementSource exists, the <audio> element's own .muted/
+      // .volume no longer affect what's actually heard (the signal is captured
+      // into the Web Audio graph instead of playing through the element natively).
       if (audioElRef.current && !sourceCreated.current) {
         sourceCreated.current = true;
         sourceRef.current = actxRef.current.createMediaElementSource(audioElRef.current);
-        sourceRef.current.connect(analyser);
+        const gain = actxRef.current.createGain();
+        gain.gain.setValueAtTime(
+          stateRef.current.isMuted ? 0 : stateRef.current.volume,
+          actxRef.current.currentTime
+        );
+        gainRef.current = gain;
+        sourceRef.current.connect(gain);
+        gain.connect(analyser);
         analyser.connect(actxRef.current.destination);
       }
 
@@ -285,11 +297,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const setVolume = useCallback((volume: number) => {
     const clamped = Math.max(0, Math.min(1, volume));
     if (audioElRef.current) audioElRef.current.volume = clamped;
+    if (gainRef.current && actxRef.current && !stateRef.current.isMuted) {
+      gainRef.current.gain.setValueAtTime(clamped, actxRef.current.currentTime);
+    }
     setAudioState(prev => ({ ...prev, volume: clamped }));
   }, []);
 
   const setMuted = useCallback((isMuted: boolean) => {
     if (audioElRef.current) audioElRef.current.muted = isMuted;
+    if (gainRef.current && actxRef.current) {
+      gainRef.current.gain.setValueAtTime(isMuted ? 0 : stateRef.current.volume, actxRef.current.currentTime);
+    }
     setAudioState(prev => ({ ...prev, isMuted }));
   }, []);
 
@@ -321,6 +339,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     volume: number,
   ): void => {
     if (!actxRef.current || actxRef.current.state === 'suspended') return;
+    if (stateRef.current.isMuted) return; // respect the global mute — every site sound, not just the track
 
     const osc  = actxRef.current.createOscillator();
     const gain = actxRef.current.createGain();
