@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useContent } from '../context/ContentContext';
 import { useIdentity } from '../context/IdentityContext';
+import { apiPost } from '../lib/apiClient';
 import type { Locale } from '../types';
 
 interface EditableTextProps {
@@ -139,6 +140,23 @@ export default function EditableText({ contentKey, defaultValue, as = 'span', cl
     }
   };
 
+  const handleGenerate = async () => {
+    setBusy(true);
+    setNotice('Asking the AI for a rewrite…');
+    setEditing(true);
+    try {
+      const { suggestion } = await apiPost<{ suggestion: string }>(`/api/content/${encodeURIComponent(contentKey)}/generate-text`, {
+        currentValue: displayValue,
+      });
+      setDraft(suggestion);
+      setNotice('AI suggestion ready — review it, then Save (or Cancel to discard).');
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'AI rewrite failed — try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDelete = async () => {
     // Distinct from Set-to-default: this stages an intentionally BLANK
     // override (cascaded to every language too), rather than reverting to
@@ -211,7 +229,8 @@ export default function EditableText({ contentKey, defaultValue, as = 'span', cl
                     <button
                       type="button"
                       className="ace-editable-btn"
-                      onClick={() => setNotice('AI rewrite is coming soon (needs an A3b model selected).')}
+                      onClick={handleGenerate}
+                      disabled={busy}
                     >
                       Generate
                     </button>

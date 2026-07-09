@@ -6,10 +6,11 @@ import { z } from "zod";
 import { db } from "../db/db";
 import { apiKeys } from "../db/schema";
 import { authGuard } from "../middleware/authGuard";
-import { encrypt } from "../services/encryptionService";
+import { encrypt, decrypt } from "../services/encryptionService";
 import { InternalError } from "../utils/errors";
 import { createChildLogger } from "../utils/logger";
 import { sendError, sendSuccess } from "../utils/response";
+import { TEXT_PROVIDERS, IMAGE_PROVIDERS, findTextProvider, findImageProvider, callTextProvider } from "../services/aiProviders";
 
 const router: Router = Router();
 const logger = createChildLogger("ApiKeysRoute");
@@ -20,8 +21,20 @@ const logger = createChildLogger("ApiKeysRoute");
 // New external services extend one of these two lists — no route
 // rewrite needed. Structured keys additionally get a real connection
 // test (see /test below) instead of the generic "long enough" check.
-const SUPPORTED_SIMPLE_KEYS = ["AI_IMAGE_GENERATION_KEY", "LLM_NARRATIVE_API_KEY", "YOUTUBE_API_DATA_V3"];
-const SUPPORTED_STRUCTURED_KEYS = ["AWS_S3_CREDENTIALS"];
+//
+// A3b (2026-07-08): AI provider keys are no longer a fixed short list —
+// every provider in the aiProviders.ts registry gets its own key slot
+// automatically, so adding an 11th provider later is a registry edit,
+// not a route rewrite. TEXT_AI_SELECTED / IMAGE_AI_SELECTED are small
+// structured keys recording which provider+model the admin picked —
+// there is no hardcoded default; every "Generate" click reads these.
+const SUPPORTED_SIMPLE_KEYS = [
+  "YOUTUBE_API_DATA_V3",
+  ...TEXT_PROVIDERS.map((p) => p.keyName),
+  ...IMAGE_PROVIDERS.map((p) => p.keyName),
+];
+const aiSelectionSchema = z.object({ providerId: z.string().min(1), model: z.string().min(1) });
+const SUPPORTED_STRUCTURED_KEYS = ["AWS_S3_CREDENTIALS", "TEXT_AI_SELECTED", "IMAGE_AI_SELECTED"];
 const SUPPORTED_KEY_NAMES = [...SUPPORTED_SIMPLE_KEYS, ...SUPPORTED_STRUCTURED_KEYS];
 
 const awsCredentialsSchema = z.object({
@@ -42,6 +55,37 @@ const apiKeySchema = z.object({
   keyValue: z.string().min(1, "Key value cannot be empty"),
 });
 
+// GET /api/keys/ai-providers — the full registry (id/label/models/docsUrl
+// per provider, NOT the keys themselves), so the frontend can build the
+// provider/model dropdowns without hardcoding anything on that side.
+router.get("/ai-providers", authGuard, (_req: Request, res: Response) => {
+  sendSuccess(
+    res,
+    {
+      text: TEXT_PROVIDERS.map((p) => ({
+        id: p.id,
+        label: p.label,
+        models: p.models,
+        keyName: p.keyName,
+        docsUrl: p.docsUrl,
+        tier: p.tier,
+        noKeyRequired: p.noKeyRequired,
+      })),
+      image: IMAGE_PROVIDERS.map((p) => ({
+        id: p.id,
+        label: p.label,
+        models: p.models,
+        keyName: p.keyName,
+        docsUrl: p.docsUrl,
+        tier: p.tier,
+        noKeyRequired: p.noKeyRequired,
+      })),
+    },
+    200
+  );
+});
+
+
 // POST /api/keys - Create or update an API key
 router.post(
   "/",
@@ -50,13 +94,27 @@ router.post(
     try {
       const { keyName, keyValue } = apiKeySchema.parse(req.body);
 
-      // Structured keys (AWS S3, etc.) arrive as a JSON-stringified object
-      // from the frontend — validate its shape before encrypting/storing,
-      // same rigor as the simple string keys.
+      // Structured keys (AWS S3, AI provider selection, etc.) arrive as a
+      // JSON-stringified object from the frontend — validate its shape
+      // before encrypting/storing, same rigor as the simple string keys.
       if (SUPPORTED_STRUCTURED_KEYS.includes(keyName)) {
         try {
           const parsed = JSON.parse(keyValue);
           if (keyName === "AWS_S3_CREDENTIALS") awsCredentialsSchema.parse(parsed);
+          if (keyName === "TEXT_AI_SELECTED") {
+            const sel = aiSelectionSchema.parse(parsed);
+            const provider = findTextProvider(sel.providerId);
+            if (!provider || !provider.models.some((m) => m.id === sel.model)) {
+              return sendError(res, "Unknown text provider or model.", "VALIDATION_ERROR", 400);
+            }
+          }
+          if (keyName === "IMAGE_AI_SELECTED") {
+            const sel = aiSelectionSchema.parse(parsed);
+            const provider = findImageProvider(sel.providerId);
+            if (!provider || !provider.models.some((m) => m.id === sel.model)) {
+              return sendError(res, "Unknown image provider or model.", "VALIDATION_ERROR", 400);
+            }
+          }
         } catch {
           return sendError(res, "Malformed credentials payload", "VALIDATION_ERROR", 400);
         }
@@ -93,18 +151,34 @@ router.post(
   }
 );
 
-// GET /api/keys/status - Get status of all API keys (without revealing values)
+// GET /api/keys/status - Get status + decrypted value of every stored key.
+// Per Reza (2026-07-08): this route is already authGuard-protected, and
+// the whole admin panel sits behind a login — hiding secrets from an
+// admin who already authenticated just meant re-typing them after every
+// refresh, no real security benefit gained. Anyone who could read this
+// response could also just log into the admin panel directly.
 router.get("/status", authGuard, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const keys = await db.query.apiKeys.findMany();
 
-    const status = keys.map((key) => ({
-      id: key.id,
-      keyName: key.keyName,
-      isActive: key.isActive,
-      isConfigured: !!key.encryptedValue, // True if encryptedValue exists
-      testedAt: key.testedAt,
-    }));
+    const status = keys.map((key) => {
+      const base = {
+        id: key.id,
+        keyName: key.keyName,
+        isActive: key.isActive,
+        isConfigured: !!key.encryptedValue, // True if encryptedValue exists
+        testedAt: key.testedAt,
+      };
+      if (!key.encryptedValue) return base;
+      try {
+        const value = decrypt({ encryptedValue: key.encryptedValue, iv: key.iv, authTag: key.authTag });
+        return { ...base, value };
+      } catch {
+        // best-effort: if a row can't be decrypted for any reason, don't
+        // fail the whole status list over it
+        return base;
+      }
+    });
 
     return sendSuccess(res, status);
   } catch (error) {
@@ -128,6 +202,9 @@ router.post(
       let testSuccess = false;
       let testMessage = "";
 
+      const textProvider = TEXT_PROVIDERS.find((p) => p.keyName === keyName);
+      const imageProvider = IMAGE_PROVIDERS.find((p) => p.keyName === keyName);
+
       if (keyName === "AWS_S3_CREDENTIALS") {
         // Real test: actually try to reach the bucket with these exact
         // credentials, not a length check.
@@ -144,11 +221,35 @@ router.post(
           logger.warn({ requestId: req.id, error: s3Error }, "AWS S3 connection test failed.");
           testMessage = "Could not reach the bucket with these credentials — check the access key, secret, region, and bucket name.";
         }
+      } else if (textProvider) {
+        // Real test: a genuine 1-word completion — cheap enough to run on
+        // every click, and proves the key actually works with this exact
+        // provider, not just that it's a plausible-looking string.
+        try {
+          const testModel = (req.body as { model?: string }).model || textProvider.models[0]!.id;
+          const reply = await callTextProvider(
+            textProvider,
+            testModel,
+            keyValue,
+            "Reply with exactly one word: OK",
+            "Connection test."
+          );
+          testSuccess = reply.trim().length > 0;
+          testMessage = testSuccess ? `Connected to ${textProvider.label} (${testModel}).` : `${textProvider.label} returned an empty reply.`;
+        } catch (providerError) {
+          logger.warn({ requestId: req.id, provider: textProvider.id, error: providerError }, "AI provider connection test failed.");
+          testMessage = providerError instanceof Error ? providerError.message : `Could not reach ${textProvider.label}.`;
+        }
+      } else if (imageProvider) {
+        // Format-only check for image providers — a real test would mean
+        // generating (and paying for) an actual image on every click.
+        testSuccess = keyValue.length > 10;
+        testMessage = testSuccess
+          ? `Key format looks valid for ${imageProvider.label} (not a live image generation — that only happens on Generate).`
+          : "Key looks too short to be valid.";
       } else {
-        // Simulated check for the remaining single-value keys — no
-        // lightweight verification endpoint exists for these providers
-        // yet. Replace per-service once each provider's real check is
-        // wired.
+        // Remaining single-value keys (YouTube data key, etc.) — no
+        // lightweight verification endpoint wired for these yet.
         testSuccess = keyValue.length > 10;
         testMessage = testSuccess ? "Key format looks valid (not a live connection test)." : "Key looks too short to be valid.";
       }

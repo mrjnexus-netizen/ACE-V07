@@ -236,6 +236,20 @@ export default function EditableImage({ contentKey, defaultUrl, children }: Edit
     );
   };
 
+  const handleGenerateImage = async () => {
+    setUploading(true);
+    setNotice('Asking the AI to generate an image…');
+    try {
+      const { url } = await apiPost<{ url: string }>(`/api/content/${encodeURIComponent(contentKey)}/generate-image`, {});
+      await save(contentKey, 'en', 'image', url);
+      setNotice(null);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'AI image generation failed — try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleDelete = async () => {
     setBusy(true);
     try {
@@ -367,7 +381,8 @@ export default function EditableImage({ contentKey, defaultUrl, children }: Edit
                 <button
                   type="button"
                   className="ace-editable-btn"
-                  onClick={() => setNotice('AI image generation is coming soon (needs an A3b model selected).')}
+                  onClick={handleGenerateImage}
+                  disabled={uploading}
                 >
                   Generate
                 </button>
