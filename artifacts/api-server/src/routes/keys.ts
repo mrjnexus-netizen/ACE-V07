@@ -11,6 +11,7 @@ import { InternalError } from "../utils/errors";
 import { createChildLogger } from "../utils/logger";
 import { sendError, sendSuccess } from "../utils/response";
 import { TEXT_PROVIDERS, IMAGE_PROVIDERS, findTextProvider, findImageProvider, callTextProvider } from "../services/aiProviders";
+import { invalidateS3ConfigCache } from "../services/awsConfig";
 
 const router: Router = Router();
 const logger = createChildLogger("ApiKeysRoute");
@@ -140,6 +141,7 @@ router.post(
           .values({ keyName, encryptedValue, iv, authTag, isActive: true });
         logger.info({ requestId: req.id, keyName }, "API key created successfully.");
       }
+      if (keyName === "AWS_S3_CREDENTIALS") invalidateS3ConfigCache();
       return sendSuccess(res, { message: `API key ${keyName} saved successfully.` });
     } catch (error) {
       if (error instanceof z.ZodError) {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { extname } from 'path';
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { encode } from 'blurhash';
 import { Router, Request, Response } from 'express';
@@ -10,6 +10,7 @@ import sharp from 'sharp';
 import { z } from 'zod';
 
 import { authGuard } from '../middleware/auth';
+import { getS3Config } from '../services/awsConfig';
 
 const router: Router = Router();
 
@@ -50,14 +51,6 @@ const upload = multer({
     } else {
       (cb as (err: Error | null, accept: boolean) => void)(new Error('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.'), false);
     }
-  },
-});
-
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
   },
 });
 
@@ -106,19 +99,21 @@ router.post('/upload', authGuard, upload.single('media'), async (req: Request, r
     }
     const { entity_type, entity_id } = req.body;
 
+    const s3 = await getS3Config();
+
     const fileExtension = extname(req.file.originalname);
     const fileName = `${entity_type}/${entity_id}/${randomUUID()}${fileExtension}`;
 
     const uploadCommand = new PutObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET_NAME || 'ace-2026-bucket',
+      Bucket: s3.bucket,
       Key: fileName,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
     });
 
-    await s3Client.send(uploadCommand);
+    await s3.client.send(uploadCommand);
 
-    const fileUrl = `https://${process.env.AWS_S3_BUCKET_NAME || 'ace-2026-bucket'}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${fileName}`;
+    const fileUrl = `https://${s3.bucket}.s3.${s3.region}.amazonaws.com/${fileName}`;
 
     let blurhash = null;
     if (req.file.mimetype.startsWith('image/')) {
@@ -170,12 +165,13 @@ router.post('/staging-preview', authGuard, upload.single('media'), async (req: R
       blurhash = await generateBlurHash(req.file.buffer);
     }
 
+    const s3 = await getS3Config();
     const temporaryKey = `staging-previews/${randomUUID()}${extname(req.file.originalname)}`;
 
     const signedUrl = await getSignedUrl(
-      s3Client,
+      s3.client,
       new GetObjectCommand({
-        Bucket: process.env.AWS_S3_BUCKET_NAME || 'ace-2026-bucket',
+        Bucket: s3.bucket,
         Key: temporaryKey,
       }),
       { expiresIn: 3600 }

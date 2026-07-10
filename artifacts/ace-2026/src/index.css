@@ -1320,7 +1320,10 @@ p, blockquote, figcaption, .text-wrap-pretty {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  padding: 0.7rem 0.25rem;
+  padding: 0.65rem 0.5rem;
   border-bottom: 1px solid var(--adm-border);
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
 }
+.adm-track-row:hover { background: rgba(255, 255, 255, 0.025); }
 .adm-track-row:last-child { border-bottom: none; }
