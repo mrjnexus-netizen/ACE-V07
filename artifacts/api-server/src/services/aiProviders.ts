@@ -14,7 +14,7 @@
 import { eq } from 'drizzle-orm';
 
 import { db } from '../db/db';
-import { apiKeys } from '../db/schema';
+import { apiKeys, modelOverrides } from '../db/schema';
 import { decrypt } from './encryptionService';
 
 export interface ProviderModel {
@@ -354,6 +354,39 @@ export function applyModelOverride(kind: 'text' | 'image', providerId: string, m
   if (provider.models.some((m) => m.id === modelId)) return true; // already there
   provider.models.push({ id: modelId, label, quality: 3 });
   return true;
+}
+
+/** Durable half of "Apply" (2026-07-10 fix) — writes the override to the
+ * model_overrides table so it survives a server restart. Call AFTER
+ * applyModelOverride() has already updated the in-memory registry; this
+ * only persists the record for next boot's hydrateModelOverrides(). Safe
+ * to call even if the row already exists (onConflictDoNothing). */
+export async function persistModelOverride(kind: 'text' | 'image', providerId: string, modelId: string, label: string): Promise<void> {
+  await db
+    .insert(modelOverrides)
+    .values({ kind, providerId, modelId, label, quality: 3 })
+    .onConflictDoNothing();
+}
+
+/** Replays every persisted override into the in-memory registry. Must run
+ * once at server boot, before any request that reads TEXT_PROVIDERS/
+ * IMAGE_PROVIDERS (model dropdowns, Generate calls, etc.). A failure here
+ * degrades gracefully — logs and continues with the hardcoded registry
+ * only, never blocks server startup. */
+export async function hydrateModelOverrides(): Promise<void> {
+  try {
+    const rows = await db.query.modelOverrides.findMany();
+    for (const row of rows) {
+      applyModelOverride(row.kind as 'text' | 'image', row.providerId, row.modelId, row.label);
+    }
+    if (rows.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[modelOverrides] Hydrated ${rows.length} persisted model override(s) from DB.`);
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[modelOverrides] Failed to hydrate persisted overrides — continuing with base registry.', err);
+  }
 }
 
 export interface ResolvedTextProvider {

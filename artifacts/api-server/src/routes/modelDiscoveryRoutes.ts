@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 
 import { authGuard } from '../middleware/auth';
 import { getModelUpdateAlerts, refreshModelUpdates, dismissModelUpdateAlert, removeModelFromAlert } from '../services/modelDiscovery';
-import { applyModelOverride, findTextProvider, findImageProvider } from '../services/aiProviders';
+import { applyModelOverride, persistModelOverride, findTextProvider, findImageProvider } from '../services/aiProviders';
 
 const router = Router();
 
@@ -32,7 +32,7 @@ router.post('/refresh', authGuard, async (_req: Request, res: Response): Promise
 // POST /api/model-updates/:providerId/apply — adds ONE model into the
 // provider's selectable list (visible immediately in the model dropdown),
 // then removes just that model from the alert.
-router.post('/:providerId/apply', authGuard, (req: Request, res: Response): void => {
+router.post('/:providerId/apply', authGuard, async (req: Request, res: Response): Promise<void> => {
   const providerId = req.params.providerId!;
   const modelId = req.body?.modelId as string | undefined;
   if (!modelId) {
@@ -50,6 +50,18 @@ router.post('/:providerId/apply', authGuard, (req: Request, res: Response): void
   if (!applied) {
     res.status(500).json({ success: false, data: null, error: 'Failed to apply model', code: 'SERVER_ERROR', timestamp: new Date().toISOString() });
     return;
+  }
+  // 2026-07-10 fix: applyModelOverride() above only updates the in-memory
+  // registry (lost on restart) — persistModelOverride() writes the durable
+  // record hydrateModelOverrides() replays at next boot. A failure here is
+  // logged but does not fail the request: the model is already live for
+  // this running process, which is what the admin clicking "Apply" wanted;
+  // worst case it needs a re-click after a restart.
+  try {
+    await persistModelOverride(kind, providerId, modelId, modelId);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[modelOverrides] Applied "${modelId}" live but failed to persist it — will not survive a restart.`, err);
   }
   removeModelFromAlert(providerId, modelId);
   res.status(200).json({ success: true, data: getModelUpdateAlerts(), error: null, code: null, timestamp: new Date().toISOString() });

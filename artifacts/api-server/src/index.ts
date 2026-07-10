@@ -24,6 +24,7 @@ import pipelineRoutes from "./routes/pipeline";
 import modelDiscoveryRoutes from "./routes/modelDiscoveryRoutes";
 import posterStudioRoutes from "./routes/posterStudioRoutes";
 import { startModelDiscoverySchedule } from "./services/modelDiscovery";
+import { hydrateModelOverrides } from "./services/aiProviders";
 import tracksRoutes from "./routes/tracks";
 import translateRoutes from "./routes/translate";
 import { createChildLogger } from "./utils/logger";
@@ -122,16 +123,36 @@ process.on("uncaughtException", (error: Error) => {
   process.exit(1);
 });
 
-const server = app.listen(PORT, () => {
-  logger.info(`API Server running on port ${PORT}`);
-  // Periodic check for new AI provider models (2026-07-09) — the first
-  // check runs 30s after boot, then every 24h. See services/modelDiscovery.ts.
-  startModelDiscoverySchedule();
-});
+// 2026-07-10 fix: replay any previously-"Applied" model overrides from the
+// DB into the in-memory provider registry BEFORE the server starts
+// accepting requests — otherwise a model an admin already applied would
+// silently vanish from the dropdown on every restart. hydrateModelOverrides()
+// never throws (degrades to the base registry + a warning log on failure),
+// so this can't block boot. Wrapped in an IIFE rather than a top-level
+// await for CJS/ESM compatibility either way this project is compiled.
+let server: ReturnType<typeof app.listen>;
+void (async () => {
+  await hydrateModelOverrides();
+  server = app.listen(PORT, () => {
+    logger.info(`API Server running on port ${PORT}`);
+    // Periodic check for new AI provider models (2026-07-09) — the first
+    // check runs 30s after boot, then every 24h. See services/modelDiscovery.ts.
+    startModelDiscoverySchedule();
+  });
+})();
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   logger.info("SIGTERM signal received: closing HTTP server");
+  // server is assigned inside the boot IIFE above (after hydration
+  // completes); guard the extremely unlikely case SIGTERM arrives before
+  // that finishes, so shutdown still cleans up instead of throwing.
+  if (!server) {
+    await pool.end();
+    await redis.quit();
+    process.exit(0);
+    return;
+  }
   server.close(async () => {
     logger.info("HTTP server closed.");
     await pool.end(); // Close PostgreSQL pool

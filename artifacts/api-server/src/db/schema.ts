@@ -108,6 +108,29 @@ export const apiKeys = pgTable(
   })
 );
 
+// Model Discovery (A3b, 2026-07-10 fix) — persists the effect of clicking
+// "Apply" on a newly-discovered model so it survives a server restart.
+// applyModelOverride() in aiProviders.ts still mutates the in-memory
+// TEXT_PROVIDERS/IMAGE_PROVIDERS registry directly (routes/UI read that,
+// unchanged) — this table is only the durable record replayed at boot via
+// hydrateModelOverrides(). Not secret data, so no encryption needed
+// (unlike apiKeys).
+export const modelOverrides = pgTable(
+  'model_overrides',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    kind: text('kind').notNull(), // 'text' | 'image'
+    providerId: text('provider_id').notNull(),
+    modelId: text('model_id').notNull(),
+    label: text('label').notNull(),
+    quality: integer('quality').notNull().default(3),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    uniqueOverrideIdx: uniqueIndex('idx_model_overrides_unique').on(table.kind, table.providerId, table.modelId),
+  })
+);
+
 export const adminUsers = pgTable(
   'admin_users',
   {
