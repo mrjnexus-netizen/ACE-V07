@@ -1,6 +1,6 @@
 import type { ApiResponse } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 const RETRY_DELAYS = [1000, 2000, 4000];

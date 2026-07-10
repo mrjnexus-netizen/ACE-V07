@@ -11,6 +11,12 @@
 // Cohere have their own shapes and get small dedicated callers.
 // ============================================================
 
+import { eq } from 'drizzle-orm';
+
+import { db } from '../db/db';
+import { apiKeys } from '../db/schema';
+import { decrypt } from './encryptionService';
+
 export interface ProviderModel {
   id: string;
   label: string;
@@ -67,8 +73,9 @@ export const TEXT_PROVIDERS: TextProvider[] = [
     compatMode: 'gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
     models: [
-      { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (free tier available)', quality: 3 },
-      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (newer, free tier available)', quality: 4 },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (fastest, free tier available)', quality: 3 },
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (free tier available)', quality: 4 },
+      { id: 'gemini-3-pro', label: 'Gemini 3 Pro (highest quality)', quality: 5 },
     ],
     keyName: 'AI_PROVIDER_KEY_GEMINI',
     docsUrl: 'https://aistudio.google.com/app/apikey',
@@ -230,7 +237,11 @@ export const IMAGE_PROVIDERS: ImageProvider[] = [
     label: 'Google Gemini (Imagen)',
     compatMode: 'gemini-image',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
-    models: [{ id: 'imagen-3.0-generate-001', label: 'Imagen 3', quality: 4 }],
+    models: [
+      { id: 'imagen-4.0-fast-generate-001', label: 'Imagen 4 Fast (cheapest, fastest)', quality: 3 },
+      { id: 'imagen-4.0-generate-001', label: 'Imagen 4 (standard)', quality: 4 },
+      { id: 'imagen-4.0-ultra-generate-001', label: 'Imagen 4 Ultra (highest quality)', quality: 5 },
+    ],
     keyName: 'AI_PROVIDER_KEY_GEMINI_IMAGE',
     docsUrl: 'https://aistudio.google.com/app/apikey',
     tier: 'limited free',
@@ -308,6 +319,86 @@ export function findImageProvider(id: string): ImageProvider | undefined {
   return IMAGE_PROVIDERS.find((p) => p.id === id);
 }
 
+async function getDecryptedKeyValue(keyName: string): Promise<string | null> {
+  const record = await db.query.apiKeys.findFirst({ where: eq(apiKeys.keyName, keyName) });
+  if (!record || !record.isActive || !record.encryptedValue) return null;
+  try {
+    return decrypt({ encryptedValue: record.encryptedValue, iv: record.iv, authTag: record.authTag });
+  } catch {
+    return null;
+  }
+}
+
+/** Looks up the saved key for ANY provider (not just whichever one is
+ * currently selected in Gatekeeper Hub) — used by modelDiscovery.ts to
+ * check every configured provider for new models, not just the active one. */
+export async function getProviderApiKey(provider: TextProvider | ImageProvider): Promise<string | null> {
+  if (provider.noKeyRequired) return '';
+  return getDecryptedKeyValue(provider.keyName);
+}
+
+/** Adds a newly-discovered model into a provider's selectable list —
+ * this is what the Gatekeeper Hub "Apply" button calls. Mutates the
+ * TEXT_PROVIDERS/IMAGE_PROVIDERS arrays in place (const only prevents
+ * reassignment, not mutation), so it's picked up immediately by the
+ * existing /api/keys/ai-providers picker with zero other changes needed.
+ *
+ * NOTE (2026-07-09): this is in-memory only for now — it resets on server
+ * restart. Persisting it to the DB needs the same encrypt/decrypt path
+ * used for API keys; wire that in once encryptionService.ts's exact
+ * signature is confirmed. */
+export function applyModelOverride(kind: 'text' | 'image', providerId: string, modelId: string, label: string): boolean {
+  const list = kind === 'text' ? TEXT_PROVIDERS : IMAGE_PROVIDERS;
+  const provider = list.find((p) => p.id === providerId);
+  if (!provider) return false;
+  if (provider.models.some((m) => m.id === modelId)) return true; // already there
+  provider.models.push({ id: modelId, label, quality: 3 });
+  return true;
+}
+
+export interface ResolvedTextProvider {
+  provider: TextProvider;
+  model: string;
+  apiKey: string;
+}
+export interface ResolvedImageProvider {
+  provider: ImageProvider;
+  model: string;
+  apiKey: string;
+}
+
+/** Reads whichever text provider the admin picked in Gatekeeper Hub
+ * (TEXT_AI_SELECTED) and its key. Returns null with a reason if nothing
+ * is set up yet — callers should degrade gracefully, never fabricate a
+ * default. Shared by the manual "Generate" buttons AND the automatic
+ * H9 pipeline, so both always use the exact same admin choice. */
+export async function resolveActiveTextProvider(): Promise<ResolvedTextProvider | { error: string }> {
+  const selectionValue = await getDecryptedKeyValue('TEXT_AI_SELECTED');
+  if (!selectionValue) return { error: 'No text AI provider selected yet — pick one in Gatekeeper Hub → AI Models.' };
+  const selection = JSON.parse(selectionValue) as { providerId: string; model: string };
+  const provider = findTextProvider(selection.providerId);
+  if (!provider) return { error: 'The selected text provider is no longer supported.' };
+  const apiKey = provider.noKeyRequired ? '' : await getDecryptedKeyValue(provider.keyName);
+  if (!provider.noKeyRequired && !apiKey) {
+    return { error: `No API key saved for ${provider.label} yet — add one in Gatekeeper Hub.` };
+  }
+  return { provider, model: selection.model, apiKey: apiKey ?? '' };
+}
+
+/** Same as above, for the image provider (IMAGE_AI_SELECTED). */
+export async function resolveActiveImageProvider(): Promise<ResolvedImageProvider | { error: string }> {
+  const selectionValue = await getDecryptedKeyValue('IMAGE_AI_SELECTED');
+  if (!selectionValue) return { error: 'No image AI provider selected yet — pick one in Gatekeeper Hub → AI Models.' };
+  const selection = JSON.parse(selectionValue) as { providerId: string; model: string };
+  const provider = findImageProvider(selection.providerId);
+  if (!provider) return { error: 'The selected image provider is no longer supported.' };
+  const apiKey = provider.noKeyRequired ? '' : await getDecryptedKeyValue(provider.keyName);
+  if (!provider.noKeyRequired && !apiKey) {
+    return { error: `No API key saved for ${provider.label} yet — add one in Gatekeeper Hub.` };
+  }
+  return { provider, model: selection.model, apiKey: apiKey ?? '' };
+}
+
 // ------------------------------------------------------------------
 // Text generation — one call per provider shape.
 // ------------------------------------------------------------------
@@ -333,6 +424,20 @@ async function friendlyProviderError(providerLabel: string, status: number, res:
   return `${providerLabel} returned an error (status ${status}) — try again or pick a different provider.`;
 }
 
+// Every provider call in this file goes through this instead of raw
+// fetch(). Before this fix, a single hanging/slow provider (bad key,
+// dead endpoint, network stall — no error, just silence) would hang
+// callTextProvider/callImageProvider forever. Since the pipeline waits
+// on BOTH via Promise.allSettled, that one hung call froze the entire
+// job's progress bar indefinitely with no error ever surfacing
+// (2026-07-09). A hard ceiling turns "hangs forever" into a normal,
+// catchable error the pipeline already knows how to handle.
+const PROVIDER_TIMEOUT_MS = 45_000;
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = PROVIDER_TIMEOUT_MS): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+}
+
 export async function callTextProvider(
   provider: TextProvider,
   model: string,
@@ -341,7 +446,7 @@ export async function callTextProvider(
   userPrompt: string
 ): Promise<string> {
   if (provider.compatMode === 'openai') {
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
@@ -363,7 +468,7 @@ export async function callTextProvider(
 
   if (provider.compatMode === 'gemini') {
     const url = `${provider.baseUrl}/${model}:generateContent?key=${apiKey}`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -379,7 +484,7 @@ export async function callTextProvider(
   }
 
   if (provider.compatMode === 'anthropic') {
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -401,7 +506,7 @@ export async function callTextProvider(
   }
 
   if (provider.compatMode === 'cohere') {
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, message: userPrompt, preamble: systemPrompt, temperature: 0.85 }),
@@ -415,8 +520,13 @@ export async function callTextProvider(
 
   if (provider.compatMode === 'pollinations-text') {
     // Genuinely keyless — a GET request with the combined prompt in the URL path.
+    // A random `seed` is required here: Pollinations (and any CDN/cache in
+    // front of it) serves an identical cached response for an identical
+    // URL, which made every "Regenerate" click return the exact same text
+    // since the prompt itself doesn't change between clicks (2026-07-09).
     const combined = `${systemPrompt}\n\n${userPrompt}`;
-    const res = await fetch(`${provider.baseUrl}/${encodeURIComponent(combined)}`);
+    const seed = Math.floor(Math.random() * 1_000_000_000);
+    const res = await fetchWithTimeout(`${provider.baseUrl}/${encodeURIComponent(combined)}?seed=${seed}`);
     if (!res.ok) throw new Error(`${provider.label} error ${res.status}.`);
     const text = (await res.text()).trim();
     if (!text) throw new Error(`${provider.label} returned no text.`);
@@ -431,7 +541,7 @@ export async function callTextProvider(
 // ------------------------------------------------------------------
 export async function callImageProvider(provider: ImageProvider, model: string, apiKey: string, prompt: string): Promise<Buffer> {
   if (provider.compatMode === 'openai-image') {
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, prompt, n: 1, size: '1024x1024', quality: 'hd', response_format: 'url' }),
@@ -440,7 +550,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     const data = await res.json();
     const url = data.data?.[0]?.url;
     if (!url) throw new Error(`${provider.label} returned no image.`);
-    const img = await fetch(url);
+    const img = await fetchWithTimeout(url);
     if (!img.ok) throw new Error(`Could not download image from ${provider.label}.`);
     return Buffer.from(await img.arrayBuffer());
   }
@@ -449,7 +559,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     const form = new FormData();
     form.append('prompt', prompt);
     form.append('output_format', 'png');
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'image/*' },
       body: form as unknown as BodyInit,
@@ -459,7 +569,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   }
 
   if (provider.compatMode === 'replicate') {
-    const create = await fetch(provider.baseUrl, {
+    const create = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, Prefer: 'wait' },
       body: JSON.stringify({ version: model, input: { prompt } }),
@@ -468,14 +578,14 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     const prediction = await create.json();
     const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
     if (!outputUrl) throw new Error(`${provider.label} returned no image.`);
-    const img = await fetch(outputUrl);
+    const img = await fetchWithTimeout(outputUrl);
     if (!img.ok) throw new Error(`Could not download image from ${provider.label}.`);
     return Buffer.from(await img.arrayBuffer());
   }
 
   if (provider.compatMode === 'gemini-image') {
     const url = `${provider.baseUrl}/${model}:predict?key=${apiKey}`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ instances: [{ prompt }], parameters: { sampleCount: 1 } }),
@@ -488,7 +598,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   }
 
   if (provider.compatMode === 'huggingface') {
-    const res = await fetch(`${provider.baseUrl}/${model}`, {
+    const res = await fetchWithTimeout(`${provider.baseUrl}/${model}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ inputs: prompt }),
@@ -500,7 +610,11 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
 
   if (provider.compatMode === 'pollinations') {
     // Genuinely keyless — a GET request with the prompt in the URL path.
-    const res = await fetch(`${provider.baseUrl}/${encodeURIComponent(prompt)}?nologo=true`);
+    // Same caching issue as pollinations-text above: without a random
+    // seed, every regenerate returned the identical cached image
+    // (2026-07-09).
+    const seed = Math.floor(Math.random() * 1_000_000_000);
+    const res = await fetchWithTimeout(`${provider.baseUrl}/${encodeURIComponent(prompt)}?nologo=true&seed=${seed}`);
     if (!res.ok) throw new Error(`${provider.label} error ${res.status}.`);
     return Buffer.from(await res.arrayBuffer());
   }
@@ -508,7 +622,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   if (provider.compatMode === 'deepai') {
     const form = new URLSearchParams();
     form.append('text', prompt);
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'api-key': apiKey, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form,
@@ -517,7 +631,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     const data = await res.json();
     const outputUrl = data.output_url;
     if (!outputUrl) throw new Error(`${provider.label} returned no image.`);
-    const img = await fetch(outputUrl);
+    const img = await fetchWithTimeout(outputUrl);
     if (!img.ok) throw new Error(`Could not download image from ${provider.label}.`);
     return Buffer.from(await img.arrayBuffer());
   }
@@ -525,7 +639,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   if (provider.compatMode === 'clipdrop') {
     const form = new FormData();
     form.append('prompt', prompt);
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'x-api-key': apiKey },
       body: form as unknown as BodyInit,
@@ -536,7 +650,7 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   }
 
   if (provider.compatMode === 'ideogram') {
-    const res = await fetch(provider.baseUrl, {
+    const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Api-Key': apiKey },
       body: JSON.stringify({ image_request: { prompt, model, aspect_ratio: 'ASPECT_1_1' } }),
@@ -545,13 +659,13 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     const data = await res.json();
     const url = data.data?.[0]?.url;
     if (!url) throw new Error(`${provider.label} returned no image.`);
-    const img = await fetch(url);
+    const img = await fetchWithTimeout(url);
     if (!img.ok) throw new Error(`Could not download image from ${provider.label}.`);
     return Buffer.from(await img.arrayBuffer());
   }
 
   if (provider.compatMode === 'leonardo') {
-    const create = await fetch(`${provider.baseUrl}/generations`, {
+    const create = await fetchWithTimeout(`${provider.baseUrl}/generations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ prompt, modelId: model, num_images: 1, width: 1024, height: 1024 }),
@@ -564,14 +678,14 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     // Poll for completion — Leonardo generations are async.
     for (let attempt = 0; attempt < 20; attempt++) {
       await new Promise((r) => setTimeout(r, 3000));
-      const poll = await fetch(`${provider.baseUrl}/generations/${genId}`, {
+      const poll = await fetchWithTimeout(`${provider.baseUrl}/generations/${genId}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!poll.ok) continue;
       const polled = await poll.json();
       const images = polled.generations_by_pk?.generated_images;
       if (Array.isArray(images) && images[0]?.url) {
-        const img = await fetch(images[0].url);
+        const img = await fetchWithTimeout(images[0].url);
         if (!img.ok) throw new Error(`Could not download image from ${provider.label}.`);
         return Buffer.from(await img.arrayBuffer());
       }

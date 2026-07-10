@@ -177,6 +177,69 @@ export const contentEntries = pgTable(
   })
 );
 
+// Poster Studio (2026-07-09, per Reza): admin maintains a gallery of
+// reusable poster templates and a separate gallery of composer portrait
+// photos. Each template carries its OWN precisely-sized YouTube and
+// Instagram images (admin uploads both — no programmatic
+// cropping/resizing, since exact framing matters for a template).
+// Generation combines a template + optional portrait via Gemini's
+// multi-image model, once per size, and every result is saved into
+// generatedPosters as a persistent, browsable gallery.
+export const posterTemplates = pgTable(
+  'poster_templates',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    category: text('category'), // one of the site's existing concept taxonomy (Cinema, Television, etc.) — nullable, groups the gallery
+    youtubeTemplateUrl: text('youtube_template_url').notNull(),
+    instagramTemplateUrl: text('instagram_template_url').notNull(),
+    defaultPrompt: text('default_prompt').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    sortOrderIdx: index('idx_poster_templates_sort_order').on(table.sortOrder),
+  })
+);
+
+export const composerPortraits = pgTable(
+  'composer_portraits',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    label: text('label'),
+    portraitUrl: text('portrait_url').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    sortOrderIdx: index('idx_composer_portraits_sort_order').on(table.sortOrder),
+  })
+);
+
+// Persistent gallery of finished poster generations — one row PER
+// PLATFORM (2026-07-10, per Reza: YouTube and Instagram are generated,
+// regenerated, and saved completely independently — never forced to
+// happen together). Browsable later and selectable as track cover art
+// from Media Pipeline ("Select from Library").
+export const generatedPosters = pgTable(
+  'generated_posters',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    templateId: uuid('template_id').references(() => posterTemplates.id, { onDelete: 'set null' }),
+    templateName: text('template_name'), // snapshot, survives template deletion
+    portraitId: uuid('portrait_id').references(() => composerPortraits.id, { onDelete: 'set null' }),
+    platform: text('platform').notNull(), // 'youtube' | 'instagram'
+    posterUrl: text('poster_url').notNull(),
+    promptUsed: text('prompt_used'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    createdAtIdx: index('idx_generated_posters_created_at').on(table.createdAt),
+    platformIdx: index('idx_generated_posters_platform').on(table.platform),
+  })
+);
+
 // Relations
 export const composerIdentityRelations = relations(composerIdentity, ({ many }) => ({
   projects: many(projects),
@@ -221,3 +284,9 @@ export type StagingDraftRow = typeof stagingDrafts.$inferSelect;
 export type NewStagingDraft = typeof stagingDrafts.$inferInsert;
 export type ContentEntryRow = typeof contentEntries.$inferSelect;
 export type NewContentEntry = typeof contentEntries.$inferInsert;
+export type PosterTemplateRow = typeof posterTemplates.$inferSelect;
+export type NewPosterTemplate = typeof posterTemplates.$inferInsert;
+export type ComposerPortraitRow = typeof composerPortraits.$inferSelect;
+export type NewComposerPortrait = typeof composerPortraits.$inferInsert;
+export type GeneratedPosterRow = typeof generatedPosters.$inferSelect;
+export type NewGeneratedPoster = typeof generatedPosters.$inferInsert;

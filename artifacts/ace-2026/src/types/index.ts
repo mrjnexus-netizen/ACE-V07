@@ -100,6 +100,10 @@ export interface AudioTrack {
   narrative: MultiLingual;
   audioUrl: string;
   coverArt: MediaAsset | null;
+  // Flat cover URL — matches the actual tracks.cover_url DB column and
+  // what the API/UI use in practice (2026-07-10). coverArt above stays
+  // for now in case something else still relies on the richer shape.
+  coverUrl: string | null;
   genre: 'cinematic' | 'gaming' | 'animation' | 'ambient';
   bpm: number | null;
   mood: string | null;
@@ -139,6 +143,7 @@ export type PipelineStatus =
   | 'idle'
   | 'uploading'
   | 'analyzing_audio'
+  | 'ready_for_review'
   | 'generating_art'
   | 'generating_narrative'
   | 'applying_filters'
@@ -148,12 +153,14 @@ export type PipelineStatus =
   | 'error';
 
 export interface AudioMetadata {
-  dominantInstrument: string;
-  bpm: number;
-  mood: string;
-  keySignature: string;
+  dominantInstrument: string | null;
+  bpm: number | null;
+  mood: string | null;
+  keySignature: string | null;
   duration: number;
   title: string | null;
+  genre: string | null;
+  aiListenAnalysis: string | null;
 }
 
 export interface PipelineJob {

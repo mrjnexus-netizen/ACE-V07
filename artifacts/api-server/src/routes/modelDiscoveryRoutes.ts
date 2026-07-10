@@ -1,0 +1,64 @@
+import { Router, Request, Response } from 'express';
+
+import { authGuard } from '../middleware/auth';
+import { getModelUpdateAlerts, refreshModelUpdates, dismissModelUpdateAlert, removeModelFromAlert } from '../services/modelDiscovery';
+import { applyModelOverride, findTextProvider, findImageProvider } from '../services/aiProviders';
+
+const router = Router();
+
+// GET /api/model-updates — current alert list (checked automatically every
+// 24h in the background; this just reads whatever was last found).
+router.get('/', authGuard, (_req: Request, res: Response): void => {
+  const result = getModelUpdateAlerts();
+  res.status(200).json({ success: true, data: result, error: null, code: null, timestamp: new Date().toISOString() });
+});
+
+// POST /api/model-updates/refresh — manual "Check Now", runs immediately.
+router.post('/refresh', authGuard, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const alerts = await refreshModelUpdates();
+    res.status(200).json({ success: true, data: { alerts }, error: null, code: null, timestamp: new Date().toISOString() });
+  } catch (err: unknown) {
+    res.status(500).json({
+      success: false,
+      data: null,
+      error: (err as Error).message || 'Model discovery check failed',
+      code: 'SERVER_ERROR',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// POST /api/model-updates/:providerId/apply — adds ONE model into the
+// provider's selectable list (visible immediately in the model dropdown),
+// then removes just that model from the alert.
+router.post('/:providerId/apply', authGuard, (req: Request, res: Response): void => {
+  const providerId = req.params.providerId!;
+  const modelId = req.body?.modelId as string | undefined;
+  if (!modelId) {
+    res.status(400).json({ success: false, data: null, error: 'modelId is required', code: 'VALIDATION_ERROR', timestamp: new Date().toISOString() });
+    return;
+  }
+  const textProvider = findTextProvider(providerId);
+  const imageProvider = findImageProvider(providerId);
+  const kind = textProvider ? 'text' : imageProvider ? 'image' : null;
+  if (!kind) {
+    res.status(404).json({ success: false, data: null, error: 'Provider not found', code: 'NOT_FOUND', timestamp: new Date().toISOString() });
+    return;
+  }
+  const applied = applyModelOverride(kind, providerId, modelId, modelId);
+  if (!applied) {
+    res.status(500).json({ success: false, data: null, error: 'Failed to apply model', code: 'SERVER_ERROR', timestamp: new Date().toISOString() });
+    return;
+  }
+  removeModelFromAlert(providerId, modelId);
+  res.status(200).json({ success: true, data: getModelUpdateAlerts(), error: null, code: null, timestamp: new Date().toISOString() });
+});
+
+// POST /api/model-updates/:providerId/dismiss — admin acknowledges an alert.
+router.post('/:providerId/dismiss', authGuard, (req: Request, res: Response): void => {
+  dismissModelUpdateAlert(req.params.providerId!);
+  res.status(200).json({ success: true, data: getModelUpdateAlerts(), error: null, code: null, timestamp: new Date().toISOString() });
+});
+
+export default router;

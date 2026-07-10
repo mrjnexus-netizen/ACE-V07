@@ -44,6 +44,7 @@ const makeTrack = (
     dominantColors: [],
     vibrantPalette: null,
   },
+  coverUrl: COVER,
   genre: genre as AudioTrack['genre'],
   bpm: null,
   mood: null,

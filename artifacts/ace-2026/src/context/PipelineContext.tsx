@@ -1,12 +1,33 @@
 import { createContext, useContext, useState, useRef, ReactNode, useCallback, useEffect } from 'react';
-import { PipelineJob, PipelineStatus } from '../types';
-import { apiPost } from '../lib/apiClient';
+import { PipelineJob, PipelineStatus, MultiLingual } from '../types';
+import { apiPost, apiGet } from '../lib/apiClient';
+
+export interface ApprovalOverrides {
+  title?: MultiLingual;
+  narrative?: MultiLingual;
+  coverUrl?: string;
+}
+
+// A file that has finished uploading and is sitting in preview — no
+// pipeline job exists for it yet. Per Reza (2026-07-09): upload must be a
+// separate, complete step (land as a listenable preview) before AI
+// generation is ever triggered; the two must never be bundled together.
+export interface StagedAudio {
+  url: string;
+  fileName: string;
+}
 
 interface PipelineContextType {
   currentJob: PipelineJob | null;
   jobHistory: PipelineJob[];
-  startPipeline: (input: { file?: File; youtubeUrl?: string }) => Promise<void>;
-  approvePipeline: (jobId: string) => Promise<void>;
+  stagedAudio: StagedAudio | null;
+  uploading: boolean;
+  loadingMessage: string | null;
+  uploadAudio: (file: File) => Promise<void>;
+  clearStagedAudio: () => void;
+  startPipeline: (input?: { youtubeUrl?: string }) => Promise<void>;
+  approvePipeline: (jobId: string, overrides?: ApprovalOverrides) => Promise<void>;
+  regeneratePipeline: (jobId: string, field: 'art' | 'narrative') => Promise<void>;
   cancelJob: () => void;
   resetJob: () => void;
 }
@@ -16,96 +37,130 @@ const PipelineContext = createContext<PipelineContextType | undefined>(undefined
 export const PipelineProvider = ({ children }: { children: ReactNode }) => {
   const [currentJob, setCurrentJob] = useState<PipelineJob | null>(null);
   const [jobHistory, setJobHistory] = useState<PipelineJob[]>([]);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const [stagedAudio, setStagedAudio] = useState<StagedAudio | null>(null);
+  const [uploading, setUploading] = useState(false);
+  // Human-readable "what's happening right now" text, sourced from the
+  // `message` field the server includes on SSE broadcasts (e.g. "Generating
+  // cover art with AI — this can take up to a minute…"). Kept separate from
+  // PipelineJob on purpose — it's transient UI copy, not job data.
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const closeEventSource = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
     }
   }, []);
 
   useEffect(() => {
     return () => {
-      closeEventSource();
+      stopPolling();
     };
-  }, [closeEventSource]);
+  }, [stopPolling]);
 
-  const startPipeline = useCallback(async (input: { file?: File; youtubeUrl?: string }) => {
+  // Step 1 — upload only. Lands the file in S3 and parks it as a listenable
+  // preview. No pipeline job is created here and no AI is triggered — that
+  // only happens when startPipeline() is explicitly called afterward.
+  const uploadAudio = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('media', file);
+      form.append('entity_type', 'track-audio');
+      form.append('entity_id', crypto.randomUUID());
+      const uploaded = await apiPost<{ url: string }>('/api/media/upload', form);
+      if (!uploaded?.url) throw new Error('Upload did not return a URL');
+      setStagedAudio({ url: uploaded.url, fileName: file.name });
+    } catch (err: unknown) {
+      console.error('Error uploading audio:', err);
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  const clearStagedAudio = useCallback(() => setStagedAudio(null), []);
+
+  // Step 2 — explicit, separate action. Uses the already-uploaded
+  // stagedAudio (or a youtubeUrl) to kick off analysis + AI generation.
+  const startPipeline = useCallback(async (input?: { youtubeUrl?: string }) => {
     if (currentJob) {
       console.warn('A pipeline job is already in progress.');
       return;
     }
+    if (!stagedAudio && !input?.youtubeUrl) {
+      console.warn('Nothing staged to process — upload a file first.');
+      return;
+    }
 
-    closeEventSource();
+    stopPolling();
 
     try {
       setCurrentJob({
         id: 'initiating',
         status: 'uploading',
-        progress: 0,
+        progress: 10,
         audioMetadata: null,
         generatedArtUrl: null,
         generatedNarrative: null,
         errorMessage: null,
       });
 
-      let processBody: { audioUrl?: string; youtubeUrl?: string };
+      const processBody: { audioUrl?: string; youtubeUrl?: string } = input?.youtubeUrl
+        ? { youtubeUrl: input.youtubeUrl }
+        : { audioUrl: stagedAudio!.url };
 
-      if (input.file) {
-        // Step 1: upload the audio to S3 via the media route, which returns a URL.
-        const form = new FormData();
-        form.append('media', input.file);
-        form.append('entity_type', 'track-audio');
-        form.append('entity_id', crypto.randomUUID());
-        const uploaded = await apiPost<{ url: string }>('/api/media/upload', form);
-        if (!uploaded?.url) throw new Error('Upload did not return a URL');
-        setCurrentJob((prev) => prev ? { ...prev, progress: 5 } : null);
-        processBody = { audioUrl: uploaded.url };
-      } else if (input.youtubeUrl) {
-        processBody = { youtubeUrl: input.youtubeUrl };
-      } else {
-        throw new Error('Either file or youtubeUrl must be provided.');
-      }
-
-      // Step 2: start the pipeline. apiPost already unwraps the ApiResponse envelope,
-      // so the resolved value IS the data object ({ jobId, trackId }).
+      // apiPost already unwraps the ApiResponse envelope, so the resolved
+      // value IS the data object ({ jobId, trackId }).
       const started = await apiPost<{ jobId: string; trackId: string }>('/api/pipeline/process', processBody);
       const jobId = started?.jobId;
       if (!jobId) throw new Error('No jobId returned from pipeline');
 
-      setCurrentJob((prev) => prev ? { ...prev, id: jobId, progress: 10 } : null);
+      setCurrentJob((prev) => prev ? { ...prev, id: jobId } : null);
 
-      const source = new EventSource(`/api/pipeline/status/${jobId}`);
-      eventSourceRef.current = source;
-
-      source.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+      // Poll for status every 2s instead of using SSE (2026-07-09). SSE
+      // silently delivered zero messages in every browser tested on this
+      // machine (Chrome incognito, Firefox) despite the exact same server
+      // responding correctly and instantly to `curl -N` — extensions,
+      // service workers, and the system proxy were each individually
+      // ruled out. A plain polled GET is the same kind of request that has
+      // worked reliably here the entire time (upload, process, login…), so
+      // it sidesteps whatever was uniquely swallowing the streamed response.
+      stopPolling();
+      const applySnapshot = (data: Record<string, unknown>) => {
         setCurrentJob((prev) => {
           if (!prev) return null;
-
           const updatedJob: PipelineJob = {
             ...prev,
             status: data.status as PipelineStatus,
-            progress: data.progress ?? prev.progress,
-            audioMetadata: data.audioMetadata ?? prev.audioMetadata,
-            generatedArtUrl: data.generatedArtUrl ?? prev.generatedArtUrl,
-            generatedNarrative: data.generatedNarrative ?? prev.generatedNarrative,
-            errorMessage: data.errorMessage ?? null,
+            progress: (data.progress as number) ?? prev.progress,
+            audioMetadata: (data.audioMetadata as PipelineJob['audioMetadata']) ?? prev.audioMetadata,
+            generatedArtUrl: (data.generatedArtUrl as string) ?? prev.generatedArtUrl,
+            generatedNarrative: (data.generatedNarrative as PipelineJob['generatedNarrative']) ?? prev.generatedNarrative,
+            errorMessage: (data.errorMessage as string) ?? null,
           };
-
           if (updatedJob.status === 'complete' || updatedJob.status === 'error') {
-            closeEventSource();
+            stopPolling();
+            setLoadingMessage(null);
             setJobHistory((history) => [...history, updatedJob]);
           }
           return updatedJob;
         });
+        if (typeof data.message === 'string' && data.status !== 'complete' && data.status !== 'error') setLoadingMessage(data.message);
       };
 
-      source.onerror = () => {
-        setCurrentJob((prev) => prev ? { ...prev, status: 'error', errorMessage: 'Real-time updates interrupted.' } : null);
-        closeEventSource();
+      const poll = async () => {
+        try {
+          const data = await apiGet<Record<string, unknown>>(`/api/pipeline/status-snapshot/${jobId}`);
+          if (data) applySnapshot(data);
+        } catch (err) {
+          console.error('[Pipeline] Status poll failed:', err);
+        }
       };
+
+      void poll(); // immediate first read, don't wait 2s for the first update
+      pollTimerRef.current = setInterval(() => { void poll(); }, 2000);
 
     } catch (err: unknown) {
       const error = err as Error;
@@ -119,13 +174,13 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         generatedNarrative: null,
         errorMessage: error.message || 'Failed to start pipeline process.',
       });
-      closeEventSource();
+      stopPolling();
     }
-  }, [currentJob, closeEventSource]);
+  }, [currentJob, stagedAudio, stopPolling]);
 
-  const approvePipeline = useCallback(async (jobId: string) => {
+  const approvePipeline = useCallback(async (jobId: string, overrides?: ApprovalOverrides) => {
     try {
-      await apiPost(`/api/pipeline/approve/${jobId}`, {});
+      await apiPost(`/api/pipeline/approve/${jobId}`, overrides ?? {});
       setCurrentJob((prev) => prev ? { ...prev, status: 'publishing' } : null);
     } catch (err: unknown) {
       const error = err as Error;
@@ -134,21 +189,39 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Art/narrative regeneration: the new value is picked up by the SAME
+  // polling loop started in startPipeline (still running at this point —
+  // it only stops on 'complete'/'error'), so this just needs to fire the
+  // request; the next 2s poll tick reflects the change automatically.
+  const regeneratePipeline = useCallback(async (jobId: string, field: 'art' | 'narrative') => {
+    setLoadingMessage(field === 'art' ? 'Starting cover art generation…' : 'Starting caption generation…');
+    try {
+      await apiPost(`/api/pipeline/regenerate/${jobId}`, { field });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error regenerating pipeline field:', error);
+      setCurrentJob((prev) => prev ? { ...prev, errorMessage: error.message || 'Regeneration failed.' } : null);
+      setLoadingMessage(null);
+    }
+  }, []);
+
   const cancelJob = useCallback(() => {
-    closeEventSource();
+    stopPolling();
     if (currentJob && currentJob.id !== 'initiating' && currentJob.status !== 'complete' && currentJob.status !== 'error') {
       fetch(`/api/pipeline/cancel/${currentJob.id}`, { method: 'POST' }).catch(console.error);
     }
     setCurrentJob(null);
-  }, [currentJob, closeEventSource]);
+  }, [currentJob, stopPolling]);
 
   const resetJob = useCallback(() => {
-    closeEventSource();
+    stopPolling();
     setCurrentJob(null);
-  }, [closeEventSource]);
+    setStagedAudio(null);
+    setLoadingMessage(null);
+  }, [stopPolling]);
 
   return (
-    <PipelineContext.Provider value={{ currentJob, jobHistory, startPipeline, approvePipeline, cancelJob, resetJob }}>
+    <PipelineContext.Provider value={{ currentJob, jobHistory, stagedAudio, uploading, loadingMessage, uploadAudio, clearStagedAudio, startPipeline, approvePipeline, regeneratePipeline, cancelJob, resetJob }}>
       {children}
     </PipelineContext.Provider>
   );

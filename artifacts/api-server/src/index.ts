@@ -21,6 +21,9 @@ import identityRoutes from "./routes/identity";
 import keysRoutes from "./routes/keys";
 import mediaRoutes from "./routes/media";
 import pipelineRoutes from "./routes/pipeline";
+import modelDiscoveryRoutes from "./routes/modelDiscoveryRoutes";
+import posterStudioRoutes from "./routes/posterStudioRoutes";
+import { startModelDiscoverySchedule } from "./services/modelDiscovery";
 import tracksRoutes from "./routes/tracks";
 import translateRoutes from "./routes/translate";
 import { createChildLogger } from "./utils/logger";
@@ -53,7 +56,20 @@ app.use(
   })
 );
 
-app.use(compression());
+// SSE routes (Server-Sent Events, e.g. the pipeline progress stream) must
+// NEVER be gzip-compressed: compression buffers small/sparse writes and can
+// hold them indefinitely instead of flushing to the client, which looks
+// exactly like a frontend progress bar that "freezes" forever even though
+// the server is broadcasting correctly. Every current and future SSE
+// endpoint should live under a path this filter recognizes.
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.path.startsWith("/api/pipeline/status")) return false;
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
@@ -67,6 +83,8 @@ app.use("/api/content", contentRoutes);
 app.use("/api/tracks", tracksRoutes);
 app.use("/api/translate", translateRoutes);
 app.use("/api/pipeline", pipelineRoutes);
+app.use("/api/model-updates", modelDiscoveryRoutes);
+app.use("/api/poster-studio", posterStudioRoutes);
 app.use("/api/media", mediaRoutes);
 app.use("/api/briefs", briefsRoutes);
 app.use("/api/keys", keysRoutes);
@@ -80,6 +98,19 @@ app.use(errorMiddleware);
 // Handle unhandled promise rejections and uncaught exceptions
 process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
   logger.error({ reason, promise }, "Unhandled Rejection caught");
+  // A transient dependency hiccup (Redis dropping a connection, hitting its
+  // retry ceiling, etc.) should never take the ENTIRE server down — that
+  // previously killed every in-flight request and open SSE connection
+  // (including the media pipeline's progress stream) the instant Redis
+  // blipped, with no way to recover short of a manual restart (2026-07-09).
+  // Only exit for errors that don't look like a known-recoverable
+  // dependency issue; log and keep serving for everything else.
+  const message = reason instanceof Error ? reason.message : String(reason);
+  const looksLikeTransientDependencyIssue = /redis|ECONNRESET|ECONNREFUSED|ETIMEDOUT|MaxRetriesPerRequest/i.test(message);
+  if (looksLikeTransientDependencyIssue) {
+    logger.warn({ message }, "Unhandled rejection looks like a transient dependency issue — NOT exiting, server stays up.");
+    return;
+  }
   // Application should ideally restart here in a controlled environment (e.g., PM2, Kubernetes)
   // For now, we will exit to ensure the process doesn\'t continue in a bad state.
   process.exit(1);
@@ -93,6 +124,9 @@ process.on("uncaughtException", (error: Error) => {
 
 const server = app.listen(PORT, () => {
   logger.info(`API Server running on port ${PORT}`);
+  // Periodic check for new AI provider models (2026-07-09) — the first
+  // check runs 30s after boot, then every 24h. See services/modelDiscovery.ts.
+  startModelDiscoverySchedule();
 });
 
 // Graceful shutdown
