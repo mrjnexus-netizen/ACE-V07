@@ -608,6 +608,22 @@ const HeadstockSelector = ({
         const y = PIN_CY[i];
         const labelX = PIN_CX[i] + 3.5; // constant offset → diagonal staircase
         const pastel = LANGUAGE_PASTEL[l.code];
+        // 2026-07-10 fix (per Reza — imprecise clicks on the language
+        // picker): the six PIN_CY values are only ~2.9-3.2 viewBox units
+        // apart, but every hit-rect used a FIXED 8.4-unit height (±4.2
+        // around its own center) regardless — adjacent languages'
+        // invisible hit-rects overlapped by ~5.2-5.5 units, over 60% of
+        // each rect's own height. Later-rendered languages paint (and
+        // hit-test) on top in SVG, so clicking anywhere in that huge
+        // shared zone silently selected the language BELOW the one you
+        // were actually pointing at. Fixed by partitioning Y into
+        // non-overlapping bands at the midpoints between neighbors —
+        // every language now owns an exact, gap-free, overlap-free slice
+        // of vertical space, however close together the crystals sit.
+        const prevY = i > 0 ? PIN_CY[i - 1] : null;
+        const nextY = i < PIN_CY.length - 1 ? PIN_CY[i + 1] : null;
+        const topBound = prevY !== null ? (prevY + y) / 2 : y - (nextY !== null ? (nextY - y) / 2 : 4.2);
+        const bottomBound = nextY !== null ? (y + nextY) / 2 : y + (prevY !== null ? (y - prevY) / 2 : 4.2);
         return (
           <g
             key={l.code}
@@ -640,11 +656,13 @@ const HeadstockSelector = ({
             >
               {l.label}
             </text>
-            {/* invisible hit area covering the crystal knob + label - padded
+            {/* invisible hit area covering the crystal knob + label — Y
+                bounds are the midpoint partition computed above (no
+                overlap with neighbors, no gaps); X still padded
                 generously since compounding scale factors (ScaleStage +
                 mobile's tighter crop) can make the effective on-screen
-                target quite small otherwise */}
-            <rect x={PIN_CX[i] - 5} y={y - 4.2} width={labelX + 22 - (PIN_CX[i] - 5)} height="8.4" fill="transparent" style={{ pointerEvents: 'all' }} />
+                target quite small otherwise. */}
+            <rect x={PIN_CX[i] - 5} y={topBound} width={labelX + 22 - (PIN_CX[i] - 5)} height={bottomBound - topBound} fill="transparent" style={{ pointerEvents: 'all' }} />
           </g>
         );
       })}

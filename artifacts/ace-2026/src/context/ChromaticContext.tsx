@@ -104,7 +104,11 @@ const MOTION_TOKENS: Record<string, string> = {
 };
 
 // v7 layered color model - Layer B: per-language color worlds.
-const LANGUAGE_WORLDS: Record<Locale, LanguageWorld> = {
+// Exported (2026-07-10) so VoronoiPortraitFilter.tsx can tint its shader
+// with the SAME per-language accent colors used everywhere else, rather
+// than duplicating this table — single source of truth for "this
+// language's color".
+export const LANGUAGE_WORLDS: Record<Locale, LanguageWorld> = {
   en: { accent: '#D4AF37', accent2: '#F3D77E', accentRgb: '212, 175, 55', mesh: '#F3D77E' },
   ja: { accent: '#3A7BFF', accent2: '#FF3B6B', accentRgb: '58, 123, 255', mesh: '#4D8BFF', surface: '#070912', surfaceRgb: '7, 9, 18' },
   ko: { accent: '#FF4FD8', accent2: '#B07BFF', accentRgb: '255, 79, 216', mesh: '#FF6FE0', surface: '#0C0610', surfaceRgb: '12, 6, 16' },

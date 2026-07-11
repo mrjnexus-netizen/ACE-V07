@@ -7,7 +7,9 @@ import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
 import { ConceptMotif, conceptTint } from './conceptArt';
 import { useBalancedText } from '../hooks/useBalancedText';
-import type { AudioTrack } from '../types';
+import EditableImage from './EditableImage';
+import MirrorShatterPortrait from './MirrorShatterPortrait';
+import type { AudioTrack, Locale } from '../types';
 
 // Section 03 - Works as a VERTICAL PIANO anchored to the left edge.
 // All 12 concepts are ALWAYS shown as keys (whether or not they hold tracks).
@@ -61,6 +63,32 @@ interface ConceptGroup {
 const NOTE_HZ = [
   261.63, 293.66, 329.63, 349.23, 392.0, 440.0, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99,
 ];
+
+// Reza (2026-07-10): the reveal was finishing almost instantly — the keys
+// and the mirror portrait were both fully "there" well before he'd even
+// started scrolling into the section, because the OLD 0.6 fraction was
+// measured against a short offset (['start end','start start'] = exactly
+// one viewport-height of scroll). Now split into two pieces, both shared
+// by PianoLane AND MirrorShatterPortrait so they can never drift apart:
+//   - START_OFFSET: a deliberate dead zone of plain scrolling BEFORE
+//     anything starts assembling (per Reza's follow-up: it was still
+//     kicking off too early even after the first fix).
+//   - REVEAL_SPAN: how much of progress, starting from START_OFFSET, the
+//     reveal takes to complete. START_OFFSET + REVEAL_SPAN is the exact
+//     progress value everything must be fully settled by — the section's
+//     natural reading position (the 2026-07-07 constraint, preserved).
+// Reza (2026-07-11): precise anchor given — when the section header
+// ("SECTION 03 — SELECTED WORKS / Play a concept.") reaches the TOP of
+// the viewport, BOTH the piano keys and the mirror portrait must be
+// fully finished. That moment is exactly progress=1 under the
+// ['start end','start start'] offset below (section top hits viewport
+// top). So completion (START_OFFSET + REVEAL_SPAN) is pinned to exactly
+// 1 — not "close to 1", exactly 1, by construction. Also pushed the
+// start further back per his "push the timing back more" — more plain
+// scrolling before anything begins, all still finishing at that same
+// fixed anchor.
+const START_OFFSET = 0.35;
+const REVEAL_SPAN = 1 - START_OFFSET;
 
 let toneCtx: AudioContext | null = null;
 
@@ -187,12 +215,18 @@ function PianoLane({
   const { t } = useT();
   const [pressed, setPressed] = useState(false);
 
-  const slice = 0.6 / total;
-  const start = index * slice;
+  const slice = REVEAL_SPAN / total;
+  const start = START_OFFSET + index * slice;
   const end = start + slice;
 
-  const x = useTransform(progress, [start, end], reduce ? ['0%', '0%'] : ['-105%', '0%']);
-  const opacity = useTransform(progress, [start, (start + end) / 2], [0, 1]);
+  // Softened per Reza (2026-07-10): the old version faded in across only
+  // HALF the slice (snappy). This now eases across the FULL slice with an
+  // intermediate keyframe, so each key arrives more gradually — still
+  // fully settled by `end`, so the section-must-be-complete-by-arrival
+  // rule from 2026-07-07 (see the scrollYProgress comment below) still
+  // holds; only the per-key curve got gentler, not the total window.
+  const x = useTransform(progress, [start, start + slice * 0.7, end], reduce ? ['0%', '0%', '0%'] : ['-105%', '-18%', '0%']);
+  const opacity = useTransform(progress, [start, start + slice * 0.6, end], [0, 0.7, 1]);
   const labelOpacity = useTransform(progress, [end - slice * 0.3, end + 0.02], [0, 1]);
   const labelX = useTransform(progress, [end - slice * 0.3, end + 0.02], reduce ? [0, 0] : [-14, 0]);
 
@@ -812,7 +846,7 @@ function ConceptOverlay({
 }
 
 export default function WorksGallery() {
-  const { tracks } = useIdentity();
+  const { tracks, composerIdentity, locale } = useIdentity();
   const { t } = useT();
   const reduce = useReducedMotion() ?? false;
   const sectionRef = useRef<HTMLElement>(null);
@@ -821,9 +855,34 @@ export default function WorksGallery() {
   // Reza (2026-07-07): the reveal must be COMPLETE by the time the section
   // settles into its natural reading position — not still opening keys
   // several scrolls later, by which point the heading has scrolled off the
-  // top. Range now spans only the section's ENTRANCE (top hits viewport
-  // bottom -> top hits viewport top), not its entire transit through the
-  // viewport, so progress reaches 1 right as it arrives, not long after.
+  // top.
+  //
+  // Reza (2026-07-10, follow-up): with the ENTRANCE-only range this used
+  // ('start end' -> 'start start' — exactly one viewport-height of scroll,
+  // no matter how the START_OFFSET/REVEAL_SPAN fractions above are tuned),
+  // the whole reveal was compressed into a sliver right at the very start
+  // of the section coming into view — "tahe safast", felt rushed, and by
+  // the time the section was actually being read it had already finished.
+  // Changed the END anchor to 'center center' (section's own vertical
+  // CENTER reaching the viewport's center) instead of 'start start' (its
+  // TOP reaching the viewport's top) — this adds real scroll distance
+  // (roughly half the section's height) for the reveal to play out across,
+  // so it's visibly happening through the middle of scrolling into the
+  // section, while still finishing at a natural "settled, centered, done
+  // reading in" point rather than dragging past it.
+  //
+  // Reza (2026-07-10, second follow-up): still too fast/early. Pushed
+  // further in the same direction: widened the end anchor again ('center
+  // center' -> 'end center', more real scroll distance) and raised
+  // START_OFFSET above for a longer beat of plain scrolling before
+  // anything starts. Same mechanism, just pushed further — simple.
+  //
+  // Reza (2026-07-11, precise anchor given): back to 'start start' (section
+  // TOP hits viewport TOP = progress 1) — he specified exactly this moment
+  // (header fully arrived at the top edge) as when everything must be
+  // done. START_OFFSET above now does the "push it back further" work
+  // instead of widening this anchor, since widening it further would push
+  // completion PAST the point he pinned it to.
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ['start end', 'start start'],
@@ -887,6 +946,38 @@ export default function WorksGallery() {
           />
         ))}
       </div>
+
+      {/* Mirror portrait (2026-07-10, per Reza): sits on the right, a mirror
+          of the piano keys on the left, and assembles itself from scattered
+          shards on the SAME scroll timeline as the keys sliding in (see
+          MirrorShatterPortrait.tsx). Hidden below the `lg` breakpoint via
+          the wrapper's Tailwind classes — there's no room for a mirrored
+          column once the piano keys stack to full width on small screens.
+          Reuses EditableImage (contentKey 'worksSection.mirrorPortrait') so
+          it gets upload/crop/replace/delete in the admin panel for free,
+          exactly like every other admin-managed photo on the site. Falls
+          back to the composer's main portrait until an admin sets one
+          specifically here. */}
+      {composerIdentity?.portrait?.url && (
+        <div
+          className="hidden lg:block absolute pointer-events-none"
+          style={{ right: 'clamp(1.5rem, 6vw, 7rem)', top: '50%', transform: 'translateY(-50%)', width: 'clamp(220px, 22vw, 380px)', height: 'min(68vh, 620px)', zIndex: 15 }}
+        >
+          <EditableImage contentKey="worksSection.mirrorPortrait" defaultUrl={composerIdentity.portrait.url}>
+            {(url) => (
+              <MirrorShatterPortrait
+                src={url}
+                locale={(locale ?? 'en') as Locale}
+                progress={scrollYProgress}
+                windowStart={START_OFFSET}
+                windowSpan={REVEAL_SPAN}
+                className="pointer-events-auto"
+                style={{ width: '100%', height: '100%' }}
+              />
+            )}
+          </EditableImage>
+        </div>
+      )}
 
       <p className="font-mono mt-14" style={{ fontSize: '0.66rem', letterSpacing: '0.15em', color: 'var(--text-dim-color)', padding: '0 clamp(1.5rem, 6vw, 7rem)' }}>
         {t('SELECT A KEY TO OPEN ITS WORKS — OR KEEP SCROLLING')}
