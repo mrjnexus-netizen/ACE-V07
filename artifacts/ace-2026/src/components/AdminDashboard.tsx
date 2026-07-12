@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
@@ -2657,6 +2658,194 @@ const TabPosterStudio = () => {
   );
 };
 
+// ---------- Ambient Tracks (2026-07-12, per Reza) ----------
+// 7 rows: one ambient bed per language + one for the language-selection
+// screen itself. Each is a content_entries override (type: 'audio') under
+// its own dedicated key — locale is fixed to 'en' on all seven since these
+// aren't per-locale VARIANTS of one thing, the KEY already identifies
+// which of the seven a row is; 'en' is just a technically-required anchor
+// value the content system's locale column needs.
+//
+// Same upload -> LOCAL preview -> confirm -> S3 + save flow as
+// EditableImage's pending-file pattern, minus the crop step (audio has
+// nothing to crop). Preview plays from a local object URL so the admin can
+// actually listen before anything is uploaded or goes live.
+//
+// v2 (per Reza, 2026-07-12): the bundled DEFAULT file must be visible and
+// playable too, not just a "using default" caption — every row always
+// shows something you can actually press play on. Also a full visual pass
+// — the first version rendered with bare .adm-panel/.adm-btn and read as
+// flat/lifeless; this uses the site's own luxury-neon recipe (accent
+// gradient + glow, same one used on the public site's media buttons)
+// instead of undecorated defaults.
+const AMBIENT_TRACKS: { key: string; label: string; defaultUrl: string }[] = [
+  { key: 'ambient-track-en', label: localeLabels.en!, defaultUrl: '/audio/bg-en.mp3' },
+  { key: 'ambient-track-es', label: localeLabels.es!, defaultUrl: '/audio/bg-es.mp3' },
+  { key: 'ambient-track-fr', label: localeLabels.fr!, defaultUrl: '/audio/bg-fr.mp3' },
+  { key: 'ambient-track-zh', label: localeLabels.zh!, defaultUrl: '/audio/bg-zh.mp3' },
+  { key: 'ambient-track-ja', label: localeLabels.ja!, defaultUrl: '/audio/bg-ja.mp3' },
+  { key: 'ambient-track-ko', label: localeLabels.ko!, defaultUrl: '/audio/bg-ko.mp3' },
+  { key: 'ambient-track-selector', label: 'Language-Selection Screen', defaultUrl: '/audio/bg-selector.mp3' },
+];
+
+const AMBIENT_BTN_NEON: CSSProperties = {
+  padding: '0.5em 1.2em',
+  borderRadius: 999,
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  letterSpacing: '0.03em',
+  border: 'none',
+  cursor: 'pointer',
+  background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 55%, #fff 45%), color-mix(in srgb, var(--accent-color) 82%, #000 18%))',
+  color: '#0B0B0D',
+  boxShadow: '0 0 16px rgba(var(--accent-rgb),0.35)',
+  transition: 'box-shadow 0.2s ease, transform 0.15s ease',
+};
+const AMBIENT_BTN_GHOST: CSSProperties = {
+  padding: '0.5em 1.2em',
+  borderRadius: 999,
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  letterSpacing: '0.03em',
+  border: '1px solid rgba(var(--accent-rgb),0.4)',
+  cursor: 'pointer',
+  background: 'transparent',
+  color: 'var(--accent-color)',
+};
+
+const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; label: string; defaultUrl: string }) => {
+  const { resolve, save } = useContent();
+  const currentUrl = resolve(trackKey, 'en');
+  const isCustom = !!currentUrl;
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!pendingFile) { setPendingUrl(null); return; }
+    const url = URL.createObjectURL(pendingFile);
+    setPendingUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingFile]);
+
+  const handleSave = async () => {
+    if (!pendingFile) return;
+    setUploading(true);
+    setNotice('Uploading\u2026');
+    try {
+      const form = new FormData();
+      form.append('media', pendingFile);
+      form.append('entity_type', 'content');
+      form.append('entity_id', trackKey);
+      const asset = await apiPost<{ url: string }>('/api/media/upload', form);
+      await save(trackKey, 'en', 'audio', asset.url);
+      setPendingFile(null);
+      setNotice(null);
+    } catch {
+      setNotice('Upload failed \u2014 try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginBottom: 14,
+        padding: '18px 20px',
+        borderRadius: 16,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+        boxShadow: '0 4px 18px rgba(0,0,0,0.25)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+        {/* accent-tinted note badge */}
+        <div
+          style={{
+            width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'radial-gradient(circle, rgba(var(--accent-rgb),0.28), rgba(var(--accent-rgb),0.06))',
+            boxShadow: '0 0 14px rgba(var(--accent-rgb),0.3)',
+            color: 'var(--accent-color)', fontSize: '1.1rem',
+          }}
+          aria-hidden
+        >
+          \u266a
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: '0.98rem' }}>{label}</div>
+          <div
+            style={{
+              display: 'inline-block', marginTop: 4, padding: '0.15em 0.7em', borderRadius: 999,
+              fontSize: '0.66rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+              color: isCustom ? '#0B0B0D' : 'var(--accent-color)',
+              background: isCustom ? 'var(--accent-color)' : 'rgba(var(--accent-rgb),0.12)',
+              border: isCustom ? 'none' : '1px solid rgba(var(--accent-rgb),0.35)',
+            }}
+          >
+            {isCustom ? 'Custom' : 'Default'}
+          </div>
+        </div>
+      </div>
+
+      {pendingUrl ? (
+        <>
+          <div style={{ fontSize: '0.75rem', opacity: 0.75, marginBottom: 6 }}>Preview \u2014 nothing is live yet</div>
+          <audio controls src={pendingUrl} style={{ width: '100%', borderRadius: 8 }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => setPendingFile(null)} disabled={uploading}>
+              Cancel
+            </button>
+            <button type="button" style={{ ...AMBIENT_BTN_NEON, opacity: uploading ? 0.6 : 1 }} onClick={handleSave} disabled={uploading}>
+              {uploading ? 'Uploading\u2026' : 'Save & Publish'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Always playable — the live override if there is one, otherwise
+              the bundled default. Never just a caption with nothing to press. */}
+          <audio controls src={currentUrl || defaultUrl} style={{ width: '100%', borderRadius: 8 }} />
+          <button type="button" style={{ ...AMBIENT_BTN_NEON, marginTop: 12 }} onClick={() => fileInputRef.current?.click()}>
+            {isCustom ? 'Replace' : 'Upload Custom Track'}
+          </button>
+        </>
+      )}
+
+      {notice && <div style={{ marginTop: 8, fontSize: '0.8rem', opacity: 0.8 }}>{notice}</div>}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) setPendingFile(f);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+};
+
+const TabAmbientTracks = () => (
+  <div>
+    <h2 className="adm-section-title">Ambient Tracks</h2>
+    <p style={{ opacity: 0.7, marginBottom: 20, fontSize: '0.85rem' }}>
+      One ambient bed per language, plus the language-selection screen. Preview locally before saving \u2014
+      Save & Publish replaces the live track immediately; the reactive visuals (waves, particles, the orb)
+      keep working with whatever plays, no changes needed there.
+    </p>
+    {AMBIENT_TRACKS.map((t) => (
+      <AmbientTrackRow key={t.key} trackKey={t.key} label={t.label} defaultUrl={t.defaultUrl} />
+    ))}
+  </div>
+);
+
 
 export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: () => void; initialTab?: number }) {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -2668,6 +2857,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
     { id: 4, label: 'Staging Engine' },
     { id: 5, label: 'Document Assistant' },
     { id: 6, label: 'Poster Studio' },
+    { id: 7, label: 'Ambient Tracks' },
   ];
 
   const handleOpenVisualEditor = () => {
@@ -2720,6 +2910,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
                 {activeTab === 4 && <TabStagingEngine />}
                 {activeTab === 5 && <TabDocumentAssistant />}
                 {activeTab === 6 && <TabPosterStudio />}
+                {activeTab === 7 && <TabAmbientTracks />}
               </motion.div>
             </AnimatePresence>
           </div>

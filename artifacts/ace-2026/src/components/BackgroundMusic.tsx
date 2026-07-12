@@ -18,21 +18,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAudio } from '../context/AudioContext';
 import { useIdentity } from '../context/IdentityContext';
+import { useContent } from '../context/ContentContext';
 
 const BG_VOLUME = 0.5; // 50% ceiling (per request)
 const FADE_MS = 1200;
 
 const SUPPORTED = ['en', 'es', 'fr', 'ja', 'zh', 'ko'] as const;
 
-function bgSrcFor(locale: string | null): string | null {
+// 2026-07-12 (per Reza — admin-manageable ambient tracks): each locale's
+// bed is now a content-entry override (key: `ambient-track-<locale>`,
+// type: 'audio', uploaded via the admin's new "Ambient Tracks" tab) with
+// the original bundled /audio/bg-<locale>.mp3 as the fallback for any
+// locale nothing has been uploaded for yet. Same two-tier
+// override-then-default pattern EditableText/EditableImage already use
+// everywhere else on the site — nothing new invented here.
+function bgSrcFor(locale: string | null, resolve: (key: string, locale: string) => string | null): string | null {
   if (!locale) return null;
   const l = (SUPPORTED as readonly string[]).includes(locale) ? locale : 'en';
-  return `/audio/bg-${l}.mp3`;
+  const override = resolve(`ambient-track-${l}`, 'en');
+  return override || `/audio/bg-${l}.mp3`;
 }
 
 export default function BackgroundMusic() {
   const { audioState } = useAudio();
   const { locale } = useIdentity();
+  const { resolve } = useContent();
 
   const elRef = useRef<HTMLAudioElement | null>(null);
   const gainRef = useRef<GainNode | null>(null);
@@ -75,11 +85,12 @@ export default function BackgroundMusic() {
     }
   }, [actx, analyser]);
 
-  // 2) Language change -> cross-fade to the new bed.
+  // 2) Language change (or an admin just published a new override) ->
+  // cross-fade to the new bed.
   useEffect(() => {
     if (!ready) return;
     const el = elRef.current;
-    const src = bgSrcFor(locale);
+    const src = bgSrcFor(locale, resolve);
     if (!el || !src || curSrcRef.current === src) return;
     curSrcRef.current = src;
 
@@ -99,7 +110,7 @@ export default function BackgroundMusic() {
       if (swapTimer.current) window.clearTimeout(swapTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locale, ready]);
+  }, [locale, ready, resolve]);
 
   // 3) Gate: play at ceiling only when visible, language set, no site track.
   useEffect(() => {
