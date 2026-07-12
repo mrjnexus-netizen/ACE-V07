@@ -5,7 +5,9 @@ import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
 import { useBalancedText } from '../hooks/useBalancedText';
 import EditableText from './EditableText';
+import VinylCardFace, { VINYL_CARD_STYLES } from './VinylCardFace';
 import type { AudioTrack, Locale } from '../types';
+import { CONCEPT_ORDER } from '../constants/concepts';
 
 /**
  * "Selected Works" — orbital card ring around a luminous core (blueprint S1–S5).
@@ -41,11 +43,6 @@ import type { AudioTrack, Locale } from '../types';
  * Data plumbing (starred-per-concept cards, playlist feed, click-to-play,
  * localisation) is preserved verbatim from the previous engine.
  */
-
-const CONCEPT_ORDER = [
-  'Cinema', 'Television', 'Games', 'Animation', 'Documentary', 'Advertising',
-  'Trailers', 'Theatre', 'Dance', 'Concert', 'Immersive', 'Albums',
-] as const;
 
 const CONCEPT_BLURB: Record<string, string> = {
   Cinema: 'Original scores written to live beneath the image.',
@@ -114,7 +111,7 @@ const SSE_STYLES = `
 @keyframes sseSheen { 0% { transform: translateX(-130%) skewX(-18deg); } 100% { transform: translateX(230%) skewX(-18deg); } }
 @keyframes sseCoreBreathe { 0%, 100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.05); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .sse-anim { animation: none !important; } }
-`;
+` + VINYL_CARD_STYLES;
 
 /**
  * Animated vector card face — no text, accent-var themed, razor-sharp at any
@@ -154,6 +151,26 @@ export default function SpatialScrollEngine() {
   const anchorRef = useRef<HTMLDivElement>(null); // holds core + ring; recentred each frame
   const sceneRef = useRef<HTMLDivElement>(null); // the whole 3D scene wrapper; fades at scroll extremes
   const inViewRef = useRef(false); // gates the rAF loop — never runs while off-screen
+  // 2026-07-12 (Reza — reported jitter/skipping while scrolling the cards,
+  // confirmed reproducible even with ZERO interaction with the banner
+  // journey feature): sec.getBoundingClientRect() was being read fresh
+  // EVERY animation frame inside the loop below. That's two problems at
+  // once: (1) it's a forced-reflow DOM read, expensive on its own, and
+  // (2) — the actual cause of the jitter — this app's Lenis smooth-scroll
+  // (useSmoothScroll.ts) runs its OWN independent rAF loop, interpolating
+  // scroll position over a 1.2s eased duration. When the main thread stalls
+  // for any reason, Lenis's interpolation can visibly "catch up" with a
+  // jump on whichever frame it next gets to run. Reading raw DOM position
+  // every frame from a SEPARATE, independently-scheduled rAF loop meant
+  // this component had no guaranteed ordering relative to Lenis's own
+  // updates — exactly the kind of two-independent-loops race that produces
+  // visible stutter/skips. FIX: read window.scrollY instead (a plain,
+  // non-reflow-forcing number — NOT a second competing measurement, just
+  // the one true scroll position that both native scrolling and Lenis
+  // alike are already writing to) combined with the section's own
+  // page-absolute top, measured ONCE on mount and re-measured only on
+  // resize/content-size changes — never every frame.
+  const metricsRef = useRef({ top: 0, height: 0 });
   const { tracks, locale } = useIdentity();
   const safeLocale = (locale ?? 'en') as Locale;
   const { audioState, playTrack, pauseTrack, setPlaylist } = useAudio();
@@ -206,6 +223,35 @@ export default function SpatialScrollEngine() {
     return rec[safeLocale] || rec.en || '';
   };
 
+  // ----- CACHED SECTION METRICS — measured on mount/resize only, never per
+  // frame (see the note on metricsRef above for why this replaced a
+  // per-frame getBoundingClientRect() call). -----
+  useEffect(() => {
+    if (isMobile || !sectionRef.current) return;
+    const sec = sectionRef.current;
+    const measure = () => {
+      const r = sec.getBoundingClientRect();
+      metricsRef.current = { top: r.top + window.scrollY, height: r.height };
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(sec);
+    window.addEventListener('resize', measure);
+    // Defensive re-sync (2026-07-12, still-reported jitter after the
+    // window.scrollY fix above): the ResizeObserver only fires when THIS
+    // section's own box changes size — it can't see the section's
+    // ABSOLUTE PAGE POSITION drifting because something ABOVE it (e.g. the
+    // rotating banner swapping to a differently-proportioned image) grew
+    // or shrank. A cheap, infrequent (not per-frame) re-measure catches
+    // that drift and self-corrects it before it can show up as a jump.
+    const resync = window.setInterval(measure, 400);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+      window.clearInterval(resync);
+    };
+  }, [isMobile]);
+
   // ----- VISIBILITY GATE — never run the loop while off-screen -----
   // This is the fix for the reported hang on load: the rAF loop below does a
   // layout-forcing getBoundingClientRect() plus several style writes EVERY
@@ -240,10 +286,10 @@ export default function SpatialScrollEngine() {
       const anchor = anchorRef.current;
       const scene = sceneRef.current;
       if (sec && stage && sph && anchor) {
-        const rect = sec.getBoundingClientRect();
+        const { top: sectionTop, height: sectionHeight } = metricsRef.current;
         const vh = window.innerHeight;
-        const total = Math.max(1, rect.height - vh);
-        const y = Math.min(Math.max(-rect.top, 0), total);
+        const total = Math.max(1, sectionHeight - vh);
+        const y = Math.min(Math.max(window.scrollY - sectionTop, 0), total);
         stage.style.transform = `translate3d(0, ${y}px, 0)`;
 
         const p = y / total;
@@ -308,7 +354,7 @@ export default function SpatialScrollEngine() {
   // ----- MOBILE: reliable vertical reveal. -----
   if (isMobile) {
     return (
-      <section className="relative py-16 px-4">
+      <section id="selected-works-orbit" className="relative py-16 px-4">
         <style>{SSE_STYLES}</style>
         <header className="text-center mb-10">
           <span className="text-xs uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">
@@ -341,17 +387,16 @@ export default function SpatialScrollEngine() {
                   aria-label={track ? `${isPlaying ? t('Pause') : t('Play')} ${title}` : `${t(concept)} — ${t('coming soon')}`}
                 >
                   <div className="relative overflow-hidden rounded-3xl" style={{ aspectRatio: '16 / 10' }}>
-                    {cover ? (
-                      <img src={cover} alt={title} crossOrigin="anonymous"
-                        className="w-full h-full object-cover"
-                        style={{
-                          WebkitMaskImage: 'radial-gradient(140% 130% at 50% 45%, #000 60%, transparent 100%)',
-                          maskImage: 'radial-gradient(140% 130% at 50% 45%, #000 60%, transparent 100%)',
-                        }} />
-                    ) : (
-                      <AnimatedFace seed={ci} active={false} />
-                    )}
-                    {isCurrent && <NowPlaying active={isPlaying} />}
+                    <VinylCardFace
+                      cover={cover}
+                      fallback={<AnimatedFace seed={ci} active={false} />}
+                      title={title}
+                      isPlaying={isPlaying}
+                      isCurrent={isCurrent}
+                      currentTime={audioState.currentTime}
+                      duration={audioState.duration}
+                      dim={false}
+                    />
                   </div>
                   <div className="mt-4">
                     <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">{t(concept)}</span>
@@ -369,7 +414,7 @@ export default function SpatialScrollEngine() {
 
   // ----- DESKTOP: the orbital ring around the luminous core. -----
   return (
-    <section ref={sectionRef} className="relative" style={{ height: `${N * 90}vh`, marginTop: '16vh' }}>
+    <section ref={sectionRef} id="selected-works-orbit" className="relative" style={{ height: `${N * 90}vh`, marginTop: '16vh' }}>
       <style>{SSE_STYLES}</style>
       <div ref={stageRef} className="absolute left-0 right-0 top-0 h-screen overflow-hidden" style={{ willChange: 'transform' }}>
         <div className="absolute left-0 right-0 top-0 pointer-events-none" style={{ height: 140, background: 'linear-gradient(to bottom, var(--surface-color), transparent)', zIndex: 30 }} />
@@ -498,20 +543,16 @@ export default function SpatialScrollEngine() {
                           transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
                         }}
                       >
-                        {cover ? (
-                          <img
-                            src={cover}
-                            alt={title}
-                            crossOrigin="anonymous"
-                            className="w-full h-full object-cover"
-                            style={{ filter: isActive ? 'grayscale(0%) brightness(1)' : 'grayscale(85%) brightness(0.5)', transition: 'filter 0.5s ease' }}
-                          />
-                        ) : (
-                          <div className="w-full h-full" style={{ filter: isActive ? 'none' : 'grayscale(65%) brightness(0.55)', transition: 'filter 0.5s ease' }}>
-                            <AnimatedFace seed={i} active={isActive} />
-                          </div>
-                        )}
-                        {isCurrent && <NowPlaying active={isPlaying} />}
+                        <VinylCardFace
+                          cover={cover}
+                          fallback={<AnimatedFace seed={i} active={isActive} />}
+                          title={title}
+                          isPlaying={isPlaying}
+                          isCurrent={isCurrent}
+                          currentTime={audioState.currentTime}
+                          duration={audioState.duration}
+                          dim={!isActive}
+                        />
                       </div>
                     </button>
                   </div>
@@ -529,19 +570,3 @@ export default function SpatialScrollEngine() {
   );
 }
 
-function NowPlaying({ active }: { active: boolean }) {
-  const bars = [0, 1, 2, 3, 4];
-  return (
-    <div className="absolute inset-0 flex items-end justify-center gap-[4px] pointer-events-none" style={{ padding: '0 0 12%', background: 'linear-gradient(to top, rgba(0,0,0,0.5), rgba(0,0,0,0.04) 55%, transparent)' }} aria-hidden>
-      {bars.map((b) => (
-        <motion.span
-          key={b}
-          style={{ width: 'clamp(3px, 0.5vw, 6px)', borderRadius: '2px', background: 'linear-gradient(to top, var(--accent2-color, #B8960C), var(--accent-color))', boxShadow: '0 0 10px rgba(212,175,55,0.5)' }}
-          initial={{ height: '12%' }}
-          animate={active ? { height: ['18%', '60%', '32%', '52%', '22%'] } : { height: '14%' }}
-          transition={active ? { duration: 1.1 + b * 0.18, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut', delay: b * 0.08 } : { duration: 0.3 }}
-        />
-      ))}
-    </div>
-  );
-}

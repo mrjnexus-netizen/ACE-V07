@@ -25,10 +25,23 @@ import { useLayoutEffect, useRef } from 'react';
  */
 export function useBalancedText<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
+  // Reza (2026-07-12) — Performance profile showed balanceNow() at 25.5%
+  // of total main-thread time, with Range.getClientRects() (its
+  // reflow-forcing measurement) at 19%. Root cause: the depless
+  // useLayoutEffect below re-ran the full 12-step forced-reflow binary
+  // search on EVERY render of every component using this hook — several
+  // of which (ComposerPresence's rotating banner, SpatialScrollEngine's
+  // per-frame scroll loop) re-render constantly, even when the text and
+  // container width hadn't actually changed. Cache the last computed
+  // result keyed on (containerWidth + text content); if unchanged, just
+  // reapply the cached maxWidth (a plain style write, no measurement) —
+  // still defends against React stomping the style on re-render, at a
+  // fraction of the cost.
+  const cacheRef = useRef<{ key: string; maxWidth: string } | null>(null);
 
-  // Re-assert after every single render/commit.
+  // Re-assert after every single render/commit — but cheaply (see above).
   useLayoutEffect(() => {
-    balanceNow(ref.current);
+    balanceNow(ref.current, cacheRef);
   });
 
   // One-time listeners: fonts, resizes.
@@ -38,7 +51,7 @@ export function useBalancedText<T extends HTMLElement>() {
     let raf = 0;
     const schedule = () => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => balanceNow(ref.current));
+      raf = requestAnimationFrame(() => balanceNow(ref.current, cacheRef, true));
     };
 
     // Re-run once all webfonts are in (the v2 killer).
@@ -70,7 +83,11 @@ export function useBalancedText<T extends HTMLElement>() {
   return ref;
 }
 
-function balanceNow(el: HTMLElement | null) {
+function balanceNow(
+  el: HTMLElement | null,
+  cacheRef: { current: { key: string; maxWidth: string } | null },
+  forceRecompute = false
+) {
   if (!el || typeof document === 'undefined') return;
   const parent = el.parentElement;
   if (!parent) return;
@@ -80,6 +97,24 @@ function balanceNow(el: HTMLElement | null) {
   // keep the very last line natural (browser default: start-aligned)
   el.dataset.wgBalance = 'v4';
 
+  // offsetWidth = LAYOUT pixels, immune to ancestor transform:scale().
+  // getBoundingClientRect() returns VISUAL (scaled) pixels - inside a
+  // ScaleStage that mismatch made the computed max-width wrong (same class
+  // of bug as the vh-inside-ScaleStage lesson from the portal work).
+  const containerWidth = parent.offsetWidth || parent.getBoundingClientRect().width;
+  if (!containerWidth) return;
+
+  // Cheap key (no forced reflow beyond the single width read above) — if
+  // neither the container width nor the text itself changed since the
+  // last time we actually measured, just reapply the cached result
+  // instead of re-running the 12-step forced-reflow binary search below.
+  const key = `${Math.round(containerWidth)}:${el.textContent ?? ''}`;
+  const cached = cacheRef.current;
+  if (!forceRecompute && cached && cached.key === key) {
+    el.style.maxWidth = cached.maxWidth;
+    return;
+  }
+
   const lineCount = (): number => {
     const range = document.createRange();
     range.selectNodeContents(el);
@@ -88,15 +123,11 @@ function balanceNow(el: HTMLElement | null) {
 
   // 2) Widow-kill via balanced max-width.
   el.style.maxWidth = 'none';
-  // offsetWidth = LAYOUT pixels, immune to ancestor transform:scale().
-  // getBoundingClientRect() returns VISUAL (scaled) pixels - inside a
-  // ScaleStage that mismatch made the computed max-width wrong (same class
-  // of bug as the vh-inside-ScaleStage lesson from the portal work).
-  const containerWidth = parent.offsetWidth || parent.getBoundingClientRect().width;
-  if (!containerWidth) return;
-
   const naturalLines = lineCount();
-  if (naturalLines <= 1) return; // single line — nothing to balance
+  if (naturalLines <= 1) {
+    cacheRef.current = { key, maxWidth: 'none' };
+    return; // single line — nothing to balance
+  }
 
   let lo = Math.max(40, containerWidth * 0.28);
   let hi = containerWidth;
@@ -109,5 +140,7 @@ function balanceNow(el: HTMLElement | null) {
       hi = mid;
     }
   }
-  el.style.maxWidth = `${Math.ceil(hi)}px`;
+  const finalMaxWidth = `${Math.ceil(hi)}px`;
+  el.style.maxWidth = finalMaxWidth;
+  cacheRef.current = { key, maxWidth: finalMaxWidth };
 }

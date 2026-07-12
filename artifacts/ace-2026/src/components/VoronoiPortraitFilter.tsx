@@ -258,11 +258,39 @@ export default function VoronoiPortraitFilter({
     const io = new IntersectionObserver(([entry]) => { inView = !!entry?.isIntersecting; }, { threshold: 0.01 });
     io.observe(container);
 
+    // 2026-07-12 (Reza — reported hangs during scroll/transitions):
+    // this component previously had NO webglcontextlost/restored
+    // handling at all. If the browser drops the GL context (GPU
+    // pressure — too many contexts open across tabs, driver reset,
+    // etc.), the rAF loop below just kept calling renderer.render()
+    // against a dead context every single frame, forever — that's a
+    // real, ongoing cost, not a one-off glitch, and a plausible
+    // contributor to the reported hangs. Now: contextlost pauses
+    // rendering immediately (and calls preventDefault(), which is what
+    // tells the browser this context is allowed to come back); on
+    // contextrestored, Three.js re-uploads GL resources automatically
+    // the next time render() runs, so simply resuming the flag is
+    // enough — no full teardown/rebuild needed.
+    let contextLost = false;
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      contextLost = true;
+      // eslint-disable-next-line no-console
+      console.warn('[VoronoiPortraitFilter] WebGL context lost — pausing render loop until restored.');
+    };
+    const handleContextRestored = () => {
+      contextLost = false;
+      // eslint-disable-next-line no-console
+      console.info('[VoronoiPortraitFilter] WebGL context restored — resuming.');
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
+    renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
+
     const startedAt = Date.now();
     let raf = 0;
     function animate() {
       raf = requestAnimationFrame(animate);
-      if (!inView || !textureReady) return;
+      if (!inView || !textureReady || contextLost) return;
       material.uniforms.time!.value = (Date.now() - startedAt) * 0.0004;
       renderer.render(scene, camera);
     }
@@ -272,6 +300,8 @@ export default function VoronoiPortraitFilter({
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost, false);
+      renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored, false);
       geometry.dispose();
       material.dispose();
       texture?.dispose();

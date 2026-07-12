@@ -191,6 +191,32 @@ const Orb = () => {
   const targetColor = useMemo(() => new THREE.Color(), []);
   const env = useRef({ pulse: 0, avg: 0, loud: 0, mx: 0, my: 0 });
 
+  // 2026-07-12 (Reza — reported hangs; Performance profile confirmed
+  // "Recalculate style" at LivingScore.tsx:68 costing ~14% of the whole
+  // recording's main-thread time): readDynamicAccent()/readAccentColor()
+  // were being called from INSIDE useFrame — i.e. getComputedStyle() on
+  // document.documentElement, ~60 times per second, forever, for as long
+  // as this orb is mounted (which is always — it's the global background
+  // layer). getComputedStyle forces the browser to recompute style; doing
+  // that every animation frame is a textbook perf anti-pattern. Fixed by
+  // reading it ONCE on mount and again only when the colours could
+  // ACTUALLY have changed — a MutationObserver on documentElement's
+  // attributes (style/class), which is how ChromaticContext/language
+  // switches apply these CSS custom properties — instead of polling every
+  // frame. useFrame below now just reads the cached ref.
+  const accentColorRef = useRef<string | null>(null);
+  const dynamicAccentRef = useRef<string | null>(null);
+  useEffect(() => {
+    const refresh = () => {
+      accentColorRef.current = readAccentColor();
+      dynamicAccentRef.current = readDynamicAccent();
+    };
+    refresh();
+    const mo = new MutationObserver(refresh);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
+    return () => mo.disconnect();
+  }, []);
+
   useFrame((three, delta) => {
     const pts = pointsRef.current;
     if (!pts) return;
@@ -273,8 +299,8 @@ const Orb = () => {
     posAttr.needsUpdate = true;
 
     // colour: saturated genre hue, cover art nudges ~25%
-    const dyn = readDynamicAccent();
-    targetColor.set(readAccentColor() || paletteFor(genreToIndex(genreRef.current)));
+    const dyn = dynamicAccentRef.current;
+    targetColor.set(accentColorRef.current || paletteFor(genreToIndex(genreRef.current)));
     if (dyn) {
       try {
         targetColor.lerp(new THREE.Color(dyn), 0.25);
