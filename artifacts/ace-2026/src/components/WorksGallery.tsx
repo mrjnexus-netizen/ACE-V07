@@ -773,7 +773,7 @@ function OverlayPanel({
           {/* Header */}
           <div className="mb-4 md:mb-6" style={{ flexShrink: 0 }}>
             <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.4em', color: 'var(--accent-color)' }}>
-              {t('Selected Works')}
+              {t('Gallery')}
             </span>
             <h2 className="font-display font-light mt-2" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', lineHeight: 1.08, color: 'var(--text-color)' }}>
               {t(group.label)}
