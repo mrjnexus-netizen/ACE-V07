@@ -2733,7 +2733,7 @@ const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; la
   const handleSave = async () => {
     if (!pendingFile) return;
     setUploading(true);
-    setNotice('Uploading\u2026');
+    setNotice('Uploading…');
     try {
       const form = new FormData();
       form.append('media', pendingFile);
@@ -2744,7 +2744,7 @@ const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; la
       setPendingFile(null);
       setNotice(null);
     } catch {
-      setNotice('Upload failed \u2014 try again.');
+      setNotice('Upload failed — try again.');
     } finally {
       setUploading(false);
     }
@@ -2773,7 +2773,7 @@ const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; la
           }}
           aria-hidden
         >
-          \u266a
+          ♪
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: '0.98rem' }}>{label}</div>
@@ -2793,14 +2793,14 @@ const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; la
 
       {pendingUrl ? (
         <>
-          <div style={{ fontSize: '0.75rem', opacity: 0.75, marginBottom: 6 }}>Preview \u2014 nothing is live yet</div>
+          <div style={{ fontSize: '0.75rem', opacity: 0.75, marginBottom: 6 }}>Preview — nothing is live yet</div>
           <audio controls src={pendingUrl} style={{ width: '100%', borderRadius: 8 }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => setPendingFile(null)} disabled={uploading}>
               Cancel
             </button>
             <button type="button" style={{ ...AMBIENT_BTN_NEON, opacity: uploading ? 0.6 : 1 }} onClick={handleSave} disabled={uploading}>
-              {uploading ? 'Uploading\u2026' : 'Save & Publish'}
+              {uploading ? 'Uploading…' : 'Save & Publish'}
             </button>
           </div>
         </>
@@ -2836,7 +2836,7 @@ const TabAmbientTracks = () => (
   <div>
     <h2 className="adm-section-title">Ambient Tracks</h2>
     <p style={{ opacity: 0.7, marginBottom: 20, fontSize: '0.85rem' }}>
-      One ambient bed per language, plus the language-selection screen. Preview locally before saving \u2014
+      One ambient bed per language, plus the language-selection screen. Preview locally before saving —
       Save & Publish replaces the live track immediately; the reactive visuals (waves, particles, the orb)
       keep working with whatever plays, no changes needed there.
     </p>
@@ -2845,6 +2845,590 @@ const TabAmbientTracks = () => (
     ))}
   </div>
 );
+
+
+// ---------- Business Scanner (Phase 5 / A3c, 2026-07-13) ----------
+// Step 1 of the build (per the plan agreed with Reza): schema + base route
+// + this admin tab. Leads and Reports are wired to real (currently empty)
+// data. Sources & Keys UI is drawn now but the actual key save/test call
+// is a TODO — it needs the real /api/keys contract confirmed first, noted
+// inline rather than guessed. Settings' schedule toggle is local-only for
+// now (not yet persisted) — the node-cron wiring is a later step, once
+// hosting is decided.
+interface PositionLead {
+  id: string;
+  source: string;
+  sourceUrl: string | null;
+  url: string;
+  project: string | null;
+  company: string | null;
+  person: string | null;
+  details: string | null;
+  contacts: Record<string, string>;
+  lang: string | null;
+  score: number;
+  scoredBy: string;
+  status: 'new' | 'reviewed' | 'dismissed';
+  firstSeen: string;
+  updatedAt: string;
+}
+interface LeadsSummary { new: number; reviewed: number; dismissed: number; total: number }
+interface PositionReport { id: string; reportUrl: string; leadCount: number; periodStart: string | null; periodEnd: string | null; createdAt: string }
+
+const BIZ_BADGE = (bg: string, fg: string): CSSProperties => ({
+  display: 'inline-block', padding: '0.15em 0.7em', borderRadius: 999,
+  fontSize: '0.66rem', letterSpacing: '0.08em', textTransform: 'uppercase',
+  background: bg, color: fg,
+});
+
+const STATUS_STYLE: Record<PositionLead['status'], CSSProperties> = {
+  new: BIZ_BADGE('rgba(var(--accent-rgb),0.16)', 'var(--accent-color)'),
+  reviewed: BIZ_BADGE('rgba(120,200,140,0.16)', '#78C88C'),
+  dismissed: BIZ_BADGE('rgba(255,255,255,0.08)', 'rgba(255,255,255,0.45)'),
+};
+
+const BizLeadsPanel = () => {
+  const [leads, setLeads] = useState<PositionLead[]>([]);
+  const [summary, setSummary] = useState<LeadsSummary>({ new: 0, reviewed: 0, dismissed: 0, total: 0 });
+  const [statusFilter, setStatusFilter] = useState<'' | PositionLead['status']>('');
+  const [relevantOnly, setRelevantOnly] = useState(true); // hides score-0 noise by default — the whole reason this bug got noticed
+  const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [rescoring, setRescoring] = useState(false);
+  const [scanNotice, setScanNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter) params.set('status', statusFilter);
+      if (relevantOnly) params.set('minScore', '20'); // hides score-0 noise (e.g. unrelated postings that share a feed with real ones) — visible score badge + this toggle are the fix for a lead like "Real-Time Environment Artist" sorting above genuinely relevant results
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const [leadsRes, summaryRes] = await Promise.all([
+        apiGet<PositionLead[]>(`/api/positions/leads${qs}`),
+        apiGet<LeadsSummary>('/api/positions/leads/summary'),
+      ]);
+      setLeads(leadsRes ?? []);
+      setSummary(summaryRes ?? { new: 0, reviewed: 0, dismissed: 0, total: 0 });
+    } catch (err) {
+      console.error('Failed to load leads:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, relevantOnly]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const updateStatus = async (id: string, status: PositionLead['status']) => {
+    try {
+      await apiPut(`/api/positions/leads/${id}`, { status });
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    } catch (err) {
+      console.error('Failed to update lead:', err);
+    }
+  };
+
+  const scanNow = async () => {
+    setScanning(true);
+    setScanNotice(null);
+    try {
+      const result = await apiPost<{ scanned: number; inserted: number; aiScored: number }>('/api/positions/scan', {});
+      setScanNotice(
+        `Scan complete — ${result.inserted} new lead${result.inserted === 1 ? '' : 's'}` +
+        (result.aiScored > 0 ? `, ${result.aiScored} AI-scored.` : '.')
+      );
+      void load();
+    } catch (err) {
+      setScanNotice(err instanceof Error ? err.message : 'No scan sources are configured yet.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const rescoreAll = async () => {
+    setRescoring(true);
+    setScanNotice(null);
+    try {
+      const result = await apiPost<{ rescored: number; changed: number }>('/api/positions/rescore', {});
+      setScanNotice(`Re-scored ${result.rescored} leads — ${result.changed} scores changed.`);
+      void load();
+    } catch (err) {
+      setScanNotice(err instanceof Error ? err.message : 'Re-score failed.');
+    } finally {
+      setRescoring(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        {(['total', 'new', 'reviewed', 'dismissed'] as const).map((k) => (
+          <div key={k} style={{
+            padding: '10px 16px', borderRadius: 12,
+            background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.08), rgba(255,255,255,0.02))',
+            border: '1px solid rgba(var(--accent-rgb),0.16)', minWidth: 90,
+          }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>{summary[k]}</div>
+            <div style={{ fontSize: '0.68rem', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
+          </div>
+        ))}
+        <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: 8 }}>
+          <button type="button" style={AMBIENT_BTN_GHOST} onClick={rescoreAll} disabled={rescoring}>
+            {rescoring ? 'Re-scoring…' : 'Re-score All'}
+          </button>
+          <button type="button" style={AMBIENT_BTN_NEON} onClick={scanNow} disabled={scanning}>
+            {scanning ? 'Scanning…' : 'Scan Now'}
+          </button>
+        </div>
+      </div>
+      {scanNotice && <div style={{ marginBottom: 12, fontSize: '0.82rem', opacity: 0.8 }}>{scanNotice}</div>}
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, alignItems: 'center' }}>
+        {(['', 'new', 'reviewed', 'dismissed'] as const).map((s) => (
+          <button
+            key={s || 'all'}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            style={{
+              ...AMBIENT_BTN_GHOST,
+              background: statusFilter === s ? 'rgba(var(--accent-rgb),0.16)' : 'transparent',
+            }}
+          >
+            {s || 'All'}
+          </button>
+        ))}
+        <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.12)', margin: '0 4px' }} />
+        <button
+          type="button"
+          onClick={() => setRelevantOnly((v) => !v)}
+          style={{
+            ...AMBIENT_BTN_GHOST,
+            background: relevantOnly ? 'rgba(120,200,140,0.16)' : 'transparent',
+            color: relevantOnly ? '#78C88C' : 'var(--accent-color)',
+          }}
+        >
+          {relevantOnly ? '✓ Relevant only (score \u2265 20)' : 'Show all (incl. score 0)'}
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>Loading…</div>
+      ) : leads.length === 0 ? (
+        <div style={{ opacity: 0.6, fontSize: '0.85rem', padding: 20, textAlign: 'center' }}>
+          No leads yet. Once a source (RSS, then Google Programmable Search) is wired up and a scan runs, results appear here.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {leads.map((lead) => (
+            <div key={lead.id} style={{
+              padding: 16, borderRadius: 14,
+              background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.05), rgba(255,255,255,0.015))',
+              border: '1px solid rgba(var(--accent-rgb),0.14)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{lead.project || lead.company || 'Untitled lead'}</div>
+                  <div style={{ fontSize: '0.78rem', opacity: 0.65, marginTop: 2 }}>
+                    {[lead.company, lead.person].filter(Boolean).join(' \u00b7 ') || '—'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                  <span style={STATUS_STYLE[lead.status]}>{lead.status}</span>
+                  <span style={BIZ_BADGE(
+                    lead.score >= 50 ? 'rgba(120,200,140,0.18)' : lead.score >= 20 ? 'rgba(var(--accent-rgb),0.16)' : 'rgba(255,255,255,0.06)',
+                    lead.score >= 50 ? '#78C88C' : lead.score >= 20 ? 'var(--accent-color)' : 'rgba(255,255,255,0.4)'
+                  )}>
+                    Score {lead.score}
+                  </span>
+                  <span style={BIZ_BADGE('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.55)')}>{lead.source}</span>
+                  {lead.scoredBy === 'ai' && (
+                    <span style={BIZ_BADGE('rgba(180,140,255,0.16)', '#B48CFF')}>✨ AI</span>
+                  )}
+                </div>
+              </div>
+              {lead.details && <p style={{ fontSize: '0.82rem', opacity: 0.75, marginTop: 8 }}>{lead.details}</p>}
+              {Object.keys(lead.contacts || {}).length > 0 && (
+                <div style={{ fontSize: '0.76rem', opacity: 0.7, marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {lead.contacts.email && <span>✉ {lead.contacts.email}</span>}
+                  {lead.contacts.phone && <span>☎ {lead.contacts.phone}</span>}
+                  {lead.contacts.formUrl && (
+                    <a href={lead.contacts.formUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)' }}>Application form →</a>
+                  )}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                <a href={lead.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--accent-color)' }}>
+                  View source →
+                </a>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {lead.status !== 'reviewed' && (
+                    <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => updateStatus(lead.id, 'reviewed')}>Mark reviewed</button>
+                  )}
+                  {lead.status !== 'dismissed' && (
+                    <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => updateStatus(lead.id, 'dismissed')}>Dismiss</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface ApiKeyStatus { keyName: string; isActive: boolean | null; isConfigured: boolean; testedAt: string | null; value?: string }
+
+const BizSourcesPanel = () => {
+  const [apiKey, setApiKey] = useState('');
+  const [searchEngineId, setSearchEngineId] = useState('');
+  const [configured, setConfigured] = useState(false);
+  const [testedAt, setTestedAt] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [noticeOk, setNoticeOk] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await apiGet<ApiKeyStatus[]>('/api/keys/status');
+        const row = rows?.find((r) => r.keyName === 'GOOGLE_SEARCH_CREDENTIALS');
+        if (row?.isConfigured) {
+          setConfigured(true);
+          setTestedAt(row.testedAt);
+          if (row.value) {
+            try {
+              const parsed = JSON.parse(row.value) as { apiKey?: string; searchEngineId?: string };
+              setApiKey(parsed.apiKey || '');
+              setSearchEngineId(parsed.searchEngineId || '');
+            } catch { /* leave fields blank if the stored value can't be parsed */ }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load key status:', err);
+      }
+    })();
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setNotice(null);
+    try {
+      await apiPost('/api/keys', {
+        keyName: 'GOOGLE_SEARCH_CREDENTIALS',
+        keyValue: JSON.stringify({ apiKey, searchEngineId }),
+      });
+      setConfigured(true);
+      setNoticeOk(true);
+      setNotice('Saved. Click Test Connection to verify it actually works before relying on it.');
+    } catch (err) {
+      setNoticeOk(false);
+      setNotice(err instanceof Error ? err.message : 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const test = async () => {
+    setTesting(true);
+    setNotice(null);
+    try {
+      const result = await apiPost<{ message: string }>('/api/keys/test', {
+        keyName: 'GOOGLE_SEARCH_CREDENTIALS',
+        keyValue: JSON.stringify({ apiKey, searchEngineId }),
+      });
+      setNoticeOk(true);
+      setNotice(result?.message || 'Connected.');
+      setTestedAt(new Date().toISOString());
+    } catch (err) {
+      setNoticeOk(false);
+      setNotice(err instanceof Error ? err.message : 'Connection test failed.');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div>
+      <p style={{ opacity: 0.7, marginBottom: 16, fontSize: '0.85rem' }}>
+        Add keys here as sources come online. RSS needs none. The scanner already works fully without any key here —
+        each one just makes it reach further.
+      </p>
+      <div style={{
+        padding: 18, borderRadius: 14, marginBottom: 12,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>RSS Feeds</div>
+        <div style={{ fontSize: '0.8rem', opacity: 0.65 }}>No key needed — already active, covering all 12 concepts.</div>
+      </div>
+      <div style={{
+        padding: 18, borderRadius: 14,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 600 }}>Google Programmable Search</div>
+          <span style={BIZ_BADGE(
+            configured ? 'rgba(120,200,140,0.18)' : 'rgba(255,255,255,0.06)',
+            configured ? '#78C88C' : 'rgba(255,255,255,0.5)'
+          )}>
+            {configured ? 'Configured' : 'Not configured'}
+          </span>
+        </div>
+        <div style={{ fontSize: '0.8rem', opacity: 0.65, marginBottom: 12 }}>
+          Needs an API key + a Search Engine ID (cx) from{' '}
+          <a href="https://programmablesearchengine.google.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-color)' }}>
+            Google Programmable Search
+          </a>. Once saved and tested, every scan searches for composer/sound-craft work across all 12 concepts automatically — nothing else to configure.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <input
+            type="text"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="API Key"
+            style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }}
+          />
+          <input
+            type="text"
+            value={searchEngineId}
+            onChange={(e) => setSearchEngineId(e.target.value)}
+            placeholder="Search Engine ID (cx)"
+            style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" style={AMBIENT_BTN_NEON} onClick={save} disabled={saving || !apiKey || !searchEngineId}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button type="button" style={AMBIENT_BTN_GHOST} onClick={test} disabled={testing || !apiKey || !searchEngineId}>
+            {testing ? 'Testing…' : 'Test Connection'}
+          </button>
+        </div>
+        {notice && (
+          <div style={{ marginTop: 10, fontSize: '0.8rem', color: noticeOk ? '#78C88C' : '#E08585' }}>{notice}</div>
+        )}
+        {testedAt && !notice && (
+          <div style={{ marginTop: 10, fontSize: '0.74rem', opacity: 0.5 }}>Last tested: {new Date(testedAt).toLocaleString()}</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const BizReportsPanel = () => {
+  const [reports, setReports] = useState<PositionReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await apiGet<PositionReport[]>('/api/positions/reports');
+      setReports(rows ?? []);
+    } catch (err) {
+      console.error('Failed to load reports:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const generate = async () => {
+    setGenerating(true);
+    setNotice(null);
+    try {
+      const result = await apiPost<{ reportUrl: string; leadCount: number }>('/api/positions/reports/generate', {});
+      setNotice(`Report ready — ${result.leadCount} leads included.`);
+      void load();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Report generation failed.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const GenerateButton = (
+    <button type="button" style={AMBIENT_BTN_NEON} onClick={generate} disabled={generating}>
+      {generating ? 'Building…' : 'Generate Report Now'}
+    </button>
+  );
+
+  if (loading) return <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: 0 }}>
+          Pulls every lead scored 20+ that isn’t dismissed into a clean .xlsx — the same builder the 8AM
+          scheduled report (once hosting is decided) will call.
+        </p>
+        {GenerateButton}
+      </div>
+      {notice && <div style={{ marginBottom: 14, fontSize: '0.82rem', opacity: 0.85 }}>{notice}</div>}
+      {reports.length === 0 ? (
+        <div style={{ opacity: 0.6, fontSize: '0.85rem', padding: 20, textAlign: 'center' }}>
+          No reports yet — click Generate Report Now above.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {reports.map((r) => (
+            <div key={r.id} style={{
+              padding: 14, borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.05), rgba(255,255,255,0.015))',
+              border: '1px solid rgba(var(--accent-rgb),0.14)',
+            }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>{new Date(r.createdAt).toLocaleDateString()}</div>
+                <div style={{ fontSize: '0.78rem', opacity: 0.6 }}>{r.leadCount} leads</div>
+              </div>
+              <a href={r.reportUrl} target="_blank" rel="noreferrer" style={AMBIENT_BTN_NEON as CSSProperties}>Download</a>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const BizSettingsPanel = () => {
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [deliveryEmail, setDeliveryEmailLocal] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const settings = await apiGet<{ enabled: boolean; deliveryEmail: string }>('/api/positions/settings');
+        setScheduleOn(!!settings?.enabled);
+        setDeliveryEmailLocal(settings?.deliveryEmail || '');
+      } catch (err) {
+        console.error('Failed to load scanner settings:', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const toggleSchedule = async () => {
+    setToggling(true);
+    try {
+      const next = !scheduleOn;
+      await apiPut('/api/positions/settings', { enabled: next });
+      setScheduleOn(next);
+    } catch (err) {
+      console.error('Failed to update schedule toggle:', err);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const saveEmail = async () => {
+    setSavingEmail(true);
+    setNotice(null);
+    try {
+      await apiPut('/api/positions/settings', { deliveryEmail });
+      setNotice('Saved.');
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Failed to save.');
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  if (loading) return <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{
+        padding: 18, borderRadius: 14, marginBottom: 14,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 600 }}>Automatic schedule</div>
+            <div style={{ fontSize: '0.78rem', opacity: 0.6, marginTop: 2 }}>
+              Scan every 2 hours; build a report at 8:00 AM Houston time.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={toggleSchedule}
+            disabled={toggling}
+            style={{ ...AMBIENT_BTN_NEON, opacity: scheduleOn ? 1 : 0.4 }}
+          >
+            {toggling ? '…' : scheduleOn ? 'On' : 'Off'}
+          </button>
+        </div>
+        <div style={{ fontSize: '0.74rem', opacity: 0.5, marginTop: 10 }}>
+          Real node-cron tasks — flipping this actually starts/stops them immediately. Only fires on schedule while
+          this server process stays running, so it's genuinely useful once this is deployed somewhere always-on;
+          harmless to leave on in the meantime, it just won't fire while the dev server is closed.
+        </div>
+      </div>
+      <div style={{
+        padding: 18, borderRadius: 14,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Delivery email (optional)</div>
+        <input
+          type="email"
+          value={deliveryEmail}
+          onChange={(e) => setDeliveryEmailLocal(e.target.value)}
+          placeholder="you@example.com"
+          style={{ ...DARK_SELECT_STYLE, width: '100%', padding: '0.5em 0.8em', borderRadius: 8 }}
+        />
+        <div style={{ fontSize: '0.74rem', opacity: 0.5, margin: '8px 0 12px' }}>
+          Saved either way — actual emailing isn't wired yet (no SMTP configured), so for now every report simply
+          saves to the Reports tab regardless of what's set here.
+        </div>
+        <button type="button" style={AMBIENT_BTN_NEON} onClick={saveEmail} disabled={savingEmail}>
+          {savingEmail ? 'Saving…' : 'Save'}
+        </button>
+        {notice && <div style={{ marginTop: 8, fontSize: '0.8rem', opacity: 0.8 }}>{notice}</div>}
+      </div>
+    </div>
+  );
+};
+
+const TabBusiness = () => {
+  const [subTab, setSubTab] = useState<'leads' | 'sources' | 'reports' | 'settings'>('leads');
+  return (
+    <div>
+      <h2 className="adm-section-title">Business</h2>
+      <p style={{ opacity: 0.7, marginBottom: 16, fontSize: '0.85rem' }}>
+        Finds potential composing work across languages and sources, scores relevance, and builds a clean report.
+        Works from RSS alone with zero keys configured — every key added under Sources just extends its reach.
+      </p>
+      <div className="adm-row" style={{ gap: 8, marginBottom: 20 }}>
+        {(['leads', 'sources', 'reports', 'settings'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            className="adm-btn"
+            style={subTab === t ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent-color)' } : undefined}
+            onClick={() => setSubTab(t)}
+          >
+            {t === 'leads' ? 'Leads' : t === 'sources' ? 'Sources & Keys' : t === 'reports' ? 'Reports' : 'Settings'}
+          </button>
+        ))}
+      </div>
+      {subTab === 'leads' && <BizLeadsPanel />}
+      {subTab === 'sources' && <BizSourcesPanel />}
+      {subTab === 'reports' && <BizReportsPanel />}
+      {subTab === 'settings' && <BizSettingsPanel />}
+    </div>
+  );
+};
 
 
 export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: () => void; initialTab?: number }) {
@@ -2858,6 +3442,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
     { id: 5, label: 'Document Assistant' },
     { id: 6, label: 'Poster Studio' },
     { id: 7, label: 'Ambient Tracks' },
+    { id: 8, label: 'Business' },
   ];
 
   const handleOpenVisualEditor = () => {
@@ -2911,6 +3496,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
                 {activeTab === 5 && <TabDocumentAssistant />}
                 {activeTab === 6 && <TabPosterStudio />}
                 {activeTab === 7 && <TabAmbientTracks />}
+                {activeTab === 8 && <TabBusiness />}
               </motion.div>
             </AnimatePresence>
           </div>

@@ -35,7 +35,7 @@ const SUPPORTED_SIMPLE_KEYS = [
   ...IMAGE_PROVIDERS.map((p) => p.keyName),
 ];
 const aiSelectionSchema = z.object({ providerId: z.string().min(1), model: z.string().min(1) });
-const SUPPORTED_STRUCTURED_KEYS = ["AWS_S3_CREDENTIALS", "TEXT_AI_SELECTED", "IMAGE_AI_SELECTED"];
+const SUPPORTED_STRUCTURED_KEYS = ["AWS_S3_CREDENTIALS", "TEXT_AI_SELECTED", "IMAGE_AI_SELECTED", "GOOGLE_SEARCH_CREDENTIALS"];
 const SUPPORTED_KEY_NAMES = [...SUPPORTED_SIMPLE_KEYS, ...SUPPORTED_STRUCTURED_KEYS];
 
 const awsCredentialsSchema = z.object({
@@ -48,6 +48,15 @@ const awsCredentialsSchema = z.object({
   // needs Cost Explorer + separate billing permissions, a much bigger
   // scope). This is just a note the admin keeps for themselves.
   tier: z.enum(["free", "paid"]).default("free"),
+});
+
+// Business Scanner (Phase 5 / A3c, 2026-07-13) — Google Programmable
+// Search needs TWO values together (an API key AND a Search Engine ID —
+// neither works without the other), so this is structured like
+// AWS_S3_CREDENTIALS rather than a single opaque string.
+const googleSearchCredentialsSchema = z.object({
+  apiKey: z.string().min(1, "API key is required"),
+  searchEngineId: z.string().min(1, "Search Engine ID (cx) is required"),
 });
 
 // Zod schema for API key creation/update
@@ -116,6 +125,7 @@ router.post(
               return sendError(res, "Unknown image provider or model.", "VALIDATION_ERROR", 400);
             }
           }
+          if (keyName === "GOOGLE_SEARCH_CREDENTIALS") googleSearchCredentialsSchema.parse(parsed);
         } catch {
           return sendError(res, "Malformed credentials payload", "VALIDATION_ERROR", 400);
         }
@@ -222,6 +232,29 @@ router.post(
         } catch (s3Error) {
           logger.warn({ requestId: req.id, error: s3Error }, "AWS S3 connection test failed.");
           testMessage = "Could not reach the bucket with these credentials — check the access key, secret, region, and bucket name.";
+        }
+      } else if (keyName === "GOOGLE_SEARCH_CREDENTIALS") {
+        // Real test: an actual Programmable Search API call with a
+        // throwaway query — proves BOTH the API key and the Search Engine
+        // ID (cx) work together, not just that they're plausible strings.
+        try {
+          const creds = googleSearchCredentialsSchema.parse(JSON.parse(keyValue));
+          const url = new URL("https://www.googleapis.com/customsearch/v1");
+          url.searchParams.set("key", creds.apiKey);
+          url.searchParams.set("cx", creds.searchEngineId);
+          url.searchParams.set("q", "test");
+          url.searchParams.set("num", "1");
+          const resp = await fetch(url.toString());
+          const body = (await resp.json()) as { error?: { message?: string } };
+          if (resp.ok) {
+            testSuccess = true;
+            testMessage = "Connected to Google Programmable Search.";
+          } else {
+            testMessage = body.error?.message || `Google Search API returned ${resp.status}.`;
+          }
+        } catch (searchError) {
+          logger.warn({ requestId: req.id, error: searchError }, "Google Search connection test failed.");
+          testMessage = "Could not reach Google Programmable Search with these credentials — check the API key and Search Engine ID.";
         }
       } else if (textProvider) {
         // Real test: a genuine 1-word completion — cheap enough to run on

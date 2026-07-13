@@ -263,7 +263,58 @@ export const generatedPosters = pgTable(
   })
 );
 
-// Relations
+// Business Scanner (Phase 5 / A3c, 2026-07-13). Source-agnostic by design:
+// `source` records which adapter found it (rss, google-search, official-api
+// names as they're added later); nothing here assumes any specific source
+// exists or that any API key is configured — the scanner runs (and this
+// table fills up) from RSS alone with zero keys. `score` and `lang` are
+// filled by keyword-rule scoring always; if an AI key is configured, the
+// same fields are OVERWRITTEN with the LLM's more precise pass — never a
+// second, separate set of columns. `contacts` is JSON (a lead may have an
+// email, a form URL, a phone, or several) rather than forcing one shape.
+export const positionLeads = pgTable(
+  'position_leads',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    source: text('source').notNull(), // 'rss' | 'google-search' | future adapter names
+    sourceUrl: text('source_url'), // the feed/search endpoint that produced this, for debugging
+    url: text('url').notNull(), // the actual posting/listing
+    project: text('project'),
+    company: text('company'),
+    person: text('person'),
+    details: text('details'),
+    contacts: jsonb('contacts').notNull().default({}), // { email?, formUrl?, phone? }
+    lang: text('lang'), // detected/declared language of the listing
+    score: integer('score').notNull().default(0), // 0-100 relevance
+    scoredBy: text('scored_by').notNull().default('rules'), // 'rules' | 'ai'
+    status: text('status').notNull().default('new'), // 'new' | 'reviewed' | 'dismissed'
+    firstSeen: timestamp('first_seen', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    urlUniqueIdx: uniqueIndex('idx_position_leads_url_unique').on(table.url), // the actual dedupe key
+    scoreIdx: index('idx_position_leads_score').on(table.score),
+    statusIdx: index('idx_position_leads_status').on(table.status),
+    firstSeenIdx: index('idx_position_leads_first_seen').on(table.firstSeen),
+  })
+);
+
+export const positionReports = pgTable(
+  'position_reports',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    reportUrl: text('report_url').notNull(), // S3 URL of the generated .xlsx
+    leadCount: integer('lead_count').notNull().default(0),
+    periodStart: timestamp('period_start', { withTimezone: true }),
+    periodEnd: timestamp('period_end', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    createdAtIdx: index('idx_position_reports_created_at').on(table.createdAt),
+  })
+);
+
+
 export const composerIdentityRelations = relations(composerIdentity, ({ many }) => ({
   projects: many(projects),
 }));
@@ -313,3 +364,7 @@ export type ComposerPortraitRow = typeof composerPortraits.$inferSelect;
 export type NewComposerPortrait = typeof composerPortraits.$inferInsert;
 export type GeneratedPosterRow = typeof generatedPosters.$inferSelect;
 export type NewGeneratedPoster = typeof generatedPosters.$inferInsert;
+export type PositionLeadRow = typeof positionLeads.$inferSelect;
+export type NewPositionLead = typeof positionLeads.$inferInsert;
+export type PositionReportRow = typeof positionReports.$inferSelect;
+export type NewPositionReport = typeof positionReports.$inferInsert;

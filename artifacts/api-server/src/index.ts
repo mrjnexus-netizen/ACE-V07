@@ -23,6 +23,8 @@ import mediaRoutes from "./routes/media";
 import pipelineRoutes from "./routes/pipeline";
 import modelDiscoveryRoutes from "./routes/modelDiscoveryRoutes";
 import posterStudioRoutes from "./routes/posterStudioRoutes";
+import positionsRoutes from "./routes/positionsRoutes";
+import { initScheduler } from "./services/positionScanner/scheduler";
 import { startModelDiscoverySchedule } from "./services/modelDiscovery";
 import { hydrateModelOverrides } from "./services/aiProviders";
 import tracksRoutes from "./routes/tracks";
@@ -86,6 +88,7 @@ app.use("/api/translate", translateRoutes);
 app.use("/api/pipeline", pipelineRoutes);
 app.use("/api/model-updates", modelDiscoveryRoutes);
 app.use("/api/poster-studio", posterStudioRoutes);
+app.use("/api/positions", positionsRoutes);
 app.use("/api/media", mediaRoutes);
 app.use("/api/briefs", briefsRoutes);
 app.use("/api/keys", keysRoutes);
@@ -133,6 +136,7 @@ process.on("uncaughtException", (error: Error) => {
 let server: ReturnType<typeof app.listen>;
 void (async () => {
   await hydrateModelOverrides();
+  await initScheduler(); // Business Scanner — replays the persisted on/off toggle so a restart doesn't silently reset it (or leave the DB saying "on" with no cron task actually running)
   server = app.listen(PORT, () => {
     logger.info(`API Server running on port ${PORT}`);
     // Periodic check for new AI provider models (2026-07-09) — the first
