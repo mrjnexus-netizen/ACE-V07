@@ -1,6 +1,7 @@
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { eq } from "drizzle-orm";
 import { Router, Request, Response, NextFunction } from "express";
+import nodemailer from "nodemailer";
 import { z } from "zod";
 
 import { db } from "../db/db";
@@ -35,7 +36,7 @@ const SUPPORTED_SIMPLE_KEYS = [
   ...IMAGE_PROVIDERS.map((p) => p.keyName),
 ];
 const aiSelectionSchema = z.object({ providerId: z.string().min(1), model: z.string().min(1) });
-const SUPPORTED_STRUCTURED_KEYS = ["AWS_S3_CREDENTIALS", "TEXT_AI_SELECTED", "IMAGE_AI_SELECTED", "GOOGLE_SEARCH_CREDENTIALS"];
+const SUPPORTED_STRUCTURED_KEYS = ["AWS_S3_CREDENTIALS", "TEXT_AI_SELECTED", "IMAGE_AI_SELECTED", "GOOGLE_SEARCH_CREDENTIALS", "SMTP_CREDENTIALS"];
 const SUPPORTED_KEY_NAMES = [...SUPPORTED_SIMPLE_KEYS, ...SUPPORTED_STRUCTURED_KEYS];
 
 const awsCredentialsSchema = z.object({
@@ -57,6 +58,18 @@ const awsCredentialsSchema = z.object({
 const googleSearchCredentialsSchema = z.object({
   apiKey: z.string().min(1, "API key is required"),
   searchEngineId: z.string().min(1, "Search Engine ID (cx) is required"),
+});
+
+// Email verification (2026-07-13) — plain SMTP, so it works with ANY
+// provider Reza picks (Gmail app password, SendGrid, Resend's SMTP
+// relay, etc.) without needing a provider-specific SDK/integration.
+const smtpCredentialsSchema = z.object({
+  host: z.string().min(1, "SMTP host is required"),
+  port: z.coerce.number().int().min(1).max(65535),
+  user: z.string().min(1, "SMTP username is required"),
+  pass: z.string().min(1, "SMTP password is required"),
+  fromAddress: z.string().email("From address must be a valid email"),
+  secure: z.boolean().default(true), // true = TLS on connect (port 465); false = STARTTLS (port 587)
 });
 
 // Zod schema for API key creation/update
@@ -126,6 +139,7 @@ router.post(
             }
           }
           if (keyName === "GOOGLE_SEARCH_CREDENTIALS") googleSearchCredentialsSchema.parse(parsed);
+          if (keyName === "SMTP_CREDENTIALS") smtpCredentialsSchema.parse(parsed);
         } catch {
           return sendError(res, "Malformed credentials payload", "VALIDATION_ERROR", 400);
         }
@@ -232,6 +246,26 @@ router.post(
         } catch (s3Error) {
           logger.warn({ requestId: req.id, error: s3Error }, "AWS S3 connection test failed.");
           testMessage = "Could not reach the bucket with these credentials — check the access key, secret, region, and bucket name.";
+        }
+      } else if (keyName === "SMTP_CREDENTIALS") {
+        // Real test: actually opens a connection to the SMTP server and
+        // authenticates (nodemailer's transporter.verify()) — proves the
+        // whole credential set works together, not just that each field
+        // is individually plausible.
+        try {
+          const creds = smtpCredentialsSchema.parse(JSON.parse(keyValue));
+          const transporter = nodemailer.createTransport({
+            host: creds.host,
+            port: creds.port,
+            secure: creds.secure,
+            auth: { user: creds.user, pass: creds.pass },
+          });
+          await transporter.verify();
+          testSuccess = true;
+          testMessage = `Connected to ${creds.host}:${creds.port}.`;
+        } catch (smtpError) {
+          logger.warn({ requestId: req.id, error: smtpError }, "SMTP connection test failed.");
+          testMessage = smtpError instanceof Error ? smtpError.message : "Could not connect to the SMTP server with these credentials.";
         }
       } else if (keyName === "GOOGLE_SEARCH_CREDENTIALS") {
         // Real test: an actual Programmable Search API call with a

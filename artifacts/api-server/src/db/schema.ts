@@ -141,6 +141,28 @@ export const adminUsers = pgTable(
     lockedUntil: timestamp('locked_until', { withTimezone: true }),
     lastLogin: timestamp('last_login', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    // 2FA (TOTP), added 2026-07-13. twoFactorSecret is the AES-encrypted
+    // base32 secret (same encrypt()/decrypt() pair keys.ts already uses
+    // for API keys) — never stored or returned in plaintext once
+    // twoFactorEnabled flips to true.
+    twoFactorSecret: text('two_factor_secret'),
+    twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+    // Email verification, added 2026-07-13. email is only trusted once
+    // emailVerified is true (set by successfully confirming a sent code —
+    // never just by typing an address). emailVerificationRequired is a
+    // separate flag from emailVerified: an admin can HAVE a verified
+    // email on file but choose not to require it as a login factor.
+    email: text('email'),
+    emailVerified: boolean('email_verified').notNull().default(false),
+    emailVerificationRequired: boolean('email_verification_required').notNull().default(false),
+    // Holds whichever 6-digit code was most recently sent — for BOTH the
+    // "confirm this is really your email" step and every login-time code.
+    // pendingEmailTarget is the address the current code was sent to
+    // (during initial setup this may differ from the already-verified
+    // `email`, since the admin is proving a NEW address).
+    pendingEmailCode: text('pending_email_code'),
+    pendingEmailTarget: text('pending_email_target'),
+    pendingEmailExpiresAt: timestamp('pending_email_expires_at', { withTimezone: true }),
   }
 );
 

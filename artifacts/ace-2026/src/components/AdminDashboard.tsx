@@ -3483,6 +3483,558 @@ const TabBusiness = () => {
   );
 };
 
+// ---------- Security (2FA) — 2026-07-13 ----------
+// ---------- Email Verification (2026-07-13) ----------
+// SMTP credentials + the "prove you own this address, then optionally
+// require it at login" flow. Kept as its own component (not inlined into
+// TabSecurity) since it's a genuinely separate sub-feature with its own
+// multi-step state — same reasoning that kept Ambient Tracks' rows and
+// Business's sub-panels each in their own component.
+const EmailVerificationPanel = () => {
+  // SMTP credentials (Save & Test)
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('587');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpFrom, setSmtpFrom] = useState('');
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [smtpConfigured, setSmtpConfigured] = useState(false);
+  const [smtpSaving, setSmtpSaving] = useState(false);
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const [smtpNotice, setSmtpNotice] = useState<string | null>(null);
+  const [smtpNoticeOk, setSmtpNoticeOk] = useState(true);
+
+  // Email address (set -> confirm code -> require toggle)
+  const [email, setEmail] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
+  const [required, setRequired] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [newEmail, setNewEmail] = useState('');
+  const [awaitingCode, setAwaitingCode] = useState(false);
+  const [confirmCode, setConfirmCode] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailNotice, setEmailNotice] = useState<string | null>(null);
+  const [emailNoticeOk, setEmailNoticeOk] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [keyRows, emailStatus] = await Promise.all([
+          apiGet<ApiKeyStatus[]>('/api/keys/status'),
+          apiGet<{ email: string | null; verified: boolean; required: boolean }>('/api/auth/email/status'),
+        ]);
+        const smtpRow = keyRows?.find((r) => r.keyName === 'SMTP_CREDENTIALS');
+        if (smtpRow?.isConfigured) {
+          setSmtpConfigured(true);
+          if (smtpRow.value) {
+            try {
+              const parsed = JSON.parse(smtpRow.value) as Partial<{ host: string; port: number; user: string; fromAddress: string; secure: boolean }>;
+              setSmtpHost(parsed.host || '');
+              setSmtpPort(String(parsed.port || 587));
+              setSmtpUser(parsed.user || '');
+              setSmtpFrom(parsed.fromAddress || '');
+              setSmtpSecure(!!parsed.secure);
+            } catch { /* leave fields blank if unparsable */ }
+          }
+        }
+        setEmail(emailStatus?.email ?? null);
+        setVerified(!!emailStatus?.verified);
+        setRequired(!!emailStatus?.required);
+      } catch (err) {
+        console.error('Failed to load email verification status:', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const saveSmtp = async () => {
+    setSmtpSaving(true);
+    setSmtpNotice(null);
+    try {
+      await apiPost('/api/keys', {
+        keyName: 'SMTP_CREDENTIALS',
+        keyValue: JSON.stringify({ host: smtpHost, port: Number(smtpPort), user: smtpUser, pass: smtpPass, fromAddress: smtpFrom, secure: smtpSecure }),
+      });
+      setSmtpConfigured(true);
+      setSmtpNoticeOk(true);
+      setSmtpNotice('Saved. Click Test Connection to verify it actually works before relying on it.');
+    } catch (err) {
+      setSmtpNoticeOk(false);
+      setSmtpNotice(err instanceof Error ? err.message : 'Failed to save.');
+    } finally {
+      setSmtpSaving(false);
+    }
+  };
+
+  const testSmtp = async () => {
+    setSmtpTesting(true);
+    setSmtpNotice(null);
+    try {
+      const result = await apiPost<{ message: string }>('/api/keys/test', {
+        keyName: 'SMTP_CREDENTIALS',
+        keyValue: JSON.stringify({ host: smtpHost, port: Number(smtpPort), user: smtpUser, pass: smtpPass, fromAddress: smtpFrom, secure: smtpSecure }),
+      });
+      setSmtpNoticeOk(true);
+      setSmtpNotice(result?.message || 'Connected.');
+    } catch (err) {
+      setSmtpNoticeOk(false);
+      setSmtpNotice(err instanceof Error ? err.message : 'Connection test failed.');
+    } finally {
+      setSmtpTesting(false);
+    }
+  };
+
+  const startEmailSet = async () => {
+    setEmailBusy(true);
+    setEmailNotice(null);
+    try {
+      await apiPost('/api/auth/email/set', { email: newEmail });
+      setAwaitingCode(true);
+      setEmailNoticeOk(true);
+      setEmailNotice(`Code sent to ${newEmail}.`);
+    } catch (err) {
+      setEmailNoticeOk(false);
+      setEmailNotice(err instanceof Error ? err.message : 'Failed to send code — check SMTP is configured above.');
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const confirmEmail = async () => {
+    if (confirmCode.length !== 6) return;
+    setEmailBusy(true);
+    setEmailNotice(null);
+    try {
+      await apiPost('/api/auth/email/confirm', { code: confirmCode });
+      setEmail(newEmail);
+      setVerified(true);
+      setAwaitingCode(false);
+      setNewEmail('');
+      setConfirmCode('');
+      setEmailNoticeOk(true);
+      setEmailNotice('Email verified.');
+    } catch (err) {
+      setEmailNoticeOk(false);
+      setEmailNotice(err instanceof Error ? err.message : 'Incorrect or expired code.');
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const toggleRequired = async () => {
+    const next = !required;
+    setEmailBusy(true);
+    try {
+      await apiPut('/api/auth/email/require', { required: next });
+      setRequired(next);
+    } catch (err) {
+      setEmailNoticeOk(false);
+      setEmailNotice(err instanceof Error ? err.message : 'Failed to update.');
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  if (loading) return <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>Loading…</div>;
+
+  return (
+    <>
+      <div style={{
+        marginTop: 16, padding: 20, borderRadius: 14,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 600 }}>Email Sending (SMTP)</div>
+          <span style={BIZ_BADGE(
+            smtpConfigured ? 'rgba(120,200,140,0.18)' : 'rgba(255,255,255,0.06)',
+            smtpConfigured ? '#78C88C' : 'rgba(255,255,255,0.5)'
+          )}>
+            {smtpConfigured ? 'Configured' : 'Not configured'}
+          </span>
+        </div>
+        <div style={{ fontSize: '0.8rem', opacity: 0.65, marginBottom: 12 }}>
+          Works with any provider — a Gmail app password, SendGrid, Resend's SMTP relay, etc. Required before email
+          verification (below) can send anything.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, maxWidth: 380 }}>
+          <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="SMTP Host (e.g. smtp.gmail.com)" style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }} />
+          <input type="text" inputMode="numeric" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value.replace(/\D/g, ''))} placeholder="Port (587 or 465)" style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }} />
+          <input type="text" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} placeholder="Username" style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }} />
+          <input type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} placeholder="Password" style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }} />
+          <input type="email" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} placeholder="From address (e.g. no-reply@yoursite.com)" style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: 'var(--text-muted-color)' }}>
+            <input type="checkbox" checked={smtpSecure} onChange={(e) => setSmtpSecure(e.target.checked)} />
+            Use TLS on connect (port 465) — leave off for STARTTLS (port 587, most common)
+          </label>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" style={AMBIENT_BTN_NEON} onClick={saveSmtp} disabled={smtpSaving || !smtpHost || !smtpPort || !smtpUser || !smtpPass || !smtpFrom}>
+            {smtpSaving ? 'Saving…' : 'Save'}
+          </button>
+          <button type="button" style={AMBIENT_BTN_GHOST} onClick={testSmtp} disabled={smtpTesting || !smtpHost || !smtpPort || !smtpUser || !smtpPass || !smtpFrom}>
+            {smtpTesting ? 'Testing…' : 'Test Connection'}
+          </button>
+        </div>
+        {smtpNotice && <div style={{ marginTop: 10, fontSize: '0.8rem', color: smtpNoticeOk ? '#78C88C' : '#E08585' }}>{smtpNotice}</div>}
+      </div>
+
+      <div style={{
+        marginTop: 16, padding: 20, borderRadius: 14,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 600 }}>Email Verification</div>
+          {verified && (
+            <span style={BIZ_BADGE(
+              required ? 'rgba(120,200,140,0.18)' : 'rgba(255,255,255,0.06)',
+              required ? '#78C88C' : 'rgba(255,255,255,0.5)'
+            )}>
+              {required ? 'Required at login' : 'Optional'}
+            </span>
+          )}
+        </div>
+
+        {verified && email && !awaitingCode ? (
+          <div>
+            <div style={{ fontSize: '0.85rem', marginBottom: 12 }}>
+              Verified: <strong>{email}</strong>
+            </div>
+            <button type="button" style={AMBIENT_BTN_GHOST} onClick={toggleRequired} disabled={emailBusy}>
+              {required ? 'Stop requiring at login' : 'Require at login'}
+            </button>
+          </div>
+        ) : awaitingCode ? (
+          <div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)', marginBottom: 10 }}>
+              Enter the 6-digit code sent to {newEmail}.
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={confirmCode}
+              onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="6-digit code"
+              style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8, width: 140, letterSpacing: '0.2em', fontSize: '1rem' }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => { setAwaitingCode(false); setConfirmCode(''); }} disabled={emailBusy}>Cancel</button>
+              <button type="button" style={AMBIENT_BTN_NEON} onClick={confirmEmail} disabled={emailBusy || confirmCode.length !== 6}>
+                {emailBusy ? 'Confirming…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)', marginBottom: 10 }}>
+              {smtpConfigured ? 'Enter an email address to verify it.' : 'Configure SMTP above first.'}
+            </p>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="you@example.com"
+              disabled={!smtpConfigured}
+              style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8, width: '100%', maxWidth: 280 }}
+            />
+            <div style={{ marginTop: 12 }}>
+              <button type="button" style={AMBIENT_BTN_NEON} onClick={startEmailSet} disabled={emailBusy || !smtpConfigured || !newEmail}>
+                {emailBusy ? 'Sending…' : 'Send Code'}
+              </button>
+            </div>
+          </div>
+        )}
+        {emailNotice && <div style={{ marginTop: 10, fontSize: '0.8rem', color: emailNoticeOk ? '#78C88C' : '#E08585' }}>{emailNotice}</div>}
+      </div>
+    </>
+  );
+};
+
+const TabSecurity = () => {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // setup flow state
+  const [setupData, setSetupData] = useState<{ secret: string; qrCodeDataUrl: string } | null>(null);
+  const [setupCode, setSetupCode] = useState('');
+  const [settingUp, setSettingUp] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+
+  // disable flow state
+  const [disabling, setDisabling] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [disableError, setDisableError] = useState<string | null>(null);
+
+  // change-password flow state
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [showDisableForm, setShowDisableForm] = useState(false);
+
+  const loadStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const status = await apiGet<{ enabled: boolean }>('/api/auth/2fa/status');
+      setEnabled(!!status?.enabled);
+    } catch (err) {
+      console.error('Failed to load 2FA status:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  const startSetup = async () => {
+    setSetupError(null);
+    try {
+      const data = await apiPost<{ secret: string; qrCodeDataUrl: string }>('/api/auth/2fa/setup', {});
+      setSetupData(data);
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : 'Failed to start setup.');
+    }
+  };
+
+  const confirmSetup = async () => {
+    if (!setupData || setupCode.length !== 6) return;
+    setSettingUp(true);
+    setSetupError(null);
+    try {
+      await apiPost('/api/auth/2fa/verify-setup', { secret: setupData.secret, code: setupCode });
+      setSetupData(null);
+      setSetupCode('');
+      setEnabled(true);
+    } catch (err) {
+      setSetupError(err instanceof Error ? err.message : 'Incorrect code — check the app and try again.');
+    } finally {
+      setSettingUp(false);
+    }
+  };
+
+  const cancelSetup = () => {
+    setSetupData(null);
+    setSetupCode('');
+    setSetupError(null);
+  };
+
+  const confirmDisable = async () => {
+    if (!disablePassword) return;
+    setDisabling(true);
+    setDisableError(null);
+    try {
+      await apiPost('/api/auth/2fa/disable', { password: disablePassword });
+      setEnabled(false);
+      setShowDisableForm(false);
+      setDisablePassword('');
+    } catch (err) {
+      setDisableError(err instanceof Error ? err.message : 'Incorrect password.');
+    } finally {
+      setDisabling(false);
+    }
+  };
+
+  const confirmChangePassword = async () => {
+    setPasswordError(null);
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords don't match.");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await apiPut('/api/auth/change-password', { currentPassword, newPassword });
+      setPasswordSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordForm(false);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to change password.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  if (loading) return <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>Loading…</div>;
+
+  return (
+    <div>
+      <h2 className="adm-section-title">Security</h2>
+      <p style={{ opacity: 0.7, marginBottom: 20, fontSize: '0.85rem' }}>
+        Two-factor authentication (TOTP) — an authenticator app (Google Authenticator, Authy, etc.), no email or SMS
+        needed. Once enabled, signing in needs the password AND a fresh 6-digit code from the app.
+      </p>
+
+      <div style={{
+        padding: 20, borderRadius: 14,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: setupData || (enabled && showDisableForm) ? 16 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontWeight: 600 }}>Two-Factor Authentication</div>
+            <span style={BIZ_BADGE(
+              enabled ? 'rgba(120,200,140,0.18)' : 'rgba(255,255,255,0.06)',
+              enabled ? '#78C88C' : 'rgba(255,255,255,0.5)'
+            )}>
+              {enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          {!enabled && !setupData && (
+            <button type="button" style={AMBIENT_BTN_NEON} onClick={startSetup}>Enable 2FA</button>
+          )}
+          {enabled && !showDisableForm && (
+            <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => setShowDisableForm(true)}>Disable</button>
+          )}
+        </div>
+
+        {/* Setup flow: QR code + secret + code confirmation */}
+        {setupData && (
+          <div>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <img
+                src={setupData.qrCodeDataUrl}
+                alt="2FA QR code"
+                style={{ width: 180, height: 180, borderRadius: 10, border: '1px solid var(--adm-border)', background: '#fff', padding: 8 }}
+              />
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)', marginBottom: 10 }}>
+                  Scan with your authenticator app, or enter this key manually:
+                </p>
+                <code style={{
+                  display: 'block', padding: '8px 10px', borderRadius: 8, fontSize: '0.78rem', wordBreak: 'break-all',
+                  background: 'rgba(107,82,38,0.06)', border: '1px solid var(--adm-border)', marginBottom: 14,
+                }}>
+                  {setupData.secret}
+                </code>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={setupCode}
+                  onChange={(e) => setSetupCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="6-digit code"
+                  style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8, width: 140, letterSpacing: '0.2em', fontSize: '1rem' }}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button type="button" style={AMBIENT_BTN_GHOST} onClick={cancelSetup} disabled={settingUp}>Cancel</button>
+                  <button type="button" style={AMBIENT_BTN_NEON} onClick={confirmSetup} disabled={settingUp || setupCode.length !== 6}>
+                    {settingUp ? 'Confirming…' : 'Confirm & Enable'}
+                  </button>
+                </div>
+                {setupError && <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#A6371F' }}>{setupError}</div>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Disable flow: password re-entry */}
+        {enabled && showDisableForm && (
+          <div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)', marginBottom: 10 }}>
+              Enter your password to confirm turning 2FA off.
+            </p>
+            <input
+              type="password"
+              value={disablePassword}
+              onChange={(e) => setDisablePassword(e.target.value)}
+              placeholder="Current password"
+              style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8, width: '100%', maxWidth: 260 }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => { setShowDisableForm(false); setDisablePassword(''); setDisableError(null); }} disabled={disabling}>
+                Cancel
+              </button>
+              <button type="button" style={{ ...AMBIENT_BTN_NEON, background: 'linear-gradient(180deg,#E38B7A,#B23A28)' }} onClick={confirmDisable} disabled={disabling || !disablePassword}>
+                {disabling ? 'Disabling…' : 'Disable 2FA'}
+              </button>
+            </div>
+            {disableError && <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#A6371F' }}>{disableError}</div>}
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        marginTop: 16, padding: 20, borderRadius: 14,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.06), rgba(255,255,255,0.02))',
+        border: '1px solid rgba(var(--accent-rgb),0.16)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showPasswordForm ? 16 : 0 }}>
+          <div style={{ fontWeight: 600 }}>Password</div>
+          {!showPasswordForm && (
+            <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => { setShowPasswordForm(true); setPasswordSuccess(false); }}>
+              Change Password
+            </button>
+          )}
+        </div>
+
+        {passwordSuccess && !showPasswordForm && (
+          <div style={{ fontSize: '0.8rem', color: '#78C88C' }}>Password changed successfully.</div>
+        )}
+
+        {showPasswordForm && (
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, maxWidth: 320 }}>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Current password"
+                style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }}
+              />
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New password (min. 8 characters)"
+                style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }}
+              />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                style={{ ...DARK_SELECT_STYLE, padding: '0.5em 0.8em', borderRadius: 8 }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                style={AMBIENT_BTN_GHOST}
+                onClick={() => { setShowPasswordForm(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPasswordError(null); }}
+                disabled={changingPassword}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={AMBIENT_BTN_NEON}
+                onClick={confirmChangePassword}
+                disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+              >
+                {changingPassword ? 'Saving…' : 'Save New Password'}
+              </button>
+            </div>
+            {passwordError && <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#A6371F' }}>{passwordError}</div>}
+          </div>
+        )}
+      </div>
+
+      <EmailVerificationPanel />
+    </div>
+  );
+};
+
 
 export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: () => void; initialTab?: number }) {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -3513,6 +4065,12 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
       label: 'Business Tools',
       tabs: [
         { id: 8, label: 'Business' },
+      ],
+    },
+    {
+      label: 'Security',
+      tabs: [
+        { id: 9, label: 'Security' },
       ],
     },
   ];
@@ -3571,6 +4129,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
                 {activeTab === 6 && <TabPosterStudio />}
                 {activeTab === 7 && <TabAmbientTracks />}
                 {activeTab === 8 && <TabBusiness />}
+                {activeTab === 9 && <TabSecurity />}
               </motion.div>
             </AnimatePresence>
           </div>
