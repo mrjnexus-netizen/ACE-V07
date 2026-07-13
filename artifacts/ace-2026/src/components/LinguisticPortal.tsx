@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
+import { useContent } from '../context/ContentContext';
 import PortalCursor from './PortalCursor';
 import PortalComposer from './PortalComposer';
 import LiquidSeam, { type SeamPin } from './LiquidSeam';
@@ -768,6 +769,13 @@ export const LinguisticPortal = () => {
   // once createMediaElementSource has captured it (same issue fixed in
   // the shared AudioContext.tsx). A real GainNode is the fix here too.
   const { audioState: globalAudioState } = useAudio();
+  // 2026-07-12 (per Reza — Ambient Tracks admin tab): this screen's own
+  // ambient bed is now overridable too, same content_entries pattern as
+  // BackgroundMusic.tsx's per-language beds (key: 'ambient-track-selector').
+  // Read once, inside start() below, at the moment the visitor actually
+  // clicks Enter — by then content data has had time to load, and start()
+  // only ever runs once anyway (autoplay policy gates it on that click).
+  const { resolve: resolveAmbientOverride } = useContent();
   const ambientGainRef = useRef<GainNode | null>(null);
   const ambientActxRef = useRef<AudioContext | null>(null);
 
@@ -798,7 +806,7 @@ export const LinguisticPortal = () => {
       if (started) return;
       started = true;
       try {
-        audioEl = new Audio('/portal-ambient.mp3');
+        audioEl = new Audio(resolveAmbientOverride('ambient-track-selector', 'en') || '/portal-ambient.mp3');
         audioEl.loop = true;
         audioEl.preload = 'auto';
         audioEl.crossOrigin = 'anonymous';

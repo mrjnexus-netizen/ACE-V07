@@ -2685,7 +2685,7 @@ const AMBIENT_TRACKS: { key: string; label: string; defaultUrl: string }[] = [
   { key: 'ambient-track-zh', label: localeLabels.zh!, defaultUrl: '/audio/bg-zh.mp3' },
   { key: 'ambient-track-ja', label: localeLabels.ja!, defaultUrl: '/audio/bg-ja.mp3' },
   { key: 'ambient-track-ko', label: localeLabels.ko!, defaultUrl: '/audio/bg-ko.mp3' },
-  { key: 'ambient-track-selector', label: 'Language-Selection Screen', defaultUrl: '/audio/bg-selector.mp3' },
+  { key: 'ambient-track-selector', label: 'Language-Selection Screen', defaultUrl: '/portal-ambient.mp3' },
 ];
 
 const AMBIENT_BTN_NEON: CSSProperties = {
