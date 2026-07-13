@@ -1,15 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
-import { useChromatic } from '../context/ChromaticContext';
 import { apiPost, apiGet, apiPut, apiDelete } from '../lib/apiClient';
 import { usePipeline } from '../context/PipelineContext';
-import StagingPreview from './StagingPreview';
 import { useContent } from '../context/ContentContext';
-import type { ComposerIdentity, AudioTrack, MultiLingual, ThemeId } from '../types';
+import type { ComposerIdentity, AudioTrack, MultiLingual } from '../types';
 
 // ---------- shared helpers ----------
 const emptyMultiLingual = (): MultiLingual => ({ en: '', es: '', fr: '', zh: '', ja: '', ko: '' });
@@ -28,7 +26,7 @@ const CONCEPT_OPTIONS = [
 // made every dropdown hard to read against this dark UI (2026-07-10).
 // Explicit inline styles on both <select> and each <option> force
 // consistent, readable dark styling across browsers.
-const DARK_SELECT_STYLE = { background: '#171410', color: '#e9e4da', border: '1px solid rgba(255,255,255,0.14)' };
+const DARK_SELECT_STYLE: CSSProperties = { background: 'rgba(107,82,38,0.035)', color: 'var(--text-color)', border: '1px solid var(--adm-border, rgba(107,82,38,0.16))' };
 const DARK_OPTION_STYLE = { background: '#171410', color: '#e9e4da' };
 
 // ---------- Tab Content Components ----------
@@ -119,6 +117,114 @@ const TabIdentityMatrix = () => {
     </div>
   );
 };
+
+// ---- Neon Audio Player (2026-07-13, per Reza) ----
+// Native <audio controls> renders with the browser/OS's own default
+// chrome — usually a plain dark bar that can't be restyled via CSS and
+// clashed badly with the new ivory/gold theme ("bare meski... zeshte").
+// This is a minimal custom transport: play/pause, a seek bar, elapsed/
+// total time — built once, reused everywhere audio needs to preview in
+// admin (Media Pipeline's staged upload, both Ambient Tracks states).
+function NeonAudioPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    setPlaying(false);
+    setProgress(0);
+    setCurrent(0);
+    setDuration(0);
+  }, [src]);
+
+  const toggle = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) el.pause();
+    else void el.play();
+  };
+
+  const seek = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const el = audioRef.current;
+    if (!el || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    el.currentTime = ratio * duration;
+  };
+
+  const fmt = (s: number): string => {
+    if (!Number.isFinite(s) || s < 0) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', borderRadius: 999,
+      background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.07), rgba(255,255,255,0.55))',
+      border: '1px solid rgba(var(--accent-rgb),0.24)',
+    }}>
+      <audio
+        ref={audioRef}
+        src={src}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onTimeUpdate={() => {
+          const el = audioRef.current;
+          if (!el || !el.duration) return;
+          setCurrent(el.currentTime);
+          setProgress(el.currentTime / el.duration);
+        }}
+        onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
+        style={{ display: 'none' }}
+      />
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? 'Pause' : 'Play'}
+        style={{
+          flexShrink: 0, width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 58%, #fff 42%), color-mix(in srgb, var(--accent-color) 90%, #000 10%))',
+          boxShadow: '0 0 12px rgba(var(--accent-rgb),0.4)',
+        }}
+      >
+        {playing ? (
+          <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
+            <rect x="3" y="2" width="3.4" height="12" rx="1" fill="#241A0C" />
+            <rect x="9.6" y="2" width="3.4" height="12" rx="1" fill="#241A0C" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
+            <path d="M4 2.4 L13.5 8 L4 13.6 Z" fill="#241A0C" />
+          </svg>
+        )}
+      </button>
+      <div
+        onClick={seek}
+        role="slider"
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+        style={{ flex: 1, height: 6, borderRadius: 999, background: 'rgba(107,82,38,0.14)', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
+      >
+        <div style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0, width: `${progress * 100}%`,
+          background: 'linear-gradient(90deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 65%, #fff 35%))',
+          boxShadow: '0 0 8px rgba(var(--accent-rgb),0.5)',
+        }} />
+      </div>
+      <div style={{ fontSize: '0.68rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted-color)', flexShrink: 0, minWidth: 70, textAlign: 'right' }}>
+        {fmt(current)} / {fmt(duration)}
+      </div>
+    </div>
+  );
+}
 
 const TabMediaPipeline = () => {
   const { tracks, fetchTracks } = useIdentity();
@@ -381,7 +487,7 @@ const TabMediaPipeline = () => {
       {stagedAudio && !currentJob && (
         <div className="adm-panel space-y-3">
           <p className="adm-notice" style={{ color: 'var(--accent-color)' }}>{stagedAudio.fileName}</p>
-          <audio controls src={stagedAudio.url} style={{ width: '100%' }} />
+          <NeonAudioPlayer src={stagedAudio.url} />
           <div className="adm-row">
             <button onClick={() => void startPipeline()} className="adm-btn adm-btn--primary">
               Start AI Processing
@@ -1226,97 +1332,12 @@ const TabGatekeeperHub = () => {
   );
 };
 
-const TabStagingEngine = () => {
-  const { themeId, switchTheme } = useChromatic();
-  const [editMode, setEditMode] = useState(false);
-  const [pendingTheme, setPendingTheme] = useState<ThemeId>(themeId);
-
-  // Keep the staged pick in sync with the live theme whenever we're not
-  // actively editing (e.g. someone changed it elsewhere).
-  useEffect(() => {
-    if (!editMode) setPendingTheme(themeId);
-  }, [editMode, themeId]);
-
-  const hasPendingChange = editMode && pendingTheme !== themeId;
-
-  const handleEnterEdit = () => {
-    setPendingTheme(themeId);
-    setEditMode(true);
-  };
-
-  const handlePublish = () => {
-    switchTheme(pendingTheme);
-    setEditMode(false);
-  };
-
-  const handleDiscard = () => {
-    setPendingTheme(themeId);
-    setEditMode(false);
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="adm-panel">
-        <div className="adm-row">
-          <button
-            onClick={() => (editMode ? handleDiscard() : handleEnterEdit())}
-            className={`adm-btn ${editMode ? 'adm-btn--primary' : 'adm-btn--ghost'}`}
-          >
-            {editMode ? 'Editing (draft)' : 'Live Mode'}
-          </button>
-          {editMode && (
-            <>
-              <button
-                onClick={handlePublish}
-                disabled={!hasPendingChange}
-                className="adm-btn"
-                style={{ background: '#3FAE63', color: '#fff' }}
-              >
-                Publish
-              </button>
-              <button onClick={handleDiscard} className="adm-btn adm-btn--ghost">
-                Discard
-              </button>
-            </>
-          )}
-        </div>
-
-        {editMode ? (
-          <div className="mt-4 pt-4" style={{ borderTop: '1px dashed var(--adm-border)' }}>
-            <p className="adm-notice mb-3">
-              Pick a theme below — it previews everywhere in the grid, live site untouched until you hit Publish.
-            </p>
-            <div className="adm-chip-row">
-              {(['onyx', 'cyber', 'minimal'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setPendingTheme(t)}
-                  className={`adm-chip ${pendingTheme === t ? 'adm-chip--active' : ''}`}
-                >
-                  {t}
-                  {t === themeId && <span className="opacity-60"> (live)</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className="adm-notice mt-3">
-            Currently live: <span style={{ color: 'var(--accent-color)' }}>{themeId}</span>. Enter Editing to stage a
-            different theme and preview it safely before publishing.
-          </p>
-        )}
-      </div>
-
-      <StagingPreview />
-    </div>
-  );
-};
-
 const TabDocumentAssistant = () => {
   const [file, setFile] = useState<File | null>(null);
   const [checklist, setChecklist] = useState<{ category: string; items: string[] }[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAnalyze = async () => {
     if (!file || analyzing) return;
@@ -1366,15 +1387,47 @@ const TabDocumentAssistant = () => {
       <div className="adm-panel">
         <div className="adm-panel-title">Document Assistant</div>
         <p className="adm-panel-subtitle">Upload a brief/contract (.pdf, .txt, .eml) to pull out timecodes, revisions, deliverables, and deadlines.</p>
-        <input type="file" accept=".pdf,.txt,.eml" onChange={e => { setFile(e.target.files?.[0] || null); setChecklist([]); setNotice(null); }} className="text-xs" />
+
+        <div
+          className="adm-dropzone"
+          onClick={() => fileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+        >
+          {file ? (
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{file.name}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted-color)', marginTop: 4 }}>
+                Click to choose a different file
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: '1.6rem', marginBottom: 6, color: 'var(--accent-color)' }} aria-hidden>⇪</div>
+              <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Drop or click to upload</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted-color)', marginTop: 4 }}>.pdf, .txt, or .eml</div>
+            </div>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.txt,.eml"
+          style={{ display: 'none' }}
+          onChange={(e) => { setFile(e.target.files?.[0] || null); setChecklist([]); setNotice(null); }}
+        />
+
         {file && (
-          <div className="mt-3">
+          <div className="adm-row mt-4">
             <button onClick={handleAnalyze} disabled={analyzing} className="adm-btn adm-btn--primary">
               {analyzing ? 'Analyzing…' : 'Analyze'}
             </button>
+            <button onClick={() => { setFile(null); setChecklist([]); setNotice(null); }} className="adm-btn adm-btn--ghost">
+              Clear
+            </button>
           </div>
         )}
-        {notice && <p className="adm-notice mt-2">{notice}</p>}
+        {notice && <p className="adm-notice mt-3">{notice}</p>}
       </div>
       {checklist.length > 0 && (
         <div className="adm-panel space-y-3">
@@ -2694,11 +2747,11 @@ const AMBIENT_BTN_NEON: CSSProperties = {
   fontSize: '0.78rem',
   fontWeight: 600,
   letterSpacing: '0.03em',
-  border: 'none',
+  border: '1px solid rgba(var(--accent-rgb),0.5)',
   cursor: 'pointer',
-  background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 55%, #fff 45%), color-mix(in srgb, var(--accent-color) 82%, #000 18%))',
-  color: '#0B0B0D',
-  boxShadow: '0 0 16px rgba(var(--accent-rgb),0.35)',
+  background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 58%, #fff 42%), color-mix(in srgb, var(--accent-color) 90%, #000 10%))',
+  color: '#241A0C',
+  boxShadow: '0 0 18px rgba(var(--accent-rgb),0.4), inset 0 1px 0 rgba(255,255,255,0.35)',
   transition: 'box-shadow 0.2s ease, transform 0.15s ease',
 };
 const AMBIENT_BTN_GHOST: CSSProperties = {
@@ -2707,9 +2760,9 @@ const AMBIENT_BTN_GHOST: CSSProperties = {
   fontSize: '0.78rem',
   fontWeight: 600,
   letterSpacing: '0.03em',
-  border: '1px solid rgba(var(--accent-rgb),0.4)',
+  border: '1px solid rgba(var(--accent-rgb),0.32)',
   cursor: 'pointer',
-  background: 'transparent',
+  background: 'rgba(var(--accent-rgb),0.05)',
   color: 'var(--accent-color)',
 };
 
@@ -2794,7 +2847,7 @@ const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; la
       {pendingUrl ? (
         <>
           <div style={{ fontSize: '0.75rem', opacity: 0.75, marginBottom: 6 }}>Preview — nothing is live yet</div>
-          <audio controls src={pendingUrl} style={{ width: '100%', borderRadius: 8 }} />
+          <NeonAudioPlayer src={pendingUrl} />
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => setPendingFile(null)} disabled={uploading}>
               Cancel
@@ -2808,7 +2861,7 @@ const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; la
         <>
           {/* Always playable — the live override if there is one, otherwise
               the bundled default. Never just a caption with nothing to press. */}
-          <audio controls src={currentUrl || defaultUrl} style={{ width: '100%', borderRadius: 8 }} />
+          <NeonAudioPlayer src={currentUrl || defaultUrl} />
           <button type="button" style={{ ...AMBIENT_BTN_NEON, marginTop: 12 }} onClick={() => fileInputRef.current?.click()}>
             {isCustom ? 'Replace' : 'Upload Custom Track'}
           </button>
@@ -3434,15 +3487,34 @@ const TabBusiness = () => {
 export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: () => void; initialTab?: number }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const { enterEditMode } = useContent();
-  const tabs = [
-    { id: 1, label: 'Identity Matrix' },
-    { id: 2, label: 'Media Pipeline' },
-    { id: 3, label: 'Gatekeeper Hub' },
-    { id: 4, label: 'Staging Engine' },
-    { id: 5, label: 'Document Assistant' },
-    { id: 6, label: 'Poster Studio' },
-    { id: 7, label: 'Ambient Tracks' },
-    { id: 8, label: 'Business' },
+  const tabGroups = [
+    {
+      label: 'Site Content',
+      tabs: [
+        { id: 1, label: 'Identity Matrix' },
+        { id: 7, label: 'Ambient Tracks' },
+      ],
+    },
+    {
+      label: 'Creative Production',
+      tabs: [
+        { id: 2, label: 'Media Pipeline' },
+        { id: 6, label: 'Poster Studio' },
+      ],
+    },
+    {
+      label: 'AI & Integrations',
+      tabs: [
+        { id: 3, label: 'Gatekeeper Hub' },
+        { id: 5, label: 'Document Assistant' },
+      ],
+    },
+    {
+      label: 'Business Tools',
+      tabs: [
+        { id: 8, label: 'Business' },
+      ],
+    },
   ];
 
   const handleOpenVisualEditor = () => {
@@ -3453,7 +3525,6 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="adm-shell fixed inset-0 z-50 flex flex-col font-sans"
-      style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}
     >
       <div className="adm-header">
         <h1 className="adm-header-title">ACE Admin</h1>
@@ -3470,18 +3541,22 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
           </div>
 
           <div>
-            <div className="adm-sidebar-section-label">Sections</div>
-            <nav className="adm-nav">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`adm-nav-item ${activeTab === tab.id ? 'adm-nav-item--active' : ''}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+            {tabGroups.map((group) => (
+              <div key={group.label} className="adm-sidebar-group">
+                <div className="adm-sidebar-section-label">{group.label}</div>
+                <nav className="adm-nav">
+                  {group.tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`adm-nav-item ${activeTab === tab.id ? 'adm-nav-item--active' : ''}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -3492,7 +3567,6 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
                 {activeTab === 1 && <TabIdentityMatrix />}
                 {activeTab === 2 && <TabMediaPipeline />}
                 {activeTab === 3 && <TabGatekeeperHub />}
-                {activeTab === 4 && <TabStagingEngine />}
                 {activeTab === 5 && <TabDocumentAssistant />}
                 {activeTab === 6 && <TabPosterStudio />}
                 {activeTab === 7 && <TabAmbientTracks />}

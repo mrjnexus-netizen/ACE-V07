@@ -21,7 +21,11 @@ interface ChromaticContextType {
   applyGenreSoul: (genre: string | null) => void;
 }
 
-const THEME_VARIABLES: Record<ThemeId, Record<string, string>> = {
+const THEME_VARIABLES: Partial<Record<ThemeId, Record<string, string>>> = {
+  // 2026-07-13 (per Reza): dropped theme-switching entirely to keep the
+  // site lighter — onyx is now the only theme, permanently. Kept as a
+  // single-key Record (rather than flattening ThemeId to a literal type)
+  // so nothing else that imports ThemeId/useChromatic has to change.
   onyx: {
     '--surface-color': '#080808',
     '--surface2-color': '#0F0F0F',
@@ -44,52 +48,6 @@ const THEME_VARIABLES: Record<ThemeId, Record<string, string>> = {
     '--letter-spacing-base': '0.08em',
     '--line-height-base': '1.7',
     '--line-height-cjk': '1.9',
-  },
-  cyber: {
-    '--surface-color': '#0A0A0F',
-    '--surface2-color': '#12131A',
-    '--surface3-color': '#1E1F26',
-    '--surface4-color': '#2C2E35',
-    '--accent-color': '#00F5D4',
-    '--accent2-color': '#00C4AA',
-    '--accent-rgb': '0, 245, 212',
-    '--surface-rgb': '10, 10, 15',
-    '--text-color': '#E8E9F0',
-    '--text-muted-color': '#6B6C75',
-    '--text-dim-color': '#3A3B44',
-    '--border-color': '#2A2B33',
-    '--border-accent-color': '#00F5D440',
-    '--glow-color': '#00F5D415',
-    '--font-display': "'Space Mono', 'IBM Plex Mono', monospace",
-    '--font-body': "'IBM Plex Mono', 'Courier New', monospace",
-    '--font-mono': "'Space Mono', monospace",
-    '--font-cjk': "'Noto Sans JP', 'Noto Sans SC', sans-serif",
-    '--letter-spacing-base': '0.12em',
-    '--line-height-base': '1.6',
-    '--line-height-cjk': '1.85',
-  },
-  minimal: {
-    '--surface-color': '#F9F9F7',
-    '--surface2-color': '#F2F2F0',
-    '--surface3-color': '#EAEAE8',
-    '--surface4-color': '#E0E0DE',
-    '--accent-color': '#0A0A08',
-    '--accent2-color': '#3D3D3A',
-    '--accent-rgb': '10, 10, 8',
-    '--surface-rgb': '249, 249, 247',
-    '--text-color': '#0A0A08',
-    '--text-muted-color': '#7A7A75',
-    '--text-dim-color': '#C0C0BC',
-    '--border-color': '#D8D8D5',
-    '--border-accent-color': '#0A0A0830',
-    '--glow-color': '#0A0A0808',
-    '--font-display': "'Playfair Display', 'Cormorant Garamond', serif",
-    '--font-body': "'Lora', Georgia, serif",
-    '--font-mono': "'Space Mono', monospace",
-    '--font-cjk': "'Noto Sans JP', 'Noto Sans SC', sans-serif",
-    '--letter-spacing-base': '0.04em',
-    '--line-height-base': '1.8',
-    '--line-height-cjk': '2.0',
   },
 };
 
@@ -130,7 +88,7 @@ const GENRE_SOULS: Record<string, string> = {
 
 // Apply theme synchronously before React renders - prevents flash.
 function applyThemeSync(theme: ThemeId): void {
-  const vars = THEME_VARIABLES[theme];
+  const vars = THEME_VARIABLES[theme] ?? THEME_VARIABLES.onyx!;
   const root = document.documentElement;
   Object.entries(vars).forEach(([key, value]) => {
     root.style.setProperty(key, value);
@@ -160,19 +118,17 @@ function applyLanguageWorldVars(locale: Locale, themeId: ThemeId): void {
   root.setAttribute('data-language-world', locale);
 }
 
-// Run immediately on module load.
-const _storedTheme = localStorage.getItem('ace-theme') as ThemeId | null;
-const _validThemes: ThemeId[] = ['onyx', 'cyber', 'minimal'];
-const _initialTheme: ThemeId = (_storedTheme && _validThemes.includes(_storedTheme))
-  ? _storedTheme
-  : 'onyx';
+// 2026-07-13 (per Reza): theme-switching removed entirely — onyx is now
+// permanent, no localStorage read/write for it anymore. applyThemeSync
+// still runs once so all the CSS custom properties get set on <html>
+// exactly as before (nothing downstream needed to change).
+const _initialTheme: ThemeId = 'onyx';
 applyThemeSync(_initialTheme);
-if (!_storedTheme) localStorage.setItem('ace-theme', _initialTheme);
 
 const ChromaticContext = createContext<ChromaticContextType | undefined>(undefined);
 
 export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
-  const [themeId, setThemeId] = useState<ThemeId>(_initialTheme);
+  const [themeId] = useState<ThemeId>(_initialTheme);
   const [languageWorld, setLanguageWorld] = useState<Locale | null>(null);
   const languageWorldRef = useRef<Locale | null>(null);
 
@@ -194,22 +150,12 @@ export const ChromaticProvider = ({ children }: { children: ReactNode }) => {
     if (color) root.style.setProperty('--genre-soul', color);
   }, []);
 
-  const switchTheme = useCallback((theme: ThemeId) => {
-    const root = document.documentElement;
-    root.style.transition = 'opacity 600ms ease';
-    root.style.opacity = '0';
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        applyThemeSync(theme);
-        // Re-apply the active language world so its accent survives a base-theme switch.
-        if (languageWorldRef.current) {
-          applyLanguageWorldVars(languageWorldRef.current, theme);
-        }
-        setThemeId(theme);
-        localStorage.setItem('ace-theme', theme);
-        root.style.opacity = '1';
-      }, 300);
-    });
+  // 2026-07-13 (per Reza): theme-switching is intentionally disabled —
+  // onyx only, permanently. Kept as a function (rather than removed from
+  // the context) so nothing that still destructures switchTheme from
+  // useChromatic() breaks; it simply no-ops now.
+  const switchTheme = useCallback((_theme: ThemeId) => {
+    // no-op — onyx only
   }, []);
 
   useEffect(() => {

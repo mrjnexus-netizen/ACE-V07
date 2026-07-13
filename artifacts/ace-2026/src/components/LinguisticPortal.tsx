@@ -31,7 +31,15 @@ const LANGUAGE_PASTEL: Record<string, string> = {
   en: '#F7E6B0', es: '#FFCB94', fr: '#EAD9B5', zh: '#FFA79E', ja: '#A9C7FF', ko: '#FFB3F0',
 };
 
-const DEFAULT_STAR_COLOR = '#FFFFFF';
+// 2026-07-13 (per Reza — minimal theme support): pure white was correct
+// for onyx/cyber (dark surfaces) but made the star swarm invisible against
+// minimal's ivory background. --text-color is already tuned per-theme for
+// exactly this kind of "reads clearly against --surface-color" contrast —
+// reusing it means no separate per-theme star-color table to keep in sync.
+function getDefaultStarColor(): string {
+  if (typeof document === 'undefined') return '#FFFFFF';
+  return getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#FFFFFF';
+}
 
 const SELECT_TRANSITION_MS = 2560; // cover -> light rake -> melt into site tone, then cross over
 
@@ -125,8 +133,8 @@ const POST_Y = POST_NORM.map(([, ny]) => IMG_Y + ny * IMG_H);
 const Starfield = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRef: React.MutableRefObject<string>; hoverRef: React.MutableRefObject<number>; audioRef: React.MutableRefObject<number>; pointerRef: React.MutableRefObject<{ x: number; y: number }> }) => {
   const meshRef = useRef<THREE.Points>(null);
   const matRef = useRef<THREE.ShaderMaterial>(null);
-  const currentColor = useRef(new THREE.Color(DEFAULT_STAR_COLOR));
-  const target = useRef(new THREE.Color(DEFAULT_STAR_COLOR));
+  const currentColor = useRef(new THREE.Color(getDefaultStarColor()));
+  const target = useRef(new THREE.Color(getDefaultStarColor()));
   const hoverVal = useRef(0);
   const beatVal = useRef(0);
   const { camera } = useThree();
@@ -156,7 +164,7 @@ const Starfield = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRef: Rea
     camera.position.x += (pointerRef.current.x * PAR - camera.position.x) * 0.045;
     camera.position.y += (-pointerRef.current.y * PAR - camera.position.y) * 0.045;
     camera.lookAt(0, 0, 0);
-    target.current.set(colorRef.current || DEFAULT_STAR_COLOR);
+    target.current.set(colorRef.current || getDefaultStarColor());
     currentColor.current.lerp(target.current, 0.18);
     hoverVal.current += ((hoverRef.current || 0) - hoverVal.current) * 0.12;
     if (matRef.current) {
@@ -230,7 +238,7 @@ const Starfield = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRef: Rea
     return geom;
   }, []);
 
-  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color(DEFAULT_STAR_COLOR) }, uTime: { value: 0 }, uHover: { value: 0 }, uBeat: { value: 0 } }), []);
+  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color(getDefaultStarColor()) }, uTime: { value: 0 }, uHover: { value: 0 }, uBeat: { value: 0 } }), []);
 
   return (
     <points ref={meshRef} geometry={geometry}>
@@ -282,8 +290,16 @@ const StarfieldCanvas = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRe
       style={{ position: 'fixed', inset: 0, zIndex: -1 }}
       camera={{ fov: 75, near: 0.1, far: 100 }}
       onCreated={({ gl, scene }) => {
-        gl.setClearColor(new THREE.Color('#000000'));
-        scene.fog = new THREE.FogExp2('#000000', 0.0008);
+        // 2026-07-13 (per Reza — minimal/cyber theme support): this used
+        // to hardcode '#000000', which is correct for onyx/cyber (both
+        // near-black) but wrong for minimal (ivory, #F9F9F7) — the canvas
+        // stayed black regardless of the live theme. Reading the actual
+        // --surface-color CSS variable (which ChromaticContext already
+        // keeps correct per-theme) means this needs no per-theme special
+        // case of its own; it just follows whatever's live.
+        const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface-color').trim() || '#000000';
+        gl.setClearColor(new THREE.Color(surface));
+        scene.fog = new THREE.FogExp2(surface, 0.0008);
       }}
     >
       <ambientLight intensity={0.1} />
@@ -683,6 +699,28 @@ const HeadstockSelector = ({
 // in fixed px relative to whatever logical canvas it's placed in, so it
 // scales together with the photo/guitar as ONE unit, on both the desktop
 // (wide) and mobile (stacked) scenes - no more independent drift.
+// 2026-07-13 (per Reza — minimal theme support): this gradient's pale cream
+// stops (#F6E9BE, #FBF0CC) read beautifully against a dark surface but
+// blend almost invisibly into a light/ivory one — the whole point of
+// Reza's report ("range font aslan moshakhas nist"). Rather than a single
+// fixed gradient, pick a deeper-gold variant (no near-white stops at all)
+// whenever the live surface itself is light. A simple luminance check on
+// --surface-rgb (already correct per-theme) decides which — no separate
+// per-theme table to keep in sync with ChromaticContext.
+function isLightSurface(): boolean {
+  if (typeof document === 'undefined') return false;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--surface-rgb').trim();
+  const [r, g, b] = raw.split(',').map((n) => parseInt(n.trim(), 10) || 0);
+  // standard relative-luminance approximation
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150;
+}
+
+function signatureGradient(): string {
+  return isLightSurface()
+    ? 'linear-gradient(180deg,#4A3610 0%,#8A6A26 22%,#6B4F14 42%,#8A6A26 58%,#4A3610 78%,#4A3610 100%)'
+    : 'linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%)';
+}
+
 function LetterGlyph({ ch, size }: { ch: string; size: number }) {
   return (
     <div
@@ -693,7 +731,7 @@ function LetterGlyph({ ch, size }: { ch: string; size: number }) {
         fontWeight: 500, fontStyle: 'normal',
         fontSize: size * 0.64, lineHeight: 1,
         color: '#F1DFA6',
-        background: 'linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%)',
+        background: signatureGradient(),
         backgroundSize: '100% 200%',
         WebkitBackgroundClip: 'text',
         backgroundClip: 'text',
@@ -962,7 +1000,7 @@ export const LinguisticPortal = () => {
   }, [selectedLang, setLocale, playMicroTone, applyLanguageWorld]);
 
   return (
-    <div ref={containerRef} className="fixed inset-0 z-50 bg-black overflow-hidden">
+    <div ref={containerRef} className="fixed inset-0 z-50 overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
       <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'); @keyframes labelFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes wgSigRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } } @keyframes wgSigRule { from { opacity: 0; transform: scaleX(0.2); } to { opacity: 0.6; transform: scaleX(1); } } @keyframes wgSigDot { from { opacity: 0; transform: rotate(45deg) scale(0.2); } to { opacity: 0.65; transform: rotate(45deg) scale(1); } } @keyframes wgSigShimmer { 0% { background-position: 0% 0%; } 100% { background-position: 0% 200%; } } .wg-sig-wrap { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: flex-start; } .wg-sig-ch { display: flex; align-items: center; justify-content: center; width: clamp(2.2rem, 6vh, 3.4rem); height: clamp(2.3rem, 6.4vh, 3.6rem); font-family: 'Cinzel','Cormorant Garamond',Didot,Georgia,serif; font-weight: 500; font-style: normal; font-size: clamp(1.7rem, 4.6vh, 2.9rem); line-height: 1; letter-spacing: 0; text-align: center; color: #F1DFA6; background: linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%); background-size: 100% 200%; background-position: 0% 0%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 22px rgba(233,200,121,0.5)) drop-shadow(0 0 40px rgba(217,180,94,0.28)) drop-shadow(0 1px 3px rgba(0,0,0,0.55)); opacity: 0; animation: wgSigRise 1.2s cubic-bezier(0.22,1,0.36,1) both, wgSigShimmer 6.5s ease-in-out infinite; } .wg-sig-rule { display: block; width: 1px; height: clamp(14px,2.4vh,26px); background: linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%); opacity: 0; animation: wgSigRule 1.3s ease both; } .wg-sig-diamond { display: block; width: 6px; height: 6px; margin: 0.9vh 0; background: linear-gradient(135deg,#FBF0CC,#D9B45E); box-shadow: 0 0 10px rgba(233,200,121,0.6); opacity: 0; animation: wgSigDot 1s ease both; } .wg-sig-sub { margin-top: 1.1vh; font-family: 'Cinzel','Cormorant Garamond',Georgia,serif; font-weight: 400; font-size: clamp(0.5rem, 1.15vh, 0.72rem); letter-spacing: 0.42em; padding-left: 0.42em; color: #C9AC6A; text-shadow: 0 0 10px rgba(201,172,106,0.4); opacity: 0; animation: wgSigRise 1.2s ease both; } @media (max-width: 767px) { .wg-sig-wrap { display: none; } } @media (prefers-reduced-motion: reduce) { .wg-sig-ch, .wg-sig-rule, .wg-sig-diamond, .wg-sig-sub { animation: none; opacity: 1; } .wg-sig-rule { opacity: 0.6; } .wg-sig-diamond { opacity: 0.65; transform: rotate(45deg); } }" }} />
 
       {/* The living starfield is always present — it backs both the welcome

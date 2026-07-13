@@ -57,12 +57,26 @@ const WG_STYLES = `
   font-family:'Great Vibes',cursive;font-weight:400;
   font-size:clamp(3.8rem,13vw,8.2rem);line-height:1.05;letter-spacing:.005em;
   padding:.22em .1em .16em;
+  /* 2026-07-13 (per Reza — minimal theme support): this used to be a fixed
+     silver/white gradient (several literal #FFFFFF stops) — beautiful on a
+     dark background, functionally invisible on a light one (white text on
+     near-white ivory). Building it from var(--text-color) instead means it
+     keeps its exact current silvery shimmer on onyx/cyber (their
+     --text-color is already near-white) and automatically becomes a dark
+     shimmer on minimal (--text-color there is near-black) — same
+     technique, no separate light-mode gradient to maintain. */
   background:linear-gradient(96deg,
-    #5E6266 0%, #A9AFB6 16%, #FFFFFF 33%, #DCDFE3 45%,
-    #FFFFFF 57%, #9BA0A6 73%, #C7CBD0 87%, #5E6266 100%);
+    color-mix(in srgb, var(--text-color) 45%, transparent) 0%,
+    color-mix(in srgb, var(--text-color) 88%, var(--accent-color) 12%) 16%,
+    var(--text-color) 33%,
+    color-mix(in srgb, var(--text-color) 92%, transparent) 45%,
+    var(--text-color) 57%,
+    color-mix(in srgb, var(--text-color) 85%, var(--accent-color) 15%) 73%,
+    color-mix(in srgb, var(--text-color) 75%, transparent) 87%,
+    color-mix(in srgb, var(--text-color) 45%, transparent) 100%);
   background-size:280% 100%;background-position:20% 0;
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 1px 1px rgba(0,0,0,.5)) drop-shadow(0 0 9px rgba(220,223,227,.13));
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)) drop-shadow(0 0 9px rgba(var(--accent-rgb),.16));
   display:inline-block;
   animation:wgShimmer 7s ease-in-out 4300ms infinite;
 }
@@ -91,22 +105,26 @@ const WG_STYLES = `
   padding:15px 46px;border-radius:999px;
   font-family:'Inter',system-ui,sans-serif;font-size:.76rem;font-weight:500;
   letter-spacing:.32em;text-transform:uppercase;
-  color:#DCDFE3;background:rgba(255,255,255,.025);
-  border:1px solid rgba(200,162,76,.34);
+  /* 2026-07-13 (per Reza — "Enter button faded"): was a fixed light-gray
+     (#DCDFE3) on near-transparent white — invisible on a light surface.
+     var(--text-color)/accent-tinted glass now tracks whichever theme is
+     actually live. */
+  color:var(--text-color);background:rgba(var(--accent-rgb),.05);
+  border:1px solid rgba(var(--accent-rgb),.34);
   cursor:pointer;backdrop-filter:blur(6px);
   transition:.55s cubic-bezier(.22,1,.36,1);
 }
 .wg-btn::before{
   content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
-  background:radial-gradient(120% 150% at 50% 130%,rgba(200,162,76,.26),transparent 62%);
+  background:radial-gradient(120% 150% at 50% 130%,rgba(var(--accent-rgb),.26),transparent 62%);
   opacity:0;transition:opacity .55s cubic-bezier(.22,1,.36,1);
 }
 .wg-btn:hover{
-  color:#fff;border-color:rgba(200,162,76,.8);transform:translateY(-2px);
-  text-shadow:0 0 14px rgba(200,162,76,.45);box-shadow:0 0 26px -8px rgba(200,162,76,.5);
+  color:var(--accent-color);border-color:rgba(var(--accent-rgb),.8);transform:translateY(-2px);
+  text-shadow:0 0 14px rgba(var(--accent-rgb),.45);box-shadow:0 0 26px -8px rgba(var(--accent-rgb),.5);
 }
 .wg-btn:hover::before{ opacity:1 }
-.wg-btn:focus-visible{ outline:2px solid rgba(200,162,76,.85);outline-offset:3px }
+.wg-btn:focus-visible{ outline:2px solid rgba(var(--accent-rgb),.85);outline-offset:3px }
 
 @keyframes wgFadeUp{ from{opacity:0;transform:translateY(9px)} to{opacity:1;transform:translateY(0)} }
 

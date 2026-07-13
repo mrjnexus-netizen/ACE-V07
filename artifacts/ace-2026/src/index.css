@@ -346,6 +346,19 @@ button, a, [role="button"], [data-cursor] {
   pointer-events: none;
   background: radial-gradient(ellipse at center, transparent 46%, rgba(0, 0, 0, 0.55) 100%);
 }
+/* Reza (2026-07-13) — "gray oval halo" persisted even after raising the
+   admin panel's own z-index above this. Root cause: this vignette (and
+   the film-grain layer below) are pseudo-elements of <html> itself
+   (ChromaticContext sets data-theme directly on document.documentElement)
+   — a z-index fight is fragile to keep winning forever. Cleaner and more
+   robust: while the admin panel (.adm-shell) is mounted anywhere in the
+   document, these public-site-only decorative effects are switched off
+   entirely — they were never meant to be visible during an admin session
+   anyway. :has() is supported in every evergreen browser as of 2026. */
+html:has(.adm-shell)::before,
+html:has(.adm-shell)::after {
+  display: none !important;
+}
 
 /* Scroll reveal - progressive enhancement; content stays visible without support. */
 @keyframes ace-reveal {
@@ -667,19 +680,19 @@ html.lenis body { height: auto; }
   padding: 0.65rem 0.9rem;
   border-radius: 10px;
   font-size: 0.85rem;
-  color: var(--text-color, #F4F1EA);
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: #F4F1EA;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(212, 175, 55, 0.16);
   outline: none;
-  transition: border-color var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease), background-color var(--btn-slow) var(--btn-ease);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
 }
 .admin-login-input::placeholder {
-  color: var(--text-dim-color, #6B6862);
+  color: #6B6862;
 }
 .admin-login-input:focus {
-  border-color: rgba(var(--accent-rgb), 0.6);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12), 0 0 16px rgba(var(--accent-rgb), 0.2);
-  background: rgba(var(--accent-rgb), 0.04);
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12), 0 0 16px rgba(212, 175, 55, 0.2);
+  background: rgba(212, 175, 55, 0.06);
 }
 
 /* ============================================================
@@ -800,7 +813,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   width: 100%;
   margin-top: auto;
   padding: 3.25rem 1.5rem 2.5rem;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.35) 100%);
+  background: linear-gradient(180deg, transparent 0%, rgba(var(--surface-rgb, 8, 8, 8), 0.35) 100%);
   overflow: hidden;
 }
 /* soft luminous divider that fades toward both edges (no hard line) */
@@ -884,9 +897,9 @@ p, blockquote, figcaption, .text-wrap-pretty {
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--accent-rgb, 212, 175, 55), 0.04);
   border: 1px solid rgba(var(--accent-rgb, 212, 175, 55), 0.22);
-  color: rgba(233, 224, 200, 0.72);
+  color: var(--text-muted-color, rgba(233, 224, 200, 0.72));
   cursor: none;
   transition: color var(--btn-slow, 0.55s) var(--btn-ease, cubic-bezier(0.22, 1, 0.36, 1)),
     border-color var(--btn-slow, 0.55s) var(--btn-ease, cubic-bezier(0.22, 1, 0.36, 1)),
@@ -914,7 +927,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   pointer-events: none;
 }
 .ftr-icon:hover {
-  color: #fff;
+  color: var(--text-color, #fff);
   border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.7);
   transform: translateY(-3px);
 }
@@ -928,7 +941,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
 .ftr-copy {
   font-size: clamp(0.62rem, 1.1vw, 0.72rem);
   letter-spacing: 0.12em;
-  color: rgba(233, 224, 200, 0.38);
+  color: var(--text-dim-color, rgba(233, 224, 200, 0.38));
 }
 @media (prefers-reduced-motion: reduce) {
   .ftr-sig-name { animation: none; }
@@ -976,10 +989,60 @@ p, blockquote, figcaption, .text-wrap-pretty {
 
 .adm-shell {
   --adm-radius: 10px;
-  --adm-border: rgba(255, 255, 255, 0.08);
-  --adm-panel-bg: rgba(255, 255, 255, 0.025);
-  --adm-panel-bg-raised: rgba(255, 255, 255, 0.045);
+
+  /* Reza (2026-07-13): the admin panel gets its OWN warm ivory/gold
+     palette — independent of whichever theme (onyx/cyber/minimal) is live
+     on the public site. Achieved by overriding the SAME variable names
+     the whole admin system (and every tab built since, e.g. Ambient
+     Tracks, Business) already reads — --accent-color, --text-color, etc.
+     — scoped to .adm-shell only. Nothing outside this shell (the public
+     site's :root values) is touched, and nothing inside had to be
+     rewritten to pick it up. */
+  --surface-color: #17110A;
+  --text-color: #2A2013;
+  --text-muted-color: #6E5F45;
+  --text-dim-color: #A39371;
+  --accent-color: #A6790F;
+  --accent-rgb: 166, 121, 15;
+
+  --adm-bg: #F7F1E3;
+  --adm-border: rgba(107, 82, 38, 0.16);
+  --adm-panel-bg: #FFFFFF;
+  --adm-panel-bg-raised: #FFFCF4;
+  background: var(--adm-bg);
+  color: var(--text-color);
   font-feature-settings: "tnum" 1;
+
+  /* Root-cause fix (2026-07-13, per Reza — "gray oval halo suffocating
+     the page"): the public site's cinematic vignette/grain effects
+     ([data-theme="onyx"]::before / ::after, see further down this file)
+     are position:fixed, full-viewport, at z-index 9996/9997 — meant to
+     sit OVER the public site's own content. The admin panel previously
+     only had Tailwind's z-50, nowhere near high enough, so that dark
+     radial vignette rendered directly on top of this entire light theme.
+     !important is deliberate and narrow here: it's specifically to win
+     against a Tailwind utility class (z-50) that would otherwise still
+     apply from the JSX className, not a general escape hatch. */
+  z-index: 99999 !important;
+
+  /* Same reasoning, different symptom (per Reza — native <select>
+     dropdowns and the <audio> control rendering with a jarring black/dark
+     native UI): browsers pick native form-control chrome based on
+     color-scheme, and default to the OS/browser's dark mode if nothing
+     says otherwise. This forces every native control INSIDE the admin
+     panel — <select>'s open dropdown list, <audio controls>, checkboxes —
+     to use the browser's LIGHT native rendering, matching the rest of
+     this theme instead of clashing with it. */
+  color-scheme: light;
+
+  /* "Bookish" complaint (per Reza): var(--font-mono) elsewhere on the
+     site is a technical/code-style monospace — fine for the public site's
+     terminal-inspired labels, wrong register for a luxury admin tool.
+     Overriding it here (same variable name, so every .adm-* rule already
+     written against var(--font-mono) picks this up automatically) to a
+     clean, refined system sans — nothing new to load, no risk of a
+     missing web font flashing unstyled text. */
+  --font-mono: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* ---- shell chrome ---- */
@@ -989,7 +1052,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   justify-content: space-between;
   padding: 1.1rem 1.75rem;
   border-bottom: 1px solid var(--adm-border);
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9), rgba(247, 241, 227, 0.4));
 }
 .adm-header-title {
   font-family: var(--font-mono);
@@ -1009,7 +1072,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   height: 7px;
   border-radius: 50%;
   background: var(--accent-color);
-  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.8);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.55);
 }
 
 .adm-sidebar {
@@ -1021,6 +1084,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   flex-direction: column;
   gap: 1.25rem;
   overflow-y: auto;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 30%);
 }
 .adm-sidebar-section-label {
   font-family: var(--font-mono);
@@ -1031,6 +1095,8 @@ p, blockquote, figcaption, .text-wrap-pretty {
   padding: 0 0.6rem;
   margin-bottom: 0.4rem;
 }
+.adm-sidebar-group { display: flex; flex-direction: column; gap: 0.2rem; }
+.adm-sidebar-group + .adm-sidebar-group { margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px solid var(--adm-border); }
 
 .adm-visual-editor-btn {
   display: flex;
@@ -1049,7 +1115,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 .adm-visual-editor-btn:hover {
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.22), rgba(var(--accent-rgb), 0.08));
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.22), rgba(var(--accent-rgb), 0.1));
   border-color: rgba(var(--accent-rgb), 0.65);
   transform: translateY(-1px);
 }
@@ -1077,11 +1143,11 @@ p, blockquote, figcaption, .text-wrap-pretty {
   transition: background-color 0.18s ease, color 0.18s ease;
 }
 .adm-nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--accent-rgb), 0.06);
   color: var(--text-color);
 }
 .adm-nav-item--active {
-  background: rgba(var(--accent-rgb), 0.1);
+  background: rgba(var(--accent-rgb), 0.12);
   color: var(--accent-color);
   font-weight: 600;
 }
@@ -1114,6 +1180,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   border: 1px solid var(--adm-border);
   border-radius: 12px;
   padding: 1.25rem 1.4rem;
+  box-shadow: 0 1px 3px rgba(70, 50, 20, 0.05), 0 6px 20px rgba(70, 50, 20, 0.04);
 }
 .adm-panel--raised {
   background: var(--adm-panel-bg-raised);
@@ -1153,7 +1220,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
 .adm-select,
 .adm-textarea {
   width: 100%;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(107, 82, 38, 0.035);
   border: 1px solid var(--adm-border);
   border-radius: 8px;
   padding: 0.55rem 0.7rem;
@@ -1170,8 +1237,8 @@ p, blockquote, figcaption, .text-wrap-pretty {
 .adm-textarea:focus {
   outline: none;
   border-color: rgba(var(--accent-rgb), 0.55);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1);
-  background: rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+  background: #FFFFFF;
 }
 .adm-select {
   cursor: pointer;
@@ -1201,31 +1268,43 @@ p, blockquote, figcaption, .text-wrap-pretty {
   white-space: nowrap;
 }
 .adm-btn:active { transform: translateY(1px); }
-.adm-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+.adm-btn:disabled { opacity: 0.55; cursor: default; transform: none; }
 
 .adm-btn--primary {
-  background: var(--accent-color);
-  color: var(--surface-color);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 58%, #fff 42%), color-mix(in srgb, var(--accent-color) 90%, #000 10%));
+  color: #241A0C;
   font-weight: 600;
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.35), 0 1px 2px rgba(70, 50, 20, 0.15), inset 0 1px 0 rgba(255,255,255,0.35);
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
 }
-.adm-btn--primary:hover:not(:disabled) { filter: brightness(1.08); }
+.adm-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 0 26px rgba(var(--accent-rgb), 0.55), 0 2px 4px rgba(70, 50, 20, 0.18), inset 0 1px 0 rgba(255,255,255,0.4);
+  transform: translateY(-1px);
+}
 
 .adm-btn--ghost {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: var(--adm-border);
-  color: var(--text-muted-color);
+  background: rgba(var(--accent-rgb), 0.06);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  color: var(--text-color);
+  box-shadow: 0 1px 2px rgba(70, 50, 20, 0.06);
 }
 .adm-btn--ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text-color);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  color: var(--accent-color);
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.22);
 }
 
 .adm-btn--danger {
-  background: rgba(220, 90, 90, 0.14);
-  border-color: rgba(220, 90, 90, 0.4);
-  color: #E38B7A;
+  background: rgba(178, 58, 40, 0.09);
+  border-color: rgba(178, 58, 40, 0.4);
+  color: #A6371F;
 }
-.adm-btn--danger:hover:not(:disabled) { background: rgba(220, 90, 90, 0.22); }
+.adm-btn--danger:hover:not(:disabled) {
+  background: rgba(178, 58, 40, 0.16);
+  box-shadow: 0 0 12px rgba(178, 58, 40, 0.22);
+}
 
 .adm-btn--sm { padding: 0.4rem 0.75rem; font-size: 0.66rem; }
 
@@ -1249,7 +1328,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
 }
 .adm-badge--paid {
   color: var(--text-muted-color);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(107, 82, 38, 0.06);
   border: 1px solid var(--adm-border);
 }
 .adm-badge--limited {
@@ -1258,9 +1337,9 @@ p, blockquote, figcaption, .text-wrap-pretty {
   border: 1px solid rgba(var(--accent-rgb), 0.28);
 }
 .adm-badge--free {
-  color: #5FD98A;
-  background: rgba(95, 217, 138, 0.1);
-  border: 1px solid rgba(95, 217, 138, 0.3);
+  color: #2F8F52;
+  background: rgba(47, 143, 82, 0.1);
+  border: 1px solid rgba(47, 143, 82, 0.3);
 }
 
 /* ---- chip row (language switcher etc.) ---- */
@@ -1271,7 +1350,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.03em;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(107, 82, 38, 0.05);
   border: 1px solid var(--adm-border);
   color: var(--text-muted-color);
   cursor: pointer;
@@ -1281,7 +1360,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
 .adm-chip--active {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: var(--surface-color);
+  color: #FFFBF2;
   font-weight: 600;
 }
 
@@ -1295,7 +1374,7 @@ p, blockquote, figcaption, .text-wrap-pretty {
   width: 100%;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(107, 82, 38, 0.09);
   overflow: hidden;
 }
 .adm-progress-fill {
@@ -1305,16 +1384,18 @@ p, blockquote, figcaption, .text-wrap-pretty {
   transition: width 0.35s ease;
 }
 .adm-dropzone {
-  border: 1.5px dashed var(--adm-border);
+  border: 1.5px dashed rgba(var(--accent-rgb), 0.35);
   border-radius: 12px;
   padding: 2.5rem 1.5rem;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  background: rgba(var(--accent-rgb), 0.025);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 .adm-dropzone:hover {
-  border-color: rgba(var(--accent-rgb), 0.5);
-  background: rgba(var(--accent-rgb), 0.03);
+  border-color: rgba(var(--accent-rgb), 0.6);
+  background: rgba(var(--accent-rgb), 0.05);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.12);
 }
 .adm-track-row {
   display: flex;
@@ -1325,5 +1406,5 @@ p, blockquote, figcaption, .text-wrap-pretty {
   border-radius: 8px;
   transition: background-color 0.15s ease;
 }
-.adm-track-row:hover { background: rgba(255, 255, 255, 0.025); }
+.adm-track-row:hover { background: rgba(107, 82, 38, 0.035); }
 .adm-track-row:last-child { border-bottom: none; }
