@@ -7,7 +7,8 @@ import { useAudio } from '../context/AudioContext';
 import { apiPost, apiGet, apiPut, apiDelete } from '../lib/apiClient';
 import { usePipeline } from '../context/PipelineContext';
 import { useContent } from '../context/ContentContext';
-import type { ComposerIdentity, AudioTrack, MultiLingual } from '../types';
+import { FONTS_BY_LOCALE, loadGoogleFonts } from '../constants/fonts';
+import type { ComposerIdentity, AudioTrack, MultiLingual, Locale } from '../types';
 
 // ---------- shared helpers ----------
 const emptyMultiLingual = (): MultiLingual => ({ en: '', es: '', fr: '', zh: '', ja: '', ko: '' });
@@ -2885,6 +2886,131 @@ const AmbientTrackRow = ({ trackKey, label, defaultUrl }: { trackKey: string; la
   );
 };
 
+// ---------- Fonts (2026-07-13, per Reza) ----------
+// A per-language drawer: which of the curated fonts (constants/fonts.ts)
+// actually show up in EditableText's font picker for that language.
+// Stored as a JSON array of family names under content_entries key
+// 'enabled-fonts', one row per locale — reusing the same generic system
+// everything else in admin already uses, no new table.
+const FontsLanguageSection = ({ localeCode, label }: { localeCode: Locale; label: string }) => {
+  const { resolve, save } = useContent();
+  const [open, setOpen] = useState(false);
+  const [enabled, setEnabled] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const catalog = FONTS_BY_LOCALE[localeCode] ?? [];
+
+  useEffect(() => {
+    if (!open || loaded) return;
+    const raw = resolve('enabled-fonts', localeCode);
+    if (raw) {
+      try {
+        setEnabled(new Set(JSON.parse(raw) as string[]));
+      } catch {
+        setEnabled(new Set(catalog.map((f) => f.family))); // corrupt value — fall back to "everything on"
+      }
+    } else {
+      setEnabled(new Set(catalog.map((f) => f.family))); // nothing configured yet — default to all enabled
+    }
+    setLoaded(true);
+    // Loading each font's actual weight so the checkbox row previews in
+    // its own typeface — genuinely helps pick, not just a name in a list.
+    loadGoogleFonts(catalog.map((f) => f.family));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, loaded]);
+
+  const toggle = (family: string) => {
+    setEnabled((prev) => {
+      const next = new Set(prev);
+      if (next.has(family)) next.delete(family);
+      else next.add(family);
+      return next;
+    });
+  };
+
+  const persist = async () => {
+    setSaving(true);
+    try {
+      await save('enabled-fonts', localeCode, 'text', JSON.stringify(Array.from(enabled)));
+    } catch (err) {
+      console.error('Failed to save enabled fonts:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      borderRadius: 14, marginBottom: 10, overflow: 'hidden',
+      border: '1px solid rgba(var(--accent-rgb),0.16)',
+      background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.05), rgba(255,255,255,0.015))',
+    }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '14px 18px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color)',
+        }}
+      >
+        <span style={{ fontWeight: 600 }}>{label}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={BIZ_BADGE('rgba(var(--accent-rgb),0.12)', 'var(--accent-color)')}>
+            {catalog.length} fonts
+          </span>
+          <span style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', opacity: 0.6 }}>▾</span>
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: '0 18px 18px' }}>
+          {!loaded ? (
+            <div style={{ opacity: 0.6, fontSize: '0.82rem' }}>Loading…</div>
+          ) : (
+            <>
+              <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                {catalog.map((f) => (
+                  <label
+                    key={f.family}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8,
+                      cursor: 'pointer', background: enabled.has(f.family) ? 'rgba(var(--accent-rgb),0.06)' : 'transparent',
+                    }}
+                  >
+                    <input type="checkbox" checked={enabled.has(f.family)} onChange={() => toggle(f.family)} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted-color)' }}>{f.family}</div>
+                      <div style={{ fontFamily: `'${f.family}', inherit`, fontSize: '1.15rem', lineHeight: 1.3, marginTop: 2 }}>
+                        {f.note}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <button type="button" style={AMBIENT_BTN_NEON} onClick={persist} disabled={saving}>
+                {saving ? 'Saving\u2026' : 'Save'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TabFonts = () => (
+  <div>
+    <h2 className="adm-section-title">Fonts</h2>
+    <p style={{ opacity: 0.7, marginBottom: 20, fontSize: '0.85rem' }}>
+      Choose which curated fonts show up in the font picker (inside any text's Edit toolbar) for each language.
+      Nothing selected here yet means every curated font is available by default — narrowing this down just
+      keeps the picker focused on what you actually want offered.
+    </p>
+    {locales.map((l) => (
+      <FontsLanguageSection key={l} localeCode={l} label={localeLabels[l]!} />
+    ))}
+  </div>
+);
+
 const TabAmbientTracks = () => (
   <div>
     <h2 className="adm-section-title">Ambient Tracks</h2>
@@ -4045,6 +4171,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
       tabs: [
         { id: 1, label: 'Identity Matrix' },
         { id: 7, label: 'Ambient Tracks' },
+        { id: 10, label: 'Fonts' },
       ],
     },
     {
@@ -4130,6 +4257,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
                 {activeTab === 7 && <TabAmbientTracks />}
                 {activeTab === 8 && <TabBusiness />}
                 {activeTab === 9 && <TabSecurity />}
+                {activeTab === 10 && <TabFonts />}
               </motion.div>
             </AnimatePresence>
           </div>

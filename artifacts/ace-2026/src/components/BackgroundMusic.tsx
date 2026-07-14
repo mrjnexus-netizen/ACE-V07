@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAudio } from '../context/AudioContext';
 import { useIdentity } from '../context/IdentityContext';
 import { useContent } from '../context/ContentContext';
+import type { Locale } from '../types';
 
 const BG_VOLUME = 0.5; // 50% ceiling (per request)
 const FADE_MS = 1200;
@@ -32,7 +33,7 @@ const SUPPORTED = ['en', 'es', 'fr', 'ja', 'zh', 'ko'] as const;
 // locale nothing has been uploaded for yet. Same two-tier
 // override-then-default pattern EditableText/EditableImage already use
 // everywhere else on the site — nothing new invented here.
-function bgSrcFor(locale: string | null, resolve: (key: string, locale: string) => string | null): string | null {
+function bgSrcFor(locale: string | null, resolve: (key: string, locale: Locale) => string | null): string | null {
   if (!locale) return null;
   const l = (SUPPORTED as readonly string[]).includes(locale) ? locale : 'en';
   const override = resolve(`ambient-track-${l}`, 'en');
