@@ -2997,6 +2997,239 @@ const FontsLanguageSection = ({ localeCode, label }: { localeCode: Locale; label
   );
 };
 
+// 2026-07-14 (per Reza) — the optional fullscreen page shown right after
+// language selection, before MainApp. Admin fully controls: on/off, and
+// whatever's being promoted (video, banner, poster, upcoming track —
+// literally any image or video). Stored via the same content_entries
+// mechanism as everything else — no new table. mediaUrl is saved as type
+// 'link' (just a URL either way; ContentType has no separate 'video'
+// variant) — mediaType is what actually tells the frontend how to render it.
+const TabPromoScreen = () => {
+  const { resolve, save } = useContent();
+  const [enabled, setEnabled] = useState(false);
+  const [mediaType, setMediaType] = useState<'video' | 'image'>('image');
+  const [imageDurationSeconds, setImageDurationSeconds] = useState(10);
+  const [savedMediaUrl, setSavedMediaUrl] = useState<string | null>(null);
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [stagedPreviewUrl, setStagedPreviewUrl] = useState<string | null>(null);
+  const [savedEnabled, setSavedEnabled] = useState(false);
+  const [savedMediaType, setSavedMediaType] = useState<'video' | 'image'>('image');
+  const [savedImageDurationSeconds, setSavedImageDurationSeconds] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const en = resolve('promoScreen.enabled', 'en') === 'true';
+    const mt = resolve('promoScreen.mediaType', 'en');
+    const resolvedType = mt === 'video' || mt === 'image' ? mt : 'image';
+    setEnabled(en);
+    setSavedEnabled(en);
+    setMediaType(resolvedType);
+    setSavedMediaType(resolvedType);
+    const durRaw = resolve('promoScreen.imageDurationSeconds', 'en');
+    const dur = durRaw ? Number(durRaw) : 10;
+    const safeDur = Number.isFinite(dur) && dur > 0 ? dur : 10;
+    setImageDurationSeconds(safeDur);
+    setSavedImageDurationSeconds(safeDur);
+    setSavedMediaUrl(resolve('promoScreen.mediaUrl', 'en'));
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Revoke the local object URL when it's replaced/unmounted (avoids leaking).
+  useEffect(() => {
+    return () => { if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl); };
+  }, [stagedPreviewUrl]);
+
+  const dirty = enabled !== savedEnabled || mediaType !== savedMediaType || imageDurationSeconds !== savedImageDurationSeconds || !!stagedFile;
+  const displayUrl = stagedPreviewUrl ?? savedMediaUrl;
+
+  const chooseFile = (file: File) => {
+    if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl);
+    setStagedFile(file);
+    setStagedPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearStagedOrSaved = () => {
+    if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl);
+    setStagedFile(null);
+    setStagedPreviewUrl(null);
+    setSavedMediaUrl(null);
+  };
+
+  // The ONE action that actually persists anything — uploads the staged
+  // file first (if there is one), then saves enabled + mediaType +
+  // mediaUrl together. Nothing else on this screen saves by itself
+  // (2026-07-14, per Reza: was three separate save-ish actions before —
+  // confusing; now exactly one).
+  const submit = async () => {
+    setSaving(true);
+    setNotice(null);
+    try {
+      let finalUrl = savedMediaUrl ?? '';
+      if (stagedFile) {
+        const form = new FormData();
+        form.append('media', stagedFile, stagedFile.name);
+        form.append('entity_type', 'content');
+        form.append('entity_id', 'promoScreen.mediaUrl');
+        const asset = await apiPost<{ url: string }>('/api/media/upload', form);
+        finalUrl = asset.url;
+      }
+      await save('promoScreen.enabled', 'en', 'text', enabled ? 'true' : 'false');
+      await save('promoScreen.mediaType', 'en', 'text', mediaType);
+      await save('promoScreen.imageDurationSeconds', 'en', 'text', String(imageDurationSeconds));
+      await save('promoScreen.mediaUrl', 'en', 'link', finalUrl);
+
+      if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl);
+      setStagedFile(null);
+      setStagedPreviewUrl(null);
+      setSavedMediaUrl(finalUrl || null);
+      setSavedEnabled(enabled);
+      setSavedMediaType(mediaType);
+      setSavedImageDurationSeconds(imageDurationSeconds);
+      setNotice('Saved.');
+    } catch {
+      setNotice('Save failed — try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>Loading…</div>;
+
+  return (
+    <div>
+      <h2 className="adm-section-title">Promo Screen</h2>
+      <p style={{ opacity: 0.7, marginBottom: 20, fontSize: '0.85rem' }}>
+        An optional fullscreen page shown right after a visitor picks a language, before they reach the main site.
+        Off by default until you turn it on. A video plays for its own length; an image shows for 5 seconds. Visitors
+        can always tap Skip.
+      </p>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button
+          type="button"
+          onClick={() => setEnabled((v) => !v)}
+          style={{
+            width: 44, height: 24, borderRadius: 999, position: 'relative',
+            background: enabled ? 'var(--accent-color)' : 'rgba(255,255,255,0.15)',
+            transition: 'background 0.2s ease', border: 'none', cursor: 'pointer', flexShrink: 0,
+          }}
+          aria-pressed={enabled}
+        >
+          <span style={{
+            position: 'absolute', top: 3, left: enabled ? 23 : 3, width: 18, height: 18, borderRadius: '50%',
+            background: '#fff', transition: 'left 0.2s ease',
+          }} />
+        </button>
+        <span style={{ fontWeight: 600 }}>{enabled ? 'Promo screen is ON' : 'Promo screen is OFF'}</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {(['image', 'video'] as const).map((mt) => (
+          <button
+            key={mt}
+            type="button"
+            className="adm-btn"
+            style={mediaType === mt ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent-color)' } : undefined}
+            onClick={() => setMediaType(mt)}
+          >
+            {mt === 'image' ? 'Image' : 'Video'}
+          </button>
+        ))}
+      </div>
+
+      {mediaType === 'image' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <label style={{ fontSize: '0.8rem', opacity: 0.8 }}>Display duration</label>
+          <input
+            type="number"
+            min={1}
+            max={120}
+            value={imageDurationSeconds}
+            onChange={(e) => setImageDurationSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)))}
+            style={{
+              width: 64, padding: '4px 8px', borderRadius: 8, fontSize: '0.85rem', textAlign: 'center',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-color)',
+            }}
+          />
+          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>seconds</span>
+        </div>
+      )}
+
+      <div style={{
+        padding: 20, borderRadius: 14, marginBottom: 20,
+        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.05), rgba(255,255,255,0.015))',
+        border: '1px solid rgba(var(--accent-rgb),0.14)', maxWidth: 480,
+      }}>
+        {displayUrl ? (
+          <div>
+            {mediaType === 'video' ? (
+              <video src={displayUrl} controls style={{ width: '100%', borderRadius: 10, marginBottom: 12 }} />
+            ) : (
+              <img src={displayUrl} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 12 }} />
+            )}
+            {stagedFile && (
+              <div style={{ fontSize: '0.72rem', color: 'var(--accent-color)', marginBottom: 8 }}>
+                New file staged — press Save &amp; Submit below to upload it.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => fileInputRef.current?.click()}>
+                Choose different {mediaType === 'video' ? 'video' : 'image'}
+              </button>
+              <button type="button" style={AMBIENT_BTN_GHOST} onClick={clearStagedOrSaved}>
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            style={AMBIENT_BTN_NEON}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {`Choose ${mediaType === 'video' ? 'a video' : 'an image'}`}
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={mediaType === 'video' ? 'video/*' : 'image/*'}
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) chooseFile(file);
+            e.target.value = '';
+          }}
+        />
+      </div>
+
+      {/* The ONE save action for this whole screen. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!dirty || saving}
+          style={{
+            padding: '6px 16px', borderRadius: 999, fontSize: '0.75rem', letterSpacing: '0.04em',
+            fontWeight: 600, cursor: dirty && !saving ? 'pointer' : 'default',
+            background: dirty ? 'linear-gradient(135deg, var(--accent-color), var(--accent2-color, var(--accent-color)))' : 'rgba(255,255,255,0.08)',
+            color: dirty ? 'var(--surface-color)' : 'rgba(255,255,255,0.4)',
+            border: 'none', transition: 'opacity 0.15s ease', opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {saving ? 'Saving…' : 'Save & Submit'}
+        </button>
+        {dirty && !saving && <span style={{ fontSize: '0.72rem', opacity: 0.55 }}>Unsaved changes</span>}
+        {notice && <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>{notice}</span>}
+      </div>
+    </div>
+  );
+};
+
 const TabFonts = () => (
   <div>
     <h2 className="adm-section-title">Fonts</h2>
@@ -4358,6 +4591,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
         { id: 1, label: 'Identity Matrix' },
         { id: 7, label: 'Ambient Tracks' },
         { id: 10, label: 'Fonts' },
+        { id: 11, label: 'Promo Screen' },
       ],
     },
     {
@@ -4444,6 +4678,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
                 {activeTab === 8 && <TabBusiness />}
                 {activeTab === 9 && <TabSecurity />}
                 {activeTab === 10 && <TabFonts />}
+                {activeTab === 11 && <TabPromoScreen />}
               </motion.div>
             </AnimatePresence>
           </div>

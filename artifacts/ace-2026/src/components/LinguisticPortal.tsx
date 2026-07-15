@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useIdentity } from '../context/IdentityContext';
@@ -7,6 +8,7 @@ import { useChromatic } from '../context/ChromaticContext';
 import { useContent } from '../context/ContentContext';
 import PortalCursor from './PortalCursor';
 import PortalComposer from './PortalComposer';
+import PromoScreen from './PromoScreen';
 import LiquidSeam, { type SeamPin } from './LiquidSeam';
 import WelcomeGate from './WelcomeGate';
 import ScaleStage from './ScaleStage';
@@ -56,6 +58,7 @@ function getDefaultStarColor(): string {
 }
 
 const SELECT_TRANSITION_MS = 2560; // cover -> light rake -> melt into site tone, then cross over
+const PROMO_EXIT_TRANSITION_MS = 1100; // 2026-07-14 (per Reza): shorter than the entry transition
 
 // ─────────────────────────────────────────────────────────────────────────
 // Image-based headstock (luxury crystal headstock PNG). SVG viewBox 0 0 160 90.
@@ -830,6 +833,8 @@ export const LinguisticPortal = () => {
   // clicks Enter — by then content data has had time to load, and start()
   // only ever runs once anyway (autoplay policy gates it on that click).
   const { resolve: resolveAmbientOverride } = useContent();
+  const [promoConfig, setPromoConfig] = useState<{ mediaType: 'video' | 'image'; mediaUrl: string; durationMs?: number } | null>(null);
+  const [exitingPromoToSite, setExitingPromoToSite] = useState(false);
   const ambientGainRef = useRef<GainNode | null>(null);
   const ambientActxRef = useRef<AudioContext | null>(null);
 
@@ -1001,6 +1006,11 @@ export const LinguisticPortal = () => {
     starHoverRef.current = 0;
   }, []);
 
+  const goToMainApp = useCallback((langCode: string) => {
+    setLocale(langCode as any);
+    document.documentElement.setAttribute('lang', langCode);
+  }, [setLocale]);
+
   const handleLanguageSelect = useCallback((langCode: string) => {
     if (selectedLang) return;
     setSelectedLang(langCode);          // drives the treble-clef transition overlay (CSS)
@@ -1009,11 +1019,35 @@ export const LinguisticPortal = () => {
     applyLanguageWorld(langCode as any);
     // navigate once the clef has written itself and we've dived into its spiral
     window.setTimeout(() => {
-      setLocale(langCode as any);
-      document.documentElement.setAttribute('lang', langCode);
-      window.location.hash = '/app';
+      // 2026-07-14 (per Reza — optional promo screen, and the actual bug
+      // fix for it): MainApp swaps away from LinguisticPortal the INSTANT
+      // `locale` becomes non-null (see MainApp.tsx: `if (!locale) return
+      // <LinguisticPortal/>`) — window.location.hash here was always
+      // inert (AppRouter uses BrowserRouter, not hash routing; confirmed,
+      // not guessed). So calling setLocale immediately was racing away
+      // from this component before any promo screen could ever paint.
+      // Fix: only call setLocale right away when there's no promo screen
+      // to show; otherwise defer it to PromoScreen's onDone.
+      const enabled = resolveAmbientOverride('promoScreen.enabled', 'en') === 'true';
+      const mediaType = resolveAmbientOverride('promoScreen.mediaType', 'en');
+      const mediaUrl = resolveAmbientOverride('promoScreen.mediaUrl', 'en');
+      const durationSecondsRaw = resolveAmbientOverride('promoScreen.imageDurationSeconds', 'en');
+      const durationMs = durationSecondsRaw ? Number(durationSecondsRaw) * 1000 : undefined;
+      if (enabled && mediaUrl && (mediaType === 'video' || mediaType === 'image')) {
+        setPromoConfig({ mediaType, mediaUrl, durationMs: Number.isFinite(durationMs) ? durationMs : undefined });
+      } else {
+        goToMainApp(langCode);
+      }
     }, SELECT_TRANSITION_MS);
-  }, [selectedLang, setLocale, playMicroTone, applyLanguageWorld]);
+  }, [selectedLang, playMicroTone, applyLanguageWorld, resolveAmbientOverride, goToMainApp]);
+
+  // Once the promo->site mesh-wipe starts, actually navigate after it's
+  // had time to play (same duration as the language-pick transition).
+  useEffect(() => {
+    if (!exitingPromoToSite || !selectedLang) return;
+    const id = window.setTimeout(() => goToMainApp(selectedLang), PROMO_EXIT_TRANSITION_MS);
+    return () => window.clearTimeout(id);
+  }, [exitingPromoToSite, selectedLang, goToMainApp]);
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
@@ -1026,6 +1060,34 @@ export const LinguisticPortal = () => {
 
       {/* Cinematic entry curtain, shown on every load before the portal. */}
       {!entered && <WelcomeGate onEnter={handleEnter} />}
+      {promoConfig && !exitingPromoToSite && (
+        <PromoScreen
+          mediaType={promoConfig.mediaType}
+          mediaUrl={promoConfig.mediaUrl}
+          durationMs={promoConfig.durationMs}
+          onDone={() => setExitingPromoToSite(true)}
+        />
+      )}
+      {/* Promo -> site transition (2026-07-14, per Reza): a soft luxury
+          color fade in the just-picked language's tint, not a reused
+          MeshWipe — reusing that canvas/triangulation animation for a
+          second, independently-triggered mount proved unreliable (its
+          own canvas never actually got created on exit, confirmed via
+          DevTools instrumentation, not guessed) after several attempts.
+          A plain opacity fade can never get stuck mid-animation. */}
+      {exitingPromoToSite && selectedLang && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 1, 1, 0] }}
+          transition={{ duration: PROMO_EXIT_TRANSITION_MS / 1000, times: [0, 0.35, 0.65, 1], ease: 'easeInOut' }}
+          className="fixed inset-0"
+          style={{
+            zIndex: 200,
+            pointerEvents: 'none',
+            background: `radial-gradient(ellipse at center, ${LANGUAGE_MESH[selectedLang] || '#F3D77E'}22 0%, #08080a 70%)`,
+          }}
+        />
+      )}
 
       {/* Language portal — fades in only after the user clicks Enter. */}
       <div
