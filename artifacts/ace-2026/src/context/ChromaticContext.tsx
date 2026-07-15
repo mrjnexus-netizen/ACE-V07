@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { loadGoogleFonts } from '../constants/fonts';
 
 type ThemeId = 'onyx' | 'cyber' | 'minimal';
 type Locale = 'en' | 'es' | 'fr' | 'zh' | 'ja' | 'ko';
@@ -86,6 +87,35 @@ const GENRE_SOULS: Record<string, string> = {
   animation: '#9B5CFF',
 };
 
+// 2026-07-14 (per Reza — full per-language typography, not just color):
+// applyLocaleTypography was referenced in the project's own planning doc as
+// already existing — it didn't; this is the actual first implementation.
+// Each language gets a real DISPLAY font (headings/signature moments),
+// pulled straight from the exact same verified-on-Google-Fonts catalog
+// built for the admin font picker (src/constants/fonts.ts) — specifically
+// each language's 'Luxury'/'Formal'-tagged entry, to match this project's
+// established taste rather than picking something new. English keeps the
+// site's current, already-approved identity type unchanged.
+const LOCALE_DISPLAY_FONT: Record<Locale, string> = {
+  en: "'Cormorant Garamond', 'Playfair Display', serif", // unchanged — the site's existing identity type
+  es: "'Vidaloka', 'Playfair Display', serif",            // 'Luxury and Aristocratic' in fonts.ts
+  fr: "'Bodoni Moda', 'Playfair Display', serif",          // 'Ultra Luxury and Fashion' in fonts.ts
+  ja: "'Noto Serif JP', 'Cormorant Garamond', serif",      // 'Luxury and Aesthetic' in fonts.ts
+  ko: "'Noto Serif KR', 'Cormorant Garamond', serif",      // 'Luxury and Traditional' in fonts.ts
+  zh: "'ZCOOL XiaoWei', 'Cormorant Garamond', serif",      // 'Luxury and Elegant' in fonts.ts
+};
+
+// The one Google Fonts family name actually needed per locale (for
+// loadGoogleFonts — English needs nothing new, Cormorant/Playfair are
+// already loaded sitewide by default).
+const LOCALE_FONT_FAMILY_TO_LOAD: Partial<Record<Locale, string>> = {
+  es: 'Vidaloka',
+  fr: 'Bodoni Moda',
+  ja: 'Noto Serif JP',
+  ko: 'Noto Serif KR',
+  zh: 'ZCOOL XiaoWei',
+};
+
 // Apply theme synchronously before React renders - prevents flash.
 function applyThemeSync(theme: ThemeId): void {
   const vars = THEME_VARIABLES[theme] ?? THEME_VARIABLES.onyx!;
@@ -101,7 +131,9 @@ function applyThemeSync(theme: ThemeId): void {
   root.setAttribute('data-theme', theme);
 }
 
-// Apply a per-language color world on top of the active base theme (Layer B).
+// Apply a per-language color world on top of the active base theme (Layer B),
+// AND this language's display typography (2026-07-14, per Reza — this is
+// the actual first wiring of "full per-language theming", not just color).
 function applyLanguageWorldVars(locale: Locale, themeId: ThemeId): void {
   const world = LANGUAGE_WORLDS[locale];
   if (!world) return;
@@ -116,6 +148,11 @@ function applyLanguageWorldVars(locale: Locale, themeId: ThemeId): void {
     if (world.surfaceRgb) root.style.setProperty('--surface-rgb', world.surfaceRgb);
   }
   root.setAttribute('data-language-world', locale);
+
+  const displayFont = LOCALE_DISPLAY_FONT[locale];
+  root.style.setProperty('--font-display', displayFont);
+  const familyToLoad = LOCALE_FONT_FAMILY_TO_LOAD[locale];
+  if (familyToLoad) loadGoogleFonts([familyToLoad]);
 }
 
 // 2026-07-13 (per Reza): theme-switching removed entirely — onyx is now
