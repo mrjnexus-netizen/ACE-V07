@@ -1,12 +1,16 @@
 import { useLayoutEffect, useRef } from 'react';
 
 /**
- * useBalancedText v4 (wgBalance-v4) — deterministic tidy paragraphs in EVERY
+ * useBalancedText v5 (wgBalance-v5) — deterministic tidy paragraphs in EVERY
  * browser, desktop and mobile:
  *
- *   1. text-align: justify  -> every line's LEFT and RIGHT edges are flush
- *      (the direct cure for ragged "aghab-jolo" line endings). Applied here
- *      in JS so no call-site style object can accidentally omit it.
+ *   1. text-align (justify by default, 'center' opt-in via the align
+ *      param — 2026-07-14 per Reza: a sitewide switch to 'center' broke
+ *      several paragraphs that were correct with 'justify' — About's bio
+ *      copy, the Cinema/Ambiant concept captions. Only ONE call site
+ *      (TrackCaption, the carousel's focus caption) actually needed
+ *      centering; every other caller keeps the original justify behavior
+ *      by not passing this param).
  *   2. binary-searched max-width -> the LAST line is never a lonely widow
  *      word: the block is narrowed to the tightest width that keeps the
  *      natural line count, spreading words evenly onto the final line.
@@ -23,7 +27,7 @@ import { useLayoutEffect, useRef } from 'react';
  *   - Sets data-wg-balance="v3" on the element so it is VERIFIABLE in
  *     DevTools that the hook really ran on the deployed build.
  */
-export function useBalancedText<T extends HTMLElement>() {
+export function useBalancedText<T extends HTMLElement>(align: 'justify' | 'center' = 'justify') {
   const ref = useRef<T | null>(null);
   // Reza (2026-07-12) — Performance profile showed balanceNow() at 25.5%
   // of total main-thread time, with Range.getClientRects() (its
@@ -41,7 +45,7 @@ export function useBalancedText<T extends HTMLElement>() {
 
   // Re-assert after every single render/commit — but cheaply (see above).
   useLayoutEffect(() => {
-    balanceNow(ref.current, cacheRef);
+    balanceNow(ref.current, cacheRef, align);
   });
 
   // One-time listeners: fonts, resizes.
@@ -51,7 +55,7 @@ export function useBalancedText<T extends HTMLElement>() {
     let raf = 0;
     const schedule = () => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => balanceNow(ref.current, cacheRef, true));
+      raf = requestAnimationFrame(() => balanceNow(ref.current, cacheRef, align, true));
     };
 
     // Re-run once all webfonts are in (the v2 killer).
@@ -86,15 +90,17 @@ export function useBalancedText<T extends HTMLElement>() {
 function balanceNow(
   el: HTMLElement | null,
   cacheRef: { current: { key: string; maxWidth: string } | null },
+  align: 'justify' | 'center',
   forceRecompute = false
 ) {
   if (!el || typeof document === 'undefined') return;
   const parent = el.parentElement;
   if (!parent) return;
 
-  // 1) Flush both edges — deterministic, zero browser dependence.
-  el.style.textAlign = 'justify';
-  // keep the very last line natural (browser default: start-aligned)
+  // 1) Center (opt-in) or justify (default) — see the top-of-file note on
+  // why this is a per-call-site choice, not a global default.
+  el.style.textAlign = align;
+  el.dataset.wgBalance = 'v5';
   el.dataset.wgBalance = 'v4';
 
   // offsetWidth = LAYOUT pixels, immune to ancestor transform:scale().

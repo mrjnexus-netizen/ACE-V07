@@ -148,12 +148,15 @@ function playNote(freq: number) {
 // One track card's caption, balanced independently (each card needs its own
 // hook instance — cannot call useBalancedText conditionally inside a .map).
 function TrackCaption({ text }: { text: string }) {
-  const ref = useBalancedText<HTMLParagraphElement>();
-  // marginLeft/Right auto: the balance hook narrows this block's max-width,
-  // and a narrowed block otherwise hugs its parent's LEFT edge — which read
-  // as the caption "bunching to one side" under the carousel's focus card.
+  const ref = useBalancedText<HTMLParagraphElement>('center');
+  // marginLeft/Right auto centers this block within its parent, but that
+  // alone does NOT center the text lines inside it — without
+  // textAlign:'center' too, multi-line text still wraps ragged-left
+  // starting from the (now-centered) block's own left edge, which is
+  // exactly what read as the caption "bunching to one side" under the
+  // carousel's centered focus card (2026-07-14, per Reza).
   return (
-    <p ref={ref} className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)', marginLeft: 'auto', marginRight: 'auto' }}>
+    <p ref={ref} className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)', marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' }}>
       {text}
     </p>
   );
