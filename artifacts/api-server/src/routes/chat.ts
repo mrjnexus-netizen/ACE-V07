@@ -4,18 +4,22 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 
 import { db } from '../db/db';
-import { apiKeys, tracks } from '../db/schema';
+import { apiKeys, chatLogs, tracks } from '../db/schema';
 import { decrypt } from '../services/encryptionService';
 import { sendError, sendSuccess } from '../utils/response';
 
 const router: Router = Router();
 
-const SYSTEM_PROMPT = `You are the ACE Studio Manager, the executive AI concierge for an elite international film and media composer's studio.
+function buildSystemPrompt(locale: string): string {
+  const languageName = LOCALE_LANGUAGE_NAME[locale] ?? 'English';
+  return `You are the ACE Studio Manager, the executive AI concierge for an elite international film and media composer's studio.
 Your role:
 - Answer questions about the composer's portfolio, style, and available tracks in a confident, concise, professional tone.
 - When the user's intent matches the mood, genre, or use-case of an available track, recommend ONE track and reference it by its EXACT English title so the client can play it.
 - If the user wants to commission work, invite them to submit a brief (they can type "brief" or "project").
-Never invent tracks that are not in the provided list. Keep every reply under 80 words.`;
+Never invent tracks that are not in the provided list. Keep every reply under 80 words.
+Respond in ${languageName} \u2014 the site is currently set to ${languageName}, and the reply is shown to the visitor as-is (not machine-translated afterward), so it must read naturally in that language.`;
+}
 
 // All routes are Zod-validated (security checklist requirement).
 const chatSchema = z.object({
@@ -30,7 +34,26 @@ const chatSchema = z.object({
     .max(20)
     .optional()
     .default([]),
+  // 2026-07-14 (per Reza — bug fix): the frontend has always sent this;
+  // it was silently stripped here (not in the schema), so GPT-4o always
+  // replied in English no matter what language the site was in.
+  locale: z.enum(['en', 'es', 'fr', 'zh', 'ja', 'ko']).optional().default('en'),
+  // 2026-07-14 (per Reza — persisted chat logs for the admin Business
+  // tab): generated once per widget session on the frontend, sent with
+  // every turn so this route can upsert the SAME row rather than needing
+  // a separate "save conversation" call — a log exists even if the
+  // visitor never explicitly submits anything.
+  conversationId: z.string().min(1).max(100).optional(),
 });
+
+const LOCALE_LANGUAGE_NAME: Record<string, string> = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  zh: 'Simplified Chinese',
+  ja: 'Japanese',
+  ko: 'Korean',
+};
 
 /**
  * Retrieves and decrypts the LLM key from the DB at runtime.
@@ -108,13 +131,38 @@ function heuristicReply(
   };
 }
 
+/**
+ * Upserts the full-so-far transcript into chat_logs, keyed by
+ * conversationId. Fire-and-forget by design (callers `void` this) — a
+ * logging failure must never delay or break the actual chat response.
+ */
+async function persistChatLog(
+  conversationId: string | undefined,
+  locale: string,
+  messages: Array<{ role: string; text: string; timestamp: string }>,
+): Promise<void> {
+  if (!conversationId) return;
+  try {
+    await db
+      .insert(chatLogs)
+      .values({ conversationId, locale, messages })
+      .onConflictDoUpdate({
+        target: chatLogs.conversationId,
+        set: { messages, locale, updatedAt: new Date() },
+      });
+  } catch (err) {
+    console.error('[chat] Failed to persist chat log (non-fatal):', err);
+  }
+}
+
 // POST /api/chat â€” public endpoint. Works WITH or WITHOUT an LLM key. Never 500s on a missing key.
 router.post('/', async (req: Request, res: Response) => {
   const parsed = chatSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, parsed.error.issues[0]?.message ?? 'Invalid request', 'VALIDATION_ERROR', 400);
   }
-  const { message, history } = parsed.data;
+  const { message, history, locale, conversationId } = parsed.data;
+  const nowIso = new Date().toISOString();
 
   let ctx: TrackContext[] = [];
   try {
@@ -128,7 +176,13 @@ router.post('/', async (req: Request, res: Response) => {
 
   // Degraded mode: no key (or demo) -> clean, helpful response, no crash.
   if (!apiKey || isDemo) {
-    return sendSuccess(res, { ...heuristicReply(message, ctx), degraded: true });
+    const heuristic = heuristicReply(message, ctx);
+    void persistChatLog(conversationId, locale, [
+      ...history.map((m) => ({ role: m.role, text: m.text, timestamp: nowIso })),
+      { role: 'user', text: message, timestamp: nowIso },
+      { role: 'bot', text: heuristic.reply, timestamp: nowIso },
+    ]);
+    return sendSuccess(res, { ...heuristic, degraded: true });
   }
 
   // Premium mode: real GPT-4o with conversation history + live portfolio context.
@@ -149,7 +203,7 @@ router.post('/', async (req: Request, res: Response) => {
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(locale) },
         ...priorTurns,
         { role: 'user', content: `Available tracks:\n${tracksContext}\n\nUser: ${message}` },
       ],
@@ -165,11 +219,23 @@ router.post('/', async (req: Request, res: Response) => {
       }
     }
 
+    void persistChatLog(conversationId, locale, [
+      ...history.map((m) => ({ role: m.role, text: m.text, timestamp: nowIso })),
+      { role: 'user', text: message, timestamp: nowIso },
+      { role: 'bot', text: reply, timestamp: nowIso },
+    ]);
+
     return sendSuccess(res, { reply, trackRecommendation, degraded: false });
   } catch (err) {
     // A transient OpenAI failure must NOT crash the bot â€” degrade gracefully.
     console.error('[chat] GPT-4o call failed, serving heuristic fallback:', err);
-    return sendSuccess(res, { ...heuristicReply(message, ctx), degraded: true });
+    const heuristic = heuristicReply(message, ctx);
+    void persistChatLog(conversationId, locale, [
+      ...history.map((m) => ({ role: m.role, text: m.text, timestamp: nowIso })),
+      { role: 'user', text: message, timestamp: nowIso },
+      { role: 'bot', text: heuristic.reply, timestamp: nowIso },
+    ]);
+    return sendSuccess(res, { ...heuristic, degraded: true });
   }
 });
 

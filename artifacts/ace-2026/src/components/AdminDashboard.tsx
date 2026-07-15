@@ -3256,6 +3256,191 @@ const BizLeadsPanel = () => {
   );
 };
 
+interface ChatLogRow {
+  id: string;
+  conversationId: string;
+  locale: string;
+  messages: Array<{ role: 'user' | 'bot'; text: string; timestamp: string }>;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 2026-07-14 (per Reza — read visitor chat conversations from the admin
+// panel, so he can personally reach out if a visitor left contact info):
+// same card-list pattern as BizLeadsPanel above, collapsed by default
+// (a full transcript is a lot to show inline) with a "Mark read" action
+// mirroring the briefs table's isRead field.
+const BizConversationsPanel = () => {
+  const [logs, setLogs] = useState<ChatLogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await apiGet<ChatLogRow[]>('/api/chat-logs');
+      setLogs(rows ?? []);
+    } catch (err) {
+      console.error('Failed to load chat logs:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const markRead = async (id: string, isRead: boolean) => {
+    try {
+      await apiPut(`/api/chat-logs/${id}`, { isRead });
+      setLogs((prev) => prev.map((l) => (l.id === id ? { ...l, isRead } : l)));
+    } catch (err) {
+      console.error('Failed to update chat log:', err);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const visible = unreadOnly ? logs.filter((l) => !l.isRead) : logs;
+  const allVisibleSelected = visible.length > 0 && visible.every((l) => selected.has(l.id));
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      if (allVisibleSelected) return new Set();
+      return new Set(visible.map((l) => l.id));
+    });
+  };
+
+  const deleteSelected = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Delete ${selected.size} conversation${selected.size === 1 ? '' : 's'}? This can't be undone.`)) return;
+    setDeleting(true);
+    try {
+      await apiPost('/api/chat-logs/bulk-delete', { ids: Array.from(selected) });
+      setLogs((prev) => prev.filter((l) => !selected.has(l.id)));
+      setSelected(new Set());
+    } catch (err) {
+      console.error('Failed to delete chat logs:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const unreadCount = logs.filter((l) => !l.isRead).length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setUnreadOnly((v) => !v)}
+          style={{
+            ...AMBIENT_BTN_GHOST,
+            background: unreadOnly ? 'rgba(var(--accent-rgb),0.16)' : 'transparent',
+          }}
+        >
+          {unreadOnly ? `Unread only (${unreadCount})` : `All conversations (${logs.length})`}
+        </button>
+        {visible.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', opacity: 0.8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} />
+            Select all
+          </label>
+        )}
+        {selected.size > 0 && (
+          <button
+            type="button"
+            onClick={deleteSelected}
+            disabled={deleting}
+            style={{ ...AMBIENT_BTN_GHOST, marginLeft: 'auto', color: '#E8232B', borderColor: 'rgba(232,35,43,0.4)' }}
+          >
+            {deleting ? 'Deleting…' : `Delete selected (${selected.size})`}
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>Loading…</div>
+      ) : visible.length === 0 ? (
+        <div style={{ opacity: 0.6, fontSize: '0.85rem', padding: 20, textAlign: 'center' }}>
+          {unreadOnly ? 'No unread conversations.' : 'No visitor conversations yet — they\u2019ll appear here as people chat with the Studio Bot.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {visible.map((log) => {
+            const lastMsg = log.messages[log.messages.length - 1];
+            const expanded = expandedId === log.id;
+            return (
+              <div key={log.id} style={{
+                padding: 16, borderRadius: 14,
+                background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.05), rgba(255,255,255,0.015))',
+                border: log.isRead ? '1px solid rgba(var(--accent-rgb),0.14)' : '1px solid rgba(var(--accent-rgb),0.4)',
+              }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(log.id)}
+                    onChange={() => toggleSelect(log.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ marginTop: 3, flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }} onClick={() => setExpandedId(expanded ? null : log.id)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {!log.isRead && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-color)', flexShrink: 0 }} />}
+                      <span style={{ fontWeight: 600 }}>{log.messages.length} message{log.messages.length === 1 ? '' : 's'}</span>
+                      <span style={BIZ_BADGE('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.55)')}>{log.locale.toUpperCase()}</span>
+                    </div>
+                    {lastMsg && (
+                      <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {lastMsg.role === 'user' ? 'Visitor: ' : 'Bot: '}{lastMsg.text}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', opacity: 0.55, flexShrink: 0 }} onClick={() => setExpandedId(expanded ? null : log.id)}>
+                    {new Date(log.updatedAt).toLocaleString()}
+                  </div>
+                </div>
+                {expanded && (
+                  <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {log.messages.map((m, i) => (
+                      <div key={i} style={{
+                        alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                        maxWidth: '85%',
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        fontSize: '0.8rem',
+                        background: m.role === 'user' ? 'rgba(var(--accent-rgb),0.16)' : 'rgba(255,255,255,0.04)',
+                      }}>
+                        {m.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button type="button" style={AMBIENT_BTN_GHOST} onClick={(e) => { e.stopPropagation(); markRead(log.id, !log.isRead); }}>
+                    {log.isRead ? 'Mark unread' : 'Mark read'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface ApiKeyStatus { keyName: string; isActive: boolean | null; isConfigured: boolean; testedAt: string | null; value?: string }
 
 const BizSourcesPanel = () => {
@@ -3580,7 +3765,7 @@ const BizSettingsPanel = () => {
 };
 
 const TabBusiness = () => {
-  const [subTab, setSubTab] = useState<'leads' | 'sources' | 'reports' | 'settings'>('leads');
+  const [subTab, setSubTab] = useState<'leads' | 'conversations' | 'sources' | 'reports' | 'settings'>('leads');
   return (
     <div>
       <h2 className="adm-section-title">Business</h2>
@@ -3589,7 +3774,7 @@ const TabBusiness = () => {
         Works from RSS alone with zero keys configured — every key added under Sources just extends its reach.
       </p>
       <div className="adm-row" style={{ gap: 8, marginBottom: 20 }}>
-        {(['leads', 'sources', 'reports', 'settings'] as const).map((t) => (
+        {(['leads', 'conversations', 'sources', 'reports', 'settings'] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -3597,11 +3782,12 @@ const TabBusiness = () => {
             style={subTab === t ? { background: 'rgba(var(--accent-rgb),0.16)', color: 'var(--accent-color)' } : undefined}
             onClick={() => setSubTab(t)}
           >
-            {t === 'leads' ? 'Leads' : t === 'sources' ? 'Sources & Keys' : t === 'reports' ? 'Reports' : 'Settings'}
+            {t === 'leads' ? 'Leads' : t === 'conversations' ? 'Conversations' : t === 'sources' ? 'Sources & Keys' : t === 'reports' ? 'Reports' : 'Settings'}
           </button>
         ))}
       </div>
       {subTab === 'leads' && <BizLeadsPanel />}
+      {subTab === 'conversations' && <BizConversationsPanel />}
       {subTab === 'sources' && <BizSourcesPanel />}
       {subTab === 'reports' && <BizReportsPanel />}
       {subTab === 'settings' && <BizSettingsPanel />}

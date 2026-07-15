@@ -13,6 +13,7 @@ import { requestTracer } from "./middleware/requestTracer";
 // Import routes
 import authRoutes from "./routes/auth";
 import briefsRoutes from "./routes/briefs";
+import chatLogsRoutes from "./routes/chatLogs";
 import chatRoutes from "./routes/chat";
 import contentRoutes from "./routes/content";
 import documentsRoutes from "./routes/documents";
@@ -91,6 +92,7 @@ app.use("/api/poster-studio", posterStudioRoutes);
 app.use("/api/positions", positionsRoutes);
 app.use("/api/media", mediaRoutes);
 app.use("/api/briefs", briefsRoutes);
+app.use("/api/chat-logs", chatLogsRoutes);
 app.use("/api/keys", keysRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/documents", documentsRoutes);

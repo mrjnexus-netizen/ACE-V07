@@ -337,6 +337,31 @@ export const positionReports = pgTable(
 );
 
 
+// 2026-07-14 (per Reza): every visitor conversation with ExecutiveStudioBot,
+// so Reza can review them in the admin Business tab and reach out
+// personally if a visitor left contact info in the chat. Keyed by
+// conversationId (client-generated once per widget session) — the chat
+// route upserts this same row on every turn rather than needing a
+// separate "save conversation" call, so a log exists even if the visitor
+// never explicitly submits anything (unlike `briefs`, which only exists
+// once the structured brief flow completes).
+export const chatLogs = pgTable(
+  'chat_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    conversationId: text('conversation_id').notNull(),
+    locale: text('locale').notNull(),
+    messages: jsonb('messages').notNull().default([]), // [{role,text,timestamp}, ...] — full transcript so far
+    isRead: boolean('is_read').default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    conversationIdUnique: uniqueIndex('idx_chat_logs_conversation_id_unique').on(table.conversationId),
+    updatedAtIdx: index('idx_chat_logs_updated_at').on(table.updatedAt),
+  })
+);
+
 export const composerIdentityRelations = relations(composerIdentity, ({ many }) => ({
   projects: many(projects),
 }));

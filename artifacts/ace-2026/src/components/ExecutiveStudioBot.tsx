@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
@@ -30,14 +31,37 @@ const BRIEF_QUESTIONS = [
 const LOCAL_FALLBACK =
   'I can\u2019t reach the studio service right now, but you can still start a project \u2014 just type "brief" and I\u2019ll collect the details.';
 
+// 2026-07-14 (per Reza — luxury re-skin + per-language icon color): a
+// bespoke sound-wave glyph instead of the generic 💬 emoji. Uses
+// currentColor so it automatically follows --accent-color, which
+// ChromaticContext already updates per language (no new plumbing needed
+// for "per-language colored icon" — the color system this ties into was
+// already sitewide).
+function StudioBotIcon({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="16" r="15" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
+      <path
+        d="M10 17.5V14.5M13.4 20V12M16.8 22V10M20.2 19V13M23.6 16.5V15.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export default function ExecutiveStudioBot() {
   const { locale, tracks } = useIdentity();
   const { playTrack } = useAudio();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'bot',
-      text: "Hello! I'm the ACE Studio Manager. How can I assist you today?",
+      text:
+        "Hello! I'm the ACE Studio Manager. How can I assist you today?\n" +
+        'If you\u2019d like Amir to personally reach out, feel free to share your contact details and what you need.',
       timestamp: new Date().toISOString(),
     },
   ]);
@@ -47,6 +71,12 @@ export default function ExecutiveStudioBot() {
   const [briefData, setBriefData] = useState<string[]>([]);
   const [briefStep, setBriefStep] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // 2026-07-14 (per Reza — persisted chat logs): one ID per widget
+  // session, sent with every turn so the backend can upsert one row per
+  // conversation instead of needing a separate "save" step.
+  const conversationIdRef = useRef<string>(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+  );
 
   const safeLocale = locale ?? 'en';
   const { t } = useT();
@@ -66,7 +96,12 @@ export default function ExecutiveStudioBot() {
       setInput('');
       setIsLoading(true);
       try {
-        const data = await apiPost<ChatApiResponse | null>('/api/chat', { message: text, history, locale: safeLocale });
+        const data = await apiPost<ChatApiResponse | null>('/api/chat', {
+          message: text,
+          history,
+          locale: safeLocale,
+          conversationId: conversationIdRef.current,
+        });
         const reply = data?.reply?.trim();
         setMessages((prev) => [
           ...prev,
@@ -175,104 +210,158 @@ export default function ExecutiveStudioBot() {
     }
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <>
+      {/* 2026-07-14 (per Reza — luxury re-skin): soft breathing glow ring
+          behind the launcher, same "everything breathes" language as the
+          orb/button auras elsewhere on the site (§6.6 design language).
+          Icon + ring both use currentColor -> var(--accent-color), so this
+          is already per-language colored via the existing Chromatic system. */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-24 right-6 w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-lg z-50 hover:scale-105 active:scale-95 transition-all"
-        style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setIsMinimized(false);
+        }}
+        className="fixed bottom-24 right-6 w-12 h-12 rounded-full flex items-center justify-center shadow-lg z-50 hover:scale-105 active:scale-95 transition-all csb-launcher"
+        style={{
+          background: 'linear-gradient(145deg, var(--surface3-color), var(--surface2-color))',
+          color: 'var(--accent-color)',
+          border: '1px solid var(--border-accent-color)',
+        }}
         aria-label={t('Studio Bot')}
       >
-        {'\uD83D\uDCAC'}
+        <span className="csb-launcher-glow" style={{ boxShadow: '0 0 0 0 var(--glow-color)' }} />
+        <StudioBotIcon size={19} />
       </button>
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed bottom-32 right-6 w-[380px] max-w-[90vw] h-[520px] rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden border"
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              height: isMinimized ? 52 : 440,
+            }}
+            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            className="fixed bottom-24 right-6 w-[300px] max-w-[86vw] rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden csb-panel"
             style={{
-              background: 'rgba(var(--surface-rgb), 0.85)',
-              backdropFilter: 'blur(40px) saturate(200%)',
-              WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-              borderColor: 'var(--border-color)',
+              background: 'linear-gradient(175deg, rgba(var(--surface-rgb),0.94), rgba(var(--surface-rgb),0.82))',
+              backdropFilter: 'blur(36px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(36px) saturate(180%)',
+              border: '1px solid var(--border-accent-color)',
             }}
           >
-            <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--border-color)' }}>
-              <span className="font-mono text-sm" style={{ color: 'var(--text-color)' }}>{t('Studio Bot')}</span>
-              <button
-                onClick={() => setIsOpen(false)}
-                aria-label={t('Close')}
-                className="text-[var(--text-muted-color)] hover:text-[var(--accent-color)]"
-              >
-                {'\u2715'}
-              </button>
+            <div
+              className="px-3.5 py-2.5 flex justify-between items-center shrink-0"
+              style={{ borderBottom: isMinimized ? 'none' : '1px solid var(--border-accent-color)' }}
+            >
+              <span className="flex items-center gap-1.5" style={{ color: 'var(--accent-color)' }}>
+                <StudioBotIcon size={14} />
+                <span className="csb-title">{t('Studio Bot')}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsMinimized((m) => !m)}
+                  aria-label={t(isMinimized ? 'Expand' : 'Minimize')}
+                  className="csb-icon-btn"
+                >
+                  {isMinimized ? '\u25A2' : '\u2013'}
+                </button>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  aria-label={t('Close')}
+                  className="csb-icon-btn"
+                >
+                  {'\u2715'}
+                </button>
+              </span>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className="max-w-[80%] rounded-lg p-3 text-sm whitespace-pre-line"
-                    style={
-                      msg.role === 'user'
-                        ? { backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }
-                        : { backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)' }
-                    }
-                  >
-                    <p>{msg.role === 'bot' ? t(msg.text) : msg.text}</p>
-                    {msg.trackId && (
-                      <button
-                        onClick={() => {
-                          const track = tracks.find((t) => t.id === msg.trackId);
-                          if (track) playTrack(track);
-                        }}
-                        className="mt-2 text-xs underline"
-                        style={{ color: 'var(--accent-color)' }}
+            {!isMinimized && (
+              <>
+                <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-3">
+                  {messages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        className="max-w-[82%] rounded-lg px-2.5 py-2 text-[12.5px] leading-snug whitespace-pre-line csb-bubble"
+                        style={
+                          msg.role === 'user'
+                            ? {
+                                background: 'linear-gradient(135deg, var(--accent-color), var(--accent2-color))',
+                                color: 'var(--surface-color)',
+                              }
+                            : {
+                                backgroundColor: 'var(--surface3-color)',
+                                color: 'var(--text-color)',
+                                border: '1px solid var(--border-color)',
+                              }
+                        }
                       >
-                        {'\u25B6 ' + t('Play Track')}
-                      </button>
-                    )}
-                    <span className="block text-[10px] mt-1 opacity-50">
-                      {new Date(msg.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
+                        <p>{msg.role === 'bot' ? t(msg.text) : msg.text}</p>
+                        {msg.trackId && (
+                          <button
+                            onClick={() => {
+                              const track = tracks.find((t) => t.id === msg.trackId);
+                              if (track) playTrack(track);
+                            }}
+                            className="mt-1.5 text-[11px] underline"
+                            style={{ color: 'var(--accent-color)' }}
+                          >
+                            {'\u25B6 ' + t('Play Track')}
+                          </button>
+                        )}
+                        <span className="block text-[9px] mt-1 opacity-50">
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div
+                        className="rounded-lg px-2.5 py-2 text-sm flex gap-1"
+                        style={{ backgroundColor: 'var(--surface3-color)', border: '1px solid var(--border-color)' }}
+                      >
+                        <span className="csb-dot" style={{ background: 'var(--accent-color)' }} />
+                        <span className="csb-dot" style={{ background: 'var(--accent-color)', animationDelay: '0.15s' }} />
+                        <span className="csb-dot" style={{ background: 'var(--accent-color)', animationDelay: '0.3s' }} />
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
                 </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="rounded-lg p-3 text-sm flex gap-1" style={{ backgroundColor: 'var(--surface3-color)' }}>
-                    <span className="animate-bounce">{'\u2022'}</span>
-                    <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>{'\u2022'}</span>
-                    <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>{'\u2022'}</span>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-            <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2" style={{ borderColor: 'var(--border-color)' }}>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={t('Type a message...')}
-                className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
-                disabled={isLoading}
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-40"
-                style={{ backgroundColor: 'var(--accent-color)', color: 'var(--surface-color)' }}
-              >
-                {t('Send')}
-              </button>
-            </form>
+                <form
+                  onSubmit={handleSubmit}
+                  className="px-3 py-2.5 flex gap-1.5 shrink-0"
+                  style={{ borderTop: '1px solid var(--border-accent-color)' }}
+                >
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={t('Type a message...')}
+                    className="flex-1 px-2.5 py-1.5 rounded-lg text-[12.5px] outline-none"
+                    style={{ backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoading || !input.trim()}
+                    className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-40 csb-send"
+                    style={{ background: 'linear-gradient(135deg, var(--accent-color), var(--accent2-color))', color: 'var(--surface-color)' }}
+                  >
+                    {t('Send')}
+                  </button>
+                </form>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </>,
+    document.body
   );
 }

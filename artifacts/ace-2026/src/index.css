@@ -764,6 +764,159 @@ html.lenis body { height: auto; }
   color: var(--text-color, #F4F1EA);
   resize: vertical;
 }
+.ace-editable-editform-style-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ace-font-dropdown {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.ace-font-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.7rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-color, #F4F1EA);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.ace-font-dropdown-trigger:hover {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  background: rgba(var(--accent-rgb), 0.06);
+}
+.ace-font-dropdown-trigger span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ace-font-dropdown-caret {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  opacity: 0.6;
+  transition: transform 0.15s ease;
+}
+.ace-font-dropdown-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  /* Wider than the trigger itself — the whole point of this fix (per
+     Reza): name + sample phrase need real room to sit on one line
+     without truncating, and the trigger button is narrow (it shares a
+     row with the color picker). Right-clamped to the viewport so it
+     never overflows off-screen on a narrow toolbar near the edge. */
+  width: max(420px, 100%);
+  max-width: min(560px, calc(100vw - 24px));
+  max-height: 340px;
+  overflow-y: auto;
+  z-index: 400;
+  border-radius: 10px;
+  /* Solid, opaque, always-dark — the whole point of building this instead
+     of a native <select> is guaranteed readability, not another surface
+     that could wash out depending on theme/browser. */
+  background: #0E0C09;
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--accent-rgb), 0.4) transparent;
+  overscroll-behavior: contain;
+}
+.ace-font-dropdown-list::-webkit-scrollbar { width: 7px; }
+.ace-font-dropdown-list::-webkit-scrollbar-thumb {
+  background: rgba(var(--accent-rgb), 0.35);
+  border-radius: 4px;
+}
+.ace-font-dropdown-group + .ace-font-dropdown-group {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(var(--accent-rgb), 0.16);
+}
+.ace-font-dropdown-group-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-color);
+  opacity: 0.85;
+  padding: 4px 10px 6px;
+}
+.ace-font-dropdown-done-row {
+  position: sticky;
+  bottom: -6px;
+  margin: 6px -6px -6px;
+  padding: 8px 10px;
+  background: linear-gradient(0deg, #0E0C09 60%, transparent);
+  display: flex;
+  justify-content: flex-end;
+}
+.ace-font-dropdown-option {
+  text-align: left;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  display: block;
+  width: 100%;
+  transition: background-color 0.12s ease;
+}
+.ace-font-dropdown-option-name {
+  color: #FFFFFF;
+  font-size: 0.72rem;
+}
+.ace-font-dropdown-option-line {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  display: block;
+}
+.ace-font-dropdown-option-line strong {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+.ace-font-dropdown-option-dash {
+  opacity: 0.4;
+  font-family: inherit;
+  padding: 0 3px;
+}
+.ace-font-dropdown-option:hover {
+  background: rgba(var(--accent-rgb), 0.14);
+}
+.ace-font-dropdown-option--active {
+  background: rgba(var(--accent-rgb), 0.22);
+}
+.ace-font-dropdown-option--active .ace-font-dropdown-option-name,
+.ace-font-dropdown-option--active .ace-font-dropdown-option-line,
+.ace-font-dropdown-option--active .ace-font-dropdown-option-line strong {
+  color: var(--accent-color);
+}
+.ace-editable-color {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ace-editable-btn--sm {
+  padding: 2px 6px;
+  font-size: 0.6rem;
+  flex-shrink: 0;
+}
 .ace-editable-editform-actions {
   display: flex;
   gap: 4px;
@@ -971,6 +1124,18 @@ p, blockquote, figcaption, .text-wrap-pretty {
   .ace-main-shell *,
   .ace-main-shell *::before,
   .ace-main-shell *::after {
+    cursor: none !important;
+  }
+  /* 2026-07-13 (per Reza) — the edit toolbar (and its font/color pickers)
+     is rendered via createPortal straight to document.body, so it's NOT
+     a descendant of .ace-main-shell in the DOM — the rule above never
+     reached it, which is why the native pointer kept showing up next to
+     the custom note cursor on every button inside it. Same fix, same
+     reasoning, just scoped to where this specific UI actually lives. */
+  .ace-editable-toolbar,
+  .ace-editable-toolbar *,
+  .ace-editable-toolbar *::before,
+  .ace-editable-toolbar *::after {
     cursor: none !important;
   }
 }
@@ -1408,3 +1573,98 @@ p, blockquote, figcaption, .text-wrap-pretty {
 }
 .adm-track-row:hover { background: rgba(107, 82, 38, 0.035); }
 .adm-track-row:last-child { border-bottom: none; }
+
+/* ============================================================
+   2026-07-13 (per Reza) — EditableText's chosen font (both the live,
+   visitor-facing text AND the picker's own preview rows) was being
+   silently beaten by some other rule on the page resolving to
+   var(--font-mono) — confirmed via getComputedStyle() in DevTools
+   returning "Space Mono" regardless of what was actually picked. A plain
+   inline style={{fontFamily}} can lose to an !important rule elsewhere;
+   this is set via a CSS custom property (which DOES set correctly
+   inline) read by this dedicated !important class instead — and placed
+   at the very end of the stylesheet so it also wins any tie in cascade
+   order against whatever the other rule turns out to be.
+   ============================================================ */
+.ace-font-override {
+  font-family: var(--ace-font-override) !important;
+}
+
+
+/* ============================================================
+   2026-07-14 (per Reza) — ExecutiveStudioBot luxury re-skin. Additive
+   only — nothing above this block was touched. Every color here reads
+   from the same CSS custom properties ChromaticContext already updates
+   per language (--accent-color etc.), so the whole widget re-themes
+   automatically on language switch — no per-language logic needed here.
+   ============================================================ */
+.csb-launcher {
+  position: fixed !important;
+  overflow: visible;
+}
+.csb-panel {
+  position: fixed !important;
+}
+.csb-launcher-glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: csb-breathe 3.2s ease-in-out infinite;
+}
+@keyframes csb-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.28); }
+  50%      { box-shadow: 0 0 14px 3px rgba(var(--accent-rgb), 0.22); }
+}
+.csb-panel {
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(var(--accent-rgb), 0.06) inset;
+}
+.csb-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+.csb-icon-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted-color);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.csb-icon-btn:hover {
+  color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+/* The sitewide body{cursor:none} rule (for the custom note cursor) loses
+   to native browser cursors on interactive elements (I-beam on inputs,
+   pointer on buttons) unless forced explicitly here too — same pattern
+   already used elsewhere in this file for other interactive components. */
+.csb-launcher,
+.csb-panel button,
+.csb-panel input {
+  cursor: none !important;
+}
+.csb-bubble {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.csb-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: csb-dot-bounce 0.9s ease-in-out infinite;
+}
+@keyframes csb-dot-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30%           { transform: translateY(-4px); opacity: 1; }
+}
+.csb-send {
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.25);
+}
