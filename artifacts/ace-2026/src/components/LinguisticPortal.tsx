@@ -27,6 +27,20 @@ const MICRO_TONES: Record<string, number> = {
 const LANGUAGE_MESH: Record<string, string> = {
   en: '#F3D77E', es: '#FF9A3F', fr: '#D8C290', zh: '#FF5A4D', ja: '#4D8BFF', ko: '#FF6FE0',
 };
+// 2026-07-14 (per Reza — light-harmony pass): same exact RGB triples as
+// LANGUAGE_MESH above (and LiquidSeam's PAL.glow — all three already agreed
+// perfectly on color, confirmed while auditing) exposed with an alpha
+// channel. Every glow in this file now builds its falloff from THESE
+// triples so brightness curves share one family instead of each effect
+// picking its own opacity in isolation.
+const LANGUAGE_MESH_RGB: Record<string, [number, number, number]> = {
+  en: [243, 215, 126], es: [255, 154, 63], fr: [216, 194, 144],
+  zh: [255, 90, 77], ja: [77, 139, 255], ko: [255, 111, 224],
+};
+function meshRgba(code: string, alpha: number): string {
+  const [r, g, b] = LANGUAGE_MESH_RGB[code] || [255, 255, 255];
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 const LANGUAGE_PASTEL: Record<string, string> = {
   en: '#F7E6B0', es: '#FFCB94', fr: '#EAD9B5', zh: '#FFA79E', ja: '#A9C7FF', ko: '#FFB3F0',
 };
@@ -667,7 +681,9 @@ const HeadstockSelector = ({
                 fontFamily: "'Cinzel', 'Noto Serif SC', 'Noto Serif JP', 'Noto Serif KR', serif",
                 fontWeight: active ? 600 : 500,
                 fontStyle: 'normal',
-                textShadow: active ? `0 0 5px ${LANGUAGE_MESH[l.code]}` : 'none',
+                textShadow: active
+                  ? `0 0 3px ${meshRgba(l.code, 0.85)}, 0 0 9px ${meshRgba(l.code, 0.55)}, 0 0 20px ${meshRgba(l.code, 0.22)}`
+                  : 'none',
                 transition: 'fill 0.4s ease, font-size 0.4s ease, letter-spacing 0.4s ease',
               }}
             >
@@ -736,7 +752,7 @@ function LetterGlyph({ ch, size }: { ch: string; size: number }) {
         WebkitBackgroundClip: 'text',
         backgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
-        filter: 'drop-shadow(0 0 18px rgba(233,200,121,0.4)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+        filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
         animation: 'wgSigShimmer 6.5s ease-in-out infinite',
       }}
     >
@@ -757,10 +773,10 @@ function LockedSignature({ letterSize, dimmed }: { letterSize: number; dimmed: b
     >
       <div style={{ width: 1, height: letterSize * 0.55, background: 'linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%)' }} />
       {'AMIR'.split('').map((ch, ci) => <LetterGlyph key={`a-${ci}`} ch={ch} size={letterSize} />)}
-      <div style={{ width: 6, height: 6, margin: `${letterSize * 0.28}px 0`, background: 'linear-gradient(135deg,#FBF0CC,#D9B45E)', boxShadow: '0 0 10px rgba(233,200,121,0.6)', transform: 'rotate(45deg)' }} />
+      <div style={{ width: 6, height: 6, margin: `${letterSize * 0.28}px 0`, background: 'linear-gradient(135deg,#FBF0CC,#D9B45E)', transform: 'rotate(45deg)' }} />
       {'MOSLEHI'.split('').map((ch, ci) => <LetterGlyph key={`m-${ci}`} ch={ch} size={letterSize} />)}
       <div style={{ width: 1, height: letterSize * 0.55, background: 'linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%)' }} />
-      <div style={{ marginTop: letterSize * 0.32, fontFamily: "'Cinzel',serif", fontWeight: 400, fontSize: letterSize * 0.24, letterSpacing: '0.42em', paddingLeft: '0.42em', color: '#C9AC6A', textShadow: '0 0 10px rgba(201,172,106,0.4)' }}>
+      <div style={{ marginTop: letterSize * 0.32, fontFamily: "'Cinzel',serif", fontWeight: 400, fontSize: letterSize * 0.24, letterSpacing: '0.42em', paddingLeft: '0.42em', color: '#C9AC6A' }}>
         THE COMPOSER
       </div>
     </div>
@@ -1001,7 +1017,7 @@ export const LinguisticPortal = () => {
 
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
-      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'); @keyframes labelFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes wgSigRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } } @keyframes wgSigRule { from { opacity: 0; transform: scaleX(0.2); } to { opacity: 0.6; transform: scaleX(1); } } @keyframes wgSigDot { from { opacity: 0; transform: rotate(45deg) scale(0.2); } to { opacity: 0.65; transform: rotate(45deg) scale(1); } } @keyframes wgSigShimmer { 0% { background-position: 0% 0%; } 100% { background-position: 0% 200%; } } .wg-sig-wrap { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: flex-start; } .wg-sig-ch { display: flex; align-items: center; justify-content: center; width: clamp(2.2rem, 6vh, 3.4rem); height: clamp(2.3rem, 6.4vh, 3.6rem); font-family: 'Cinzel','Cormorant Garamond',Didot,Georgia,serif; font-weight: 500; font-style: normal; font-size: clamp(1.7rem, 4.6vh, 2.9rem); line-height: 1; letter-spacing: 0; text-align: center; color: #F1DFA6; background: linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%); background-size: 100% 200%; background-position: 0% 0%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 22px rgba(233,200,121,0.5)) drop-shadow(0 0 40px rgba(217,180,94,0.28)) drop-shadow(0 1px 3px rgba(0,0,0,0.55)); opacity: 0; animation: wgSigRise 1.2s cubic-bezier(0.22,1,0.36,1) both, wgSigShimmer 6.5s ease-in-out infinite; } .wg-sig-rule { display: block; width: 1px; height: clamp(14px,2.4vh,26px); background: linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%); opacity: 0; animation: wgSigRule 1.3s ease both; } .wg-sig-diamond { display: block; width: 6px; height: 6px; margin: 0.9vh 0; background: linear-gradient(135deg,#FBF0CC,#D9B45E); box-shadow: 0 0 10px rgba(233,200,121,0.6); opacity: 0; animation: wgSigDot 1s ease both; } .wg-sig-sub { margin-top: 1.1vh; font-family: 'Cinzel','Cormorant Garamond',Georgia,serif; font-weight: 400; font-size: clamp(0.5rem, 1.15vh, 0.72rem); letter-spacing: 0.42em; padding-left: 0.42em; color: #C9AC6A; text-shadow: 0 0 10px rgba(201,172,106,0.4); opacity: 0; animation: wgSigRise 1.2s ease both; } @media (max-width: 767px) { .wg-sig-wrap { display: none; } } @media (prefers-reduced-motion: reduce) { .wg-sig-ch, .wg-sig-rule, .wg-sig-diamond, .wg-sig-sub { animation: none; opacity: 1; } .wg-sig-rule { opacity: 0.6; } .wg-sig-diamond { opacity: 0.65; transform: rotate(45deg); } }" }} />
+      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'); @keyframes labelFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes wgSigRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } } @keyframes wgSigRule { from { opacity: 0; transform: scaleX(0.2); } to { opacity: 0.6; transform: scaleX(1); } } @keyframes wgSigDot { from { opacity: 0; transform: rotate(45deg) scale(0.2); } to { opacity: 0.65; transform: rotate(45deg) scale(1); } } @keyframes wgSigShimmer { 0% { background-position: 0% 0%; } 100% { background-position: 0% 200%; } } .wg-sig-wrap { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: flex-start; } .wg-sig-ch { display: flex; align-items: center; justify-content: center; width: clamp(2.2rem, 6vh, 3.4rem); height: clamp(2.3rem, 6.4vh, 3.6rem); font-family: 'Cinzel','Cormorant Garamond',Didot,Georgia,serif; font-weight: 500; font-style: normal; font-size: clamp(1.7rem, 4.6vh, 2.9rem); line-height: 1; letter-spacing: 0; text-align: center; color: #F1DFA6; background: linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%); background-size: 100% 200%; background-position: 0% 0%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55)); opacity: 0; animation: wgSigRise 1.2s cubic-bezier(0.22,1,0.36,1) both, wgSigShimmer 6.5s ease-in-out infinite; } .wg-sig-rule { display: block; width: 1px; height: clamp(14px,2.4vh,26px); background: linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%); opacity: 0; animation: wgSigRule 1.3s ease both; } .wg-sig-diamond { display: block; width: 6px; height: 6px; margin: 0.9vh 0; background: linear-gradient(135deg,#FBF0CC,#D9B45E);  opacity: 0; animation: wgSigDot 1s ease both; } .wg-sig-sub { margin-top: 1.1vh; font-family: 'Cinzel','Cormorant Garamond',Georgia,serif; font-weight: 400; font-size: clamp(0.5rem, 1.15vh, 0.72rem); letter-spacing: 0.42em; padding-left: 0.42em; color: #C9AC6A;  opacity: 0; animation: wgSigRise 1.2s ease both; } @media (max-width: 767px) { .wg-sig-wrap { display: none; } } @media (prefers-reduced-motion: reduce) { .wg-sig-ch, .wg-sig-rule, .wg-sig-diamond, .wg-sig-sub { animation: none; opacity: 1; } .wg-sig-rule { opacity: 0.6; } .wg-sig-diamond { opacity: 0.65; transform: rotate(45deg); } }" }} />
 
       {/* The living starfield is always present — it backs both the welcome
           gate and the language portal so the transition feels continuous. */}
@@ -1180,9 +1196,9 @@ export const LinguisticPortal = () => {
         style={{
           zIndex: 2,
           background: hoveredLang
-            ? `radial-gradient(ellipse 80% 70% at ${isMobile ? '50% 82%' : '68% 44%'}, ${LANGUAGE_MESH[hoveredLang]}, transparent 62%)`
+            ? `radial-gradient(ellipse 80% 70% at ${isMobile ? '50% 82%' : '68% 44%'}, ${meshRgba(hoveredLang, 0.9)} 0%, ${meshRgba(hoveredLang, 0.4)} 30%, transparent 62%)`
             : 'transparent',
-          opacity: hoveredLang ? 0.07 : 0,
+          opacity: hoveredLang ? 0.13 : 0,
           transition: 'opacity 1s ease',
           mixBlendMode: 'screen',
         }}

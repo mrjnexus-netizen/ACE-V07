@@ -187,12 +187,23 @@ const MagneticCursor = () => {
           pointerEvents: 'none',
           position: 'fixed',
           zIndex: 99999,
-          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 4px rgba(246,192,38,0.45))',
         }}
-        animate={{ scale: pressed ? 0.85 : 1, rotate: 15 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 18 }}
       >
-        <NoteMark size={SIZE} spin />
+        {/* Rotation/press-scale live on this INNER element only. The outer
+         * div above owns position (cursorX/cursorY, aligned to TIP_X/TIP_Y
+         * with no rotation) — if rotate/scale lived on the same element as
+         * position, framer-motion's default transform-origin (the
+         * element's own center, not the tip) would drag the visual tip
+         * away from the real e.clientX/e.clientY on every rotation frame,
+         * a real site-wide cursor-precision bug since the OS cursor is
+         * hidden and this icon is the only visual anchor the user has. */}
+        <motion.div
+          animate={{ scale: pressed ? 0.85 : 1, rotate: 15 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 4px rgba(246,192,38,0.45))' }}
+        >
+          <NoteMark size={SIZE} spin />
+        </motion.div>
       </motion.div>
 
       <AnimatePresence>
