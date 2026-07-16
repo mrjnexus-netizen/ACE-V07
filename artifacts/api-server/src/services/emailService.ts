@@ -26,7 +26,12 @@ interface SmtpCredentials {
   secure: boolean;
 }
 
-async function loadSmtpCredentials(): Promise<SmtpCredentials | null> {
+// Exported (was previously module-private) so other features that need
+// to send arbitrary email — not just the verification-code flow this
+// file was originally built for — can reuse the exact same DB-first
+// credential loading instead of duplicating the decrypt() call. Added
+// 2026-07-16 for the Document Assistant's "Send to Email" feature.
+export async function loadSmtpCredentials(): Promise<SmtpCredentials | null> {
   const row = await db.query.apiKeys.findFirst({ where: (k, { eq: e }) => e(k.keyName, 'SMTP_CREDENTIALS') });
   if (!row?.encryptedValue) return null;
   try {
@@ -103,4 +108,53 @@ export async function verifyPendingCode(userId: string, code: string): Promise<{
 
   if (expired || !matches) return { ok: false };
   return { ok: true, email: target };
+}
+
+export interface RawEmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
+
+/** Generic "send whatever" helper, added 2026-07-16 for the Document
+ * Assistant's "Send to Email" feature — same SMTP_CREDENTIALS source
+ * and transporter setup as sendVerificationCode() above, generalized to
+ * take an arbitrary subject/body/attachments instead of a fixed
+ * verification-code template. Returns a result object instead of
+ * throwing so the calling route can turn a missing/misconfigured SMTP
+ * setup into a friendly, actionable error message rather than a raw
+ * 500. */
+export async function sendRawEmail(params: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  attachments?: RawEmailAttachment[];
+}): Promise<{ ok: boolean; error?: string }> {
+  const creds = await loadSmtpCredentials();
+  if (!creds) {
+    return { ok: false, error: 'Email sending is not configured yet — add SMTP credentials in Gatekeeper Hub → Security.' };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: creds.host,
+      port: creds.port,
+      secure: creds.secure,
+      auth: { user: creds.user, pass: creds.pass },
+    });
+    await transporter.sendMail({
+      from: creds.fromAddress,
+      to: params.to,
+      subject: params.subject,
+      text: params.text,
+      html: params.html,
+      attachments: params.attachments,
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to send email.';
+    logger.error({ error: message }, 'sendRawEmail failed.');
+    return { ok: false, error: message };
+  }
 }

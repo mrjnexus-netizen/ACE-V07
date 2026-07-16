@@ -1333,49 +1333,988 @@ const TabGatekeeperHub = () => {
   );
 };
 
+// ============================================================
+// ============================================================
+// Document Assistant — luxury-tier redesign, 2026-07-16 (round 2).
+// Elevates the functional-but-plain first pass into something that
+// matches the rest of this admin panel's design bar: an overview strip
+// with live stats, a staged progress indicator during analysis,
+// collapsible icon-led sections, a category-grouped checklist with
+// custom animated checkboxes and inline editing, a card-grid archive
+// with filtering/sorting, and a two-step delete confirmation. No new
+// dependencies -- built entirely on framer-motion (already imported at
+// the top of this file) and the existing adm-* design system.
+// ============================================================
+
+type DocChecklistPriority = 'high' | 'medium' | 'low';
+
+interface DocChecklistItem {
+  id: string;
+  text: string;
+  priority: DocChecklistPriority;
+  category: string;
+  done: boolean;
+}
+
+interface DocTrackMatch {
+  trackId: string;
+  title: string;
+  coverUrl: string | null;
+  audioUrl: string | null;
+  bpm: number | null;
+  mood: string | null;
+  keySignature: string | null;
+  genre: string | null;
+  aiListenAnalysis: string | null;
+  matchedFrom: string;
+  fitAssessment: string | null;
+}
+
+interface DocAnalysis {
+  id: string;
+  filename: string;
+  fileType: 'pdf' | 'txt' | 'eml' | 'paste';
+  sourceFileUrl: string | null;
+  summary: string | null;
+  parties: { name: string; role: string }[];
+  deliverables: string[];
+  deadlines: { item: string; date: string; parsedDate: string | null }[];
+  paymentTerms: string[];
+  timecodes: string[];
+  risks: string[];
+  checklist: DocChecklistItem[];
+  trackMatches: DocTrackMatch[];
+  degraded: boolean;
+  degradedReason?: string;
+  sourceTextLength: number;
+  truncated: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface DocUpcomingDeadline {
+  analysisId: string;
+  filename: string;
+  item: string;
+  date: string;
+}
+
+interface DocStats {
+  totalAnalyses: number;
+  totalChecklistItems: number;
+  openChecklistItems: number;
+  openHighPriority: number;
+  byFileType: Record<string, number>;
+  upcomingDeadlines: DocUpcomingDeadline[];
+}
+
+const DOC_PRIORITY_COLOR: Record<DocChecklistPriority, string> = {
+  high: '#c0463a',
+  medium: '#b8863a',
+  low: '#5c8a5c',
+};
+
+const DOC_FILE_TYPE_META: Record<DocAnalysis['fileType'], { label: string; color: string }> = {
+  pdf: { label: 'PDF', color: '#c0463a' },
+  txt: { label: 'TXT', color: '#5c7a8a' },
+  eml: { label: 'EML', color: '#8a6ac0' },
+  paste: { label: 'TEXT', color: '#b8863a' },
+};
+
+const DOC_ANALYZE_STEPS = ['Extracting document text', 'Consulting AI for structured analysis', 'Building your action checklist'];
+// Mirrors the backend's real thresholds (documentAnalysis.ts): documents
+// up to SINGLE_CALL_LIMIT are analyzed in one AI call; beyond that, they
+// are automatically split into overlapping sections and merged -- up to
+// this new, much higher ceiling (was a hard, invisible 30,000-character
+// truncation before; now transparent and ~4.6x higher).
+const DOC_SINGLE_CALL_LIMIT = 12_000;
+const DOC_MAX_CHARS = 139_600;
+
+// Best-effort, honest relative-date label for a resolved deadline.
+// Never invents precision the data doesn't have -- callers only pass a
+// real parsedDate (already validated server-side as YYYY-MM-DD).
+function formatRelativeDate(isoDate: string): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${isoDate}T00:00:00`);
+  const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'tomorrow';
+  if (diffDays === -1) return 'yesterday';
+  if (diffDays > 1 && diffDays <= 30) return `in ${diffDays} days`;
+  if (diffDays < -1 && diffDays >= -30) return `${Math.abs(diffDays)} days ago`;
+  return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+
+// ---------------------------------------------------------------
+// Small, pure, module-scope display primitives. Hoisted (never defined
+// inside another component's render body) per this project's own
+// documented remount-bug lesson.
+// ---------------------------------------------------------------
+
+function DocFileTypeBadge({ type, size = 'md' }: { type: DocAnalysis['fileType']; size?: 'sm' | 'md' }) {
+  const meta = DOC_FILE_TYPE_META[type];
+  return (
+    <span
+      className={`adm-doc-filetype-badge adm-doc-filetype-badge--${size}`}
+      style={{ color: meta.color, borderColor: meta.color, background: `${meta.color}14` }}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+function DocProgressRing({ done, total, size = 38 }: { done: number; total: number; size?: number }) {
+  const pct = total > 0 ? done / total : 0;
+  const stroke = 3.5;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - pct);
+  return (
+    <div className="adm-doc-ring" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(169,129,47,0.16)" strokeWidth={stroke} />
+        {total > 0 && (
+          <motion.circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke="#a9812f"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={false}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        )}
+      </svg>
+      <span className="adm-doc-ring-label">{total > 0 ? `${done}/${total}` : '—'}</span>
+    </div>
+  );
+}
+
+function DocCheckIcon({ checked }: { checked: boolean }) {
+  return (
+    <span className={`adm-doc-checkbox${checked ? ' adm-doc-checkbox--checked' : ''}`}>
+      <svg viewBox="0 0 16 16" width={11} height={11}>
+        <motion.path
+          d="M3 8.2L6.2 11.5L13 4"
+          fill="none"
+          stroke="#0d0b08"
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          initial={false}
+          animate={{ pathLength: checked ? 1 : 0, opacity: checked ? 1 : 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+        />
+      </svg>
+    </span>
+  );
+}
+
+function DocSectionIcon({ kind }: { kind: 'summary' | 'parties' | 'deliverables' | 'deadlines' | 'payment' | 'timecodes' | 'risks' }) {
+  const paths: Record<typeof kind, string> = {
+    summary: 'M3 4h10M3 8h10M3 12h6',
+    parties: 'M6 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm4 8v-1.5A2.5 2.5 0 0 0 7.5 10h-3A2.5 2.5 0 0 0 2 12.5V14M12 8a1.6 1.6 0 1 0 0-3.2A1.6 1.6 0 0 0 12 8Zm2 6v-1a2 2 0 0 0-1.4-1.9',
+    deliverables: 'M2.5 5.5 8 2.5l5.5 3v5L8 13.5l-5.5-3v-5Zm0 0L8 8.5m0 0 5.5-3M8 8.5V14',
+    deadlines: 'M8 4.5V8l2.5 1.5M14 8A6 6 0 1 1 2 8a6 6 0 0 1 12 0Z',
+    payment: 'M2 6h12M2 6a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6Zm3 4h2',
+    timecodes: 'M8 4v4l2.8 1.6M2.5 3.5l1.8 1.6M13.5 3.5l-1.8 1.6M8 8a5.5 5.5 0 1 1 0 6',
+    risks: 'M8 2 1.5 13.5h13L8 2Zm0 5v3m0 2.2v.05',
+  };
+  return (
+    <svg viewBox="0 0 16 16" width={13} height={13} className="adm-doc-section-icon-svg">
+      <path d={paths[kind]} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DocPriorityTag({ priority }: { priority: DocChecklistPriority }) {
+  return (
+    <span className="adm-doc-priority-tag" style={{ color: DOC_PRIORITY_COLOR[priority], borderColor: DOC_PRIORITY_COLOR[priority] }}>
+      <span className="adm-doc-priority-dot" style={{ background: DOC_PRIORITY_COLOR[priority] }} />
+      {priority}
+    </span>
+  );
+}
+
+// Collapsible section shell used for every structured-data block
+// (Summary, Parties, Deliverables, ...). AnimatePresence + height:'auto'
+// is the standard framer-motion accordion pattern used elsewhere on
+// this site's own public-facing components.
+function DocAccordion({
+  icon,
+  title,
+  count,
+  tone,
+  defaultOpen = true,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  count?: number;
+  tone?: 'alert';
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`adm-doc-accordion${tone === 'alert' ? ' adm-doc-accordion--alert' : ''}`}>
+      <button type="button" className="adm-doc-accordion-header" onClick={() => setOpen((v) => !v)}>
+        <span className="adm-doc-accordion-icon">{icon}</span>
+        <span className="adm-doc-accordion-title">{title}</span>
+        {typeof count === 'number' && <span className="adm-doc-accordion-count">{count}</span>}
+        <motion.span className="adm-doc-accordion-chevron" animate={{ rotate: open ? 90 : 0 }} transition={{ duration: 0.2 }}>
+          {'›'}
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            className="adm-doc-accordion-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="adm-doc-accordion-inner">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function DocOverviewStrip({
+  stats,
+  loading,
+  onOpenDeadline,
+}: {
+  stats: DocStats | null;
+  loading: boolean;
+  onOpenDeadline: (analysisId: string) => void;
+}) {
+  const cards = [
+    { label: 'Documents Analyzed', value: stats?.totalAnalyses ?? 0 },
+    { label: 'Open Actions', value: stats?.openChecklistItems ?? 0 },
+    { label: 'High Priority Open', value: stats?.openHighPriority ?? 0, alert: (stats?.openHighPriority ?? 0) > 0 },
+  ];
+  const upcoming = stats?.upcomingDeadlines ?? [];
+  return (
+    <div>
+      <div className="adm-doc-overview">
+        {cards.map((c) => (
+          <div key={c.label} className={`adm-doc-stat-card${c.alert ? ' adm-doc-stat-card--alert' : ''}`}>
+            <div className="adm-doc-stat-value">{loading ? '—' : c.value}</div>
+            <div className="adm-doc-stat-label">{c.label}</div>
+          </div>
+        ))}
+      </div>
+      {upcoming.length > 0 && (
+        <div className="adm-doc-upcoming">
+          <div className="adm-doc-upcoming-title">Upcoming Deadlines</div>
+          <div className="adm-doc-upcoming-list">
+            {upcoming.map((d, i) => (
+              <button key={i} type="button" className="adm-doc-upcoming-item" onClick={() => onOpenDeadline(d.analysisId)}>
+                <span className="adm-doc-upcoming-when">{formatRelativeDate(d.date)}</span>
+                <span className="adm-doc-upcoming-item-text">{d.item}</span>
+                <span className="adm-doc-upcoming-file">{d.filename}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One editable checklist row -- toggle / inline edit / remove, all in
+// one small component so DocChecklistGroup below stays readable.
+function DocChecklistRow({
+  item,
+  onToggle,
+  onEdit,
+  onRemove,
+}: {
+  item: DocChecklistItem;
+  onToggle: (done: boolean) => void;
+  onEdit: (patch: { text?: string; priority?: DocChecklistPriority; category?: string }) => void;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draftText, setDraftText] = useState(item.text);
+  const [draftPriority, setDraftPriority] = useState<DocChecklistPriority>(item.priority);
+
+  const save = () => {
+    const patch: { text?: string; priority?: DocChecklistPriority } = {};
+    if (draftText.trim() && draftText.trim() !== item.text) patch.text = draftText.trim();
+    if (draftPriority !== item.priority) patch.priority = draftPriority;
+    if (Object.keys(patch).length > 0) onEdit(patch);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="adm-doc-checklist-row adm-doc-checklist-row--editing" style={{ borderLeftColor: DOC_PRIORITY_COLOR[draftPriority] }}>
+        <input
+          className="adm-input"
+          value={draftText}
+          onChange={(e) => setDraftText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+          autoFocus
+        />
+        <div className="adm-chip-row">
+          {(['low', 'medium', 'high'] as DocChecklistPriority[]).map((p) => (
+            <button key={p} type="button" className={`adm-chip adm-chip--sm${draftPriority === p ? ' adm-chip--active' : ''}`} onClick={() => setDraftPriority(p)}>
+              {p}
+            </button>
+          ))}
+        </div>
+        <button onClick={save} className="adm-btn adm-btn--primary adm-btn--sm">Save</button>
+        <button onClick={() => setEditing(false)} className="adm-btn adm-btn--ghost adm-btn--sm">Cancel</button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`adm-doc-checklist-row${item.done ? ' adm-doc-checklist-row--done' : ''}`}
+      style={{ borderLeftColor: DOC_PRIORITY_COLOR[item.priority] }}
+    >
+      <button type="button" className="adm-doc-checkbox-btn" onClick={() => onToggle(!item.done)} aria-label={item.done ? 'Mark as not done' : 'Mark as done'}>
+        <DocCheckIcon checked={item.done} />
+      </button>
+      <span className="adm-doc-checklist-text" onClick={() => setEditing(true)} title="Click to edit">
+        {item.text}
+      </span>
+      <DocPriorityTag priority={item.priority} />
+      <button onClick={onRemove} className="adm-doc-checklist-remove" aria-label="Remove item" title="Remove item">
+        {'✕'}
+      </button>
+    </div>
+  );
+}
+
+// Groups the flat checklist array by category, each group its own
+// mini-accordion with its own progress ring -- much easier to scan for
+// a document with 15+ extracted action items than one long flat list.
+function DocChecklistGroup({
+  checklist,
+  onToggle,
+  onEdit,
+  onRemove,
+}: {
+  checklist: DocChecklistItem[];
+  onToggle: (itemId: string, done: boolean) => void;
+  onEdit: (itemId: string, patch: { text?: string; priority?: DocChecklistPriority; category?: string }) => void;
+  onRemove: (itemId: string) => void;
+}) {
+  const groups = new Map<string, DocChecklistItem[]>();
+  checklist.forEach((item) => {
+    const key = item.category || 'General';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(item);
+  });
+
+  return (
+    <div className="adm-doc-checklist-groups">
+      {Array.from(groups.entries()).map(([category, items]) => {
+        const done = items.filter((i) => i.done).length;
+        return (
+          <div key={category} className="adm-doc-checklist-group">
+            <div className="adm-doc-checklist-group-header">
+              <span className="adm-doc-checklist-group-title">{category}</span>
+              <DocProgressRing done={done} total={items.length} size={26} />
+            </div>
+            <div className="adm-doc-checklist">
+              {items.map((item) => (
+                <DocChecklistRow
+                  key={item.id}
+                  item={item}
+                  onToggle={(done) => onToggle(item.id, done)}
+                  onEdit={(patch) => onEdit(item.id, patch)}
+                  onRemove={() => onRemove(item.id)}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Small inline SVG glyphs for the action bar, so buttons read as
+// "download / mail / trash" at a glance instead of text-only.
+function DocActionIcon({ kind }: { kind: 'export' | 'email' | 'delete' }) {
+  const paths: Record<typeof kind, string> = {
+    export: 'M8 2v8m0 0 3-3M8 10 5 7M3 12v1.5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5V12',
+    email: 'M2.5 4.5h11a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Zm0 0 5.5 4 5.5-4',
+    delete: 'M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M6 7v4.5M10 7v4.5M4 4.5l.6 8A1.5 1.5 0 0 0 6.1 14h3.8a1.5 1.5 0 0 0 1.5-1.5l.6-8',
+  };
+  return (
+    <svg viewBox="0 0 16 16" width={12} height={12} className="adm-doc-action-icon-svg">
+      <path d={paths[kind]} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Track Intelligence (2026-07-16) -- the standout feature: when the
+// document mentions a track/file name, this card surfaces the matched
+// track's REAL audio-derived facts (BPM/mood/key/genre + the AI's own
+// prior listening description, both already computed by Media
+// Pipeline), the AI's honest one-line assessment of whether the brief's
+// requirements fit what the track actually sounds like, and the track
+// itself, playable right there via the same NeonAudioPlayer used
+// throughout the rest of the admin panel.
+function DocTrackMatchCard({ match }: { match: DocTrackMatch }) {
+  const facts = [
+    match.genre ? { label: 'Genre', value: match.genre } : null,
+    match.bpm ? { label: 'BPM', value: String(match.bpm) } : null,
+    match.mood ? { label: 'Mood', value: match.mood } : null,
+    match.keySignature ? { label: 'Key', value: match.keySignature } : null,
+  ].filter((f): f is { label: string; value: string } => f !== null);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="adm-doc-trackmatch-card"
+    >
+      <div className="adm-doc-trackmatch-top">
+        <div className="adm-doc-trackmatch-cover" style={match.coverUrl ? { backgroundImage: `url(${match.coverUrl})` } : undefined}>
+          {!match.coverUrl && <span className="adm-doc-trackmatch-cover-note">{'\u266b'}</span>}
+        </div>
+        <div className="adm-doc-trackmatch-meta">
+          <div className="adm-doc-trackmatch-title">{match.title}</div>
+          <div className="adm-doc-trackmatch-matched">matched from "{match.matchedFrom}"</div>
+          {facts.length > 0 && (
+            <div className="adm-doc-trackmatch-facts">
+              {facts.map((f) => (
+                <span key={f.label} className="adm-doc-trackmatch-fact">
+                  <span className="adm-doc-trackmatch-fact-label">{f.label}</span>
+                  {f.value}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {match.aiListenAnalysis && (
+        <div className="adm-doc-trackmatch-heard">
+          <span className="adm-doc-trackmatch-heard-label">AI heard</span>
+          <span className="adm-doc-trackmatch-heard-text">{match.aiListenAnalysis}</span>
+        </div>
+      )}
+
+      {match.fitAssessment && (
+        <div className="adm-doc-trackmatch-insight">
+          <span className="adm-doc-trackmatch-insight-icon" aria-hidden>{'\u2728'}</span>
+          <span>{match.fitAssessment}</span>
+        </div>
+      )}
+
+      {match.audioUrl && (
+        <div className="adm-doc-trackmatch-player">
+          <NeonAudioPlayer src={match.audioUrl} />
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// The full detail view -- reused for both "just analyzed" and "reopened
+// from archive". Header (file badge, title, progress ring, meta), an
+// action bar, degraded/truncated notices, an inline email form, then
+// every extracted section as its own collapsible accordion, ending with
+// the grouped, editable checklist.
+function DocAnalysisView({
+  analysis,
+  onToggleItem,
+  onEditItem,
+  onAddItem,
+  onRemoveItem,
+  onExport,
+  onEmail,
+  onDelete,
+  exporting,
+  emailing,
+  deleting,
+  showDelete,
+}: {
+  analysis: DocAnalysis;
+  onToggleItem: (itemId: string, done: boolean) => void;
+  onEditItem: (itemId: string, patch: { text?: string; priority?: DocChecklistPriority; category?: string }) => void;
+  onAddItem: (text: string, priority: DocChecklistPriority) => void;
+  onRemoveItem: (itemId: string) => void;
+  onExport: () => void;
+  onEmail: (to: string, note: string) => void;
+  onDelete?: () => void;
+  exporting: boolean;
+  emailing: boolean;
+  deleting: boolean;
+  showDelete: boolean;
+}) {
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailNote, setEmailNote] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [newItemText, setNewItemText] = useState('');
+  const [newItemPriority, setNewItemPriority] = useState<DocChecklistPriority>('medium');
+
+  const doneCount = analysis.checklist.filter((i) => i.done).length;
+  const totalCount = analysis.checklist.length;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo);
+
+  return (
+    <motion.div
+      key={analysis.id}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className="adm-panel adm-doc-detail"
+    >
+      <div className="adm-doc-detail-header">
+        <div className="adm-doc-detail-headline">
+          <DocFileTypeBadge type={analysis.fileType} />
+          <div>
+            <div className="adm-panel-title" style={{ marginBottom: 2 }}>{analysis.filename}</div>
+            <p className="adm-panel-subtitle" style={{ margin: 0 }}>
+              Analyzed {new Date(analysis.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+            </p>
+          </div>
+        </div>
+        <div className="adm-doc-detail-headright">
+          {totalCount > 0 && <DocProgressRing done={doneCount} total={totalCount} size={42} />}
+          <div className="adm-row adm-doc-action-bar">
+            <button onClick={onExport} disabled={exporting} className="adm-btn adm-btn--ghost adm-btn--sm">
+              <DocActionIcon kind="export" /> {exporting ? 'Exporting…' : 'Export PDF'}
+            </button>
+            <button onClick={() => setEmailOpen((v) => !v)} className="adm-btn adm-btn--ghost adm-btn--sm">
+              <DocActionIcon kind="email" /> Email
+            </button>
+            {showDelete && onDelete && !confirmDelete && (
+              <button onClick={() => setConfirmDelete(true)} disabled={deleting} className="adm-btn adm-btn--danger adm-btn--sm">
+                <DocActionIcon kind="delete" /> Delete
+              </button>
+            )}
+            {showDelete && onDelete && confirmDelete && (
+              <div className="adm-doc-confirm-delete">
+                <span>Delete this?</span>
+                <button onClick={onDelete} disabled={deleting} className="adm-btn adm-btn--danger adm-btn--sm">
+                  {deleting ? 'Deleting…' : 'Yes'}
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="adm-btn adm-btn--ghost adm-btn--sm">No</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {analysis.degraded && (
+        <p className="adm-notice">{analysis.degradedReason || 'AI analysis was unavailable — showing whatever could be extracted without it.'}</p>
+      )}
+      {analysis.truncated && (
+        <p className="adm-notice">This document was long and was truncated before analysis — some later content may not be reflected below.</p>
+      )}
+
+      <AnimatePresence initial={false}>
+        {emailOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="adm-doc-email-form">
+              <input className="adm-input" placeholder="recipient@example.com" value={emailTo} onChange={(e) => setEmailTo(e.target.value)} />
+              <textarea className="adm-textarea" placeholder="Optional note to include in the email…" rows={2} value={emailNote} onChange={(e) => setEmailNote(e.target.value)} />
+              <div className="adm-row" style={{ gap: 8 }}>
+                <button
+                  onClick={() => { onEmail(emailTo, emailNote); setEmailOpen(false); setEmailTo(''); setEmailNote(''); }}
+                  disabled={!emailValid || emailing}
+                  className="adm-btn adm-btn--primary adm-btn--sm"
+                >
+                  {emailing ? 'Sending…' : 'Send'}
+                </button>
+                <button onClick={() => setEmailOpen(false)} className="adm-btn adm-btn--ghost adm-btn--sm">Cancel</button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {analysis.trackMatches.length > 0 && (
+        <div className="adm-doc-trackmatch-section">
+          <div className="adm-doc-trackmatch-section-title">
+            <span aria-hidden>{'\u266a'}</span> Referenced Tracks
+          </div>
+          <div className="adm-doc-trackmatch-grid">
+            {analysis.trackMatches.map((match) => (
+              <DocTrackMatchCard key={match.trackId} match={match} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="adm-doc-sections">
+        {analysis.summary && (
+          <DocAccordion icon={<DocSectionIcon kind="summary" />} title="Summary">
+            <p className="adm-doc-summary">{analysis.summary}</p>
+          </DocAccordion>
+        )}
+
+        <DocAccordion icon={<DocSectionIcon kind="parties" />} title="Parties" count={analysis.parties.length}>
+          {analysis.parties.length === 0 ? <p className="adm-doc-empty">None identified.</p> : (
+            <ul className="adm-doc-list">
+              {analysis.parties.map((p, i) => <li key={i}>{p.name} — <span className="adm-doc-muted">{p.role}</span></li>)}
+            </ul>
+          )}
+        </DocAccordion>
+
+        <DocAccordion icon={<DocSectionIcon kind="deliverables" />} title="Deliverables" count={analysis.deliverables.length}>
+          {analysis.deliverables.length === 0 ? <p className="adm-doc-empty">None identified.</p> : (
+            <ul className="adm-doc-list">{analysis.deliverables.map((d, i) => <li key={i}>{d}</li>)}</ul>
+          )}
+        </DocAccordion>
+
+        <DocAccordion icon={<DocSectionIcon kind="deadlines" />} title="Deadlines" count={analysis.deadlines.length}>
+          {analysis.deadlines.length === 0 ? <p className="adm-doc-empty">None identified.</p> : (
+            <ul className="adm-doc-list adm-doc-list--deadlines">
+              {[...analysis.deadlines]
+                .sort((a, b) => {
+                  if (a.parsedDate && b.parsedDate) return a.parsedDate.localeCompare(b.parsedDate);
+                  if (a.parsedDate && !b.parsedDate) return -1;
+                  if (!a.parsedDate && b.parsedDate) return 1;
+                  return 0;
+                })
+                .map((d, i) => (
+                  <li key={i}>
+                    {d.item} — <span className="adm-doc-muted">{d.date}</span>
+                    {d.parsedDate ? (
+                      <span className="adm-doc-date-badge">{formatRelativeDate(d.parsedDate)}</span>
+                    ) : (
+                      <span className="adm-doc-date-unclear">date unclear</span>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </DocAccordion>
+
+        <DocAccordion icon={<DocSectionIcon kind="payment" />} title="Payment Terms" count={analysis.paymentTerms.length}>
+          {analysis.paymentTerms.length === 0 ? <p className="adm-doc-empty">None identified.</p> : (
+            <ul className="adm-doc-list">{analysis.paymentTerms.map((p, i) => <li key={i}>{p}</li>)}</ul>
+          )}
+        </DocAccordion>
+
+        {analysis.timecodes.length > 0 && (
+          <DocAccordion icon={<DocSectionIcon kind="timecodes" />} title="Timecodes" count={analysis.timecodes.length} defaultOpen={false}>
+            <ul className="adm-doc-list">{analysis.timecodes.map((t, i) => <li key={i}>{t}</li>)}</ul>
+          </DocAccordion>
+        )}
+
+        {analysis.risks.length > 0 && (
+          <DocAccordion icon={<DocSectionIcon kind="risks" />} title="Risks & Notes" count={analysis.risks.length} tone="alert">
+            <ul className="adm-doc-list adm-doc-list--risk">{analysis.risks.map((r, i) => <li key={i}>{r}</li>)}</ul>
+          </DocAccordion>
+        )}
+      </div>
+
+      <div className="adm-doc-section-divider" />
+
+      <div className="adm-doc-section">
+        <div className="adm-doc-section-title">Action Checklist</div>
+        {analysis.checklist.length === 0 ? (
+          <p className="adm-doc-empty">No checklist items yet.</p>
+        ) : (
+          <DocChecklistGroup checklist={analysis.checklist} onToggle={onToggleItem} onEdit={onEditItem} onRemove={onRemoveItem} />
+        )}
+
+        <div className="adm-doc-add-item">
+          <input
+            className="adm-input"
+            placeholder="Add a manual checklist item…"
+            value={newItemText}
+            onChange={(e) => setNewItemText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && newItemText.trim()) { onAddItem(newItemText.trim(), newItemPriority); setNewItemText(''); } }}
+          />
+          <div className="adm-chip-row">
+            {(['low', 'medium', 'high'] as DocChecklistPriority[]).map((p) => (
+              <button key={p} type="button" className={`adm-chip${newItemPriority === p ? ' adm-chip--active' : ''}`} onClick={() => setNewItemPriority(p)}>{p}</button>
+            ))}
+          </div>
+          <button
+            onClick={() => { if (newItemText.trim()) { onAddItem(newItemText.trim(), newItemPriority); setNewItemText(''); } }}
+            disabled={!newItemText.trim()}
+            className="adm-btn adm-btn--ghost adm-btn--sm"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// Staged, promise-driven progress feel for the single "analyze" black-box
+// request: advances through labeled steps on a timer while `active` is
+// true, and simply stops advancing (never gets stuck) once the real
+// request resolves and `active` flips back to false.
+function useStagedProgress(active: boolean, steps: string[]) {
+  const [stepIndex, setStepIndex] = useState(0);
+  useEffect(() => {
+    if (!active) { setStepIndex(0); return; }
+    const interval = window.setInterval(() => {
+      setStepIndex((i) => Math.min(i + 1, steps.length - 1));
+    }, 1100);
+    return () => window.clearInterval(interval);
+  }, [active, steps.length]);
+  return steps[stepIndex];
+}
+
+// ---- Quick guide box, 2026-07-16 (per Reza) ----
+// A single always-available reference explaining every capability of
+// this tab in plain language, so the admin never has to guess what a
+// feature does or how to use it. Collapsible (state remembered across
+// visits via localStorage), glowing border to draw the eye the first
+// time without becoming a permanent distraction once it's been read.
+function DocGuideIcon({ kind }: { kind: 'upload' | 'summary' | 'checklist' | 'expand' | 'calendar' | 'music' | 'archive' | 'share' }) {
+  const paths: Record<typeof kind, string> = {
+    upload: 'M8 11V3m0 0L5 6m3-3 3 3M3 12.5v.5A1.5 1.5 0 0 0 4.5 14.5h7A1.5 1.5 0 0 0 13 13v-.5',
+    summary: 'M3 4h10M3 8h10M3 12h6',
+    checklist: 'M3 4.5h1.5L6 6l2.5-2.5M3 9.5h1.5L6 11l2.5-2.5M9.5 4.5h4M9.5 9.5h4M3 14.5h10',
+    expand: 'M5 3H3v2M11 3h2v2M5 13H3v-2M11 13h2v-2M6 6l-2-2M10 6l2-2M6 10l-2 2M10 10l2 2',
+    calendar: 'M3.5 3.5h9a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Zm0 3.5h10M6 2.5v2M10 2.5v2',
+    music: 'M6 12.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm7-1.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM6 11V3.8L13 2.5V8',
+    archive: 'M2.5 4.5h11v2h-11v-2Zm.75 2h9.5V13a1 1 0 0 1-1 1h-7.5a1 1 0 0 1-1-1V6.5ZM6.5 8.5h3',
+    share: 'M8 2v8m0 0 3-3M8 10 5 7M3 12v1.5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5V12',
+  };
+  return (
+    <svg viewBox="0 0 16 16" width={15} height={15} className="adm-doc-guide-item-icon-svg">
+      <path d={paths[kind]} fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+const DOC_GUIDE_ITEMS: { icon: Parameters<typeof DocGuideIcon>[0]['kind']; title: string; text: string; badge?: string }[] = [
+  {
+    icon: 'upload',
+    title: 'Get Started',
+    text: 'Drop in a PDF, TXT, or EML file — or switch to "Paste text" if you don\u2019t have a file handy. Client briefs, contracts, and project emails all work the same way.',
+  },
+  {
+    icon: 'summary',
+    title: 'What You Get',
+    text: 'The AI reads the document and pulls out everything that matters: a plain-English summary, who\u2019s involved, what needs to be delivered, when it\u2019s due, payment terms, and anything worth double-checking before you agree to it.',
+  },
+  {
+    icon: 'checklist',
+    title: 'Smart Checklist',
+    text: 'Every requirement becomes a checkable action item, sorted by priority and grouped by category. Check items off, edit the wording, or add your own — everything saves instantly, nothing is lost on refresh.',
+  },
+  {
+    icon: 'expand',
+    title: 'Any Length, No Limits',
+    text: 'Short emails and long contracts are both handled automatically. Long documents are split into sections behind the scenes and merged back together — you never have to do anything differently.',
+  },
+  {
+    icon: 'calendar',
+    title: 'Real Deadlines',
+    text: 'When the AI can confidently read an actual date, it appears as a live countdown at the top of this tab — click any one to jump straight to that document.',
+  },
+  {
+    icon: 'music',
+    title: 'Track Intelligence',
+    text: 'If a document mentions one of your tracks by name or filename, it\u2019s automatically matched against your music library. You\u2019ll see its real BPM, mood, and key, an honest AI opinion on whether it actually fits what the brief is asking for, and you can play it right there.',
+    badge: 'New',
+  },
+  {
+    icon: 'archive',
+    title: 'Everything is Saved',
+    text: 'Every analysis is stored permanently in your Archive — searchable by name or summary, filterable by file type, and sortable by date or by how much is still open.',
+  },
+  {
+    icon: 'share',
+    title: 'Share It',
+    text: 'One click turns any analysis into a polished PDF, or emails it directly to a client or collaborator using your own email setup from Gatekeeper Hub \u2192 Security.',
+  },
+];
+
+function DocGuideBox() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem('ace-doc-guide-collapsed') !== '1';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem('ace-doc-guide-collapsed', next ? '0' : '1');
+      } catch {
+        /* localStorage unavailable -- state still toggles for this session */
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div className="adm-doc-guide">
+      <button type="button" className="adm-doc-guide-header" onClick={toggle}>
+        <span className="adm-doc-guide-header-icon" aria-hidden>{'\u2726'}</span>
+        <span className="adm-doc-guide-header-title">How Document Assistant Works</span>
+        <span className="adm-doc-guide-header-sub">— a quick guide to every feature on this tab</span>
+        <motion.span className="adm-doc-guide-chevron" animate={{ rotate: open ? 90 : 0 }} transition={{ duration: 0.2 }}>
+          {'\u203a'}
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="adm-doc-guide-grid">
+              {DOC_GUIDE_ITEMS.map((item) => (
+                <div key={item.title} className="adm-doc-guide-item">
+                  <div className="adm-doc-guide-item-head">
+                    <span className="adm-doc-guide-item-icon"><DocGuideIcon kind={item.icon} /></span>
+                    <span className="adm-doc-guide-item-title">{item.title}</span>
+                    {item.badge && <span className="adm-doc-guide-item-badge">{item.badge}</span>}
+                  </div>
+                  <p className="adm-doc-guide-item-text">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 const TabDocumentAssistant = () => {
+  const [view, setView] = useState<'new' | 'archive'>('new');
+
+  // "New analysis" state
+  const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload');
   const [file, setFile] = useState<File | null>(null);
-  const [checklist, setChecklist] = useState<{ category: string; items: string[] }[]>([]);
+  const [dragActive, setDragActive] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteFilename, setPasteFilename] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [currentAnalysis, setCurrentAnalysis] = useState<DocAnalysis | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const analyzeStepLabel = useStagedProgress(analyzing, DOC_ANALYZE_STEPS);
+
+  // Archive state
+  const [archiveRows, setArchiveRows] = useState<DocAnalysis[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveQuery, setArchiveQuery] = useState('');
+  const [archiveTypeFilter, setArchiveTypeFilter] = useState<'all' | DocAnalysis['fileType']>('all');
+  const [archiveOpenOnly, setArchiveOpenOnly] = useState(false);
+  const [archiveSort, setArchiveSort] = useState<'newest' | 'oldest' | 'mostOpen'>('newest');
+  const [openArchiveId, setOpenArchiveId] = useState<string | null>(null);
+
+  // Overview stats (loaded once, refreshed after any mutation)
+  const [stats, setStats] = useState<DocStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Shared busy flags for the currently-open analysis (either mode)
+  const [exporting, setExporting] = useState(false);
+  const [emailing, setEmailing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const acceptExt = (name: string) => /\.(pdf|txt|eml)$/i.test(name);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const result = await apiGet<DocStats>('/api/documents/stats');
+      setStats(result);
+    } catch {
+      /* non-critical -- overview simply stays at its last known state */
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  const loadArchive = useCallback(async (q?: string) => {
+    setArchiveLoading(true);
+    try {
+      const qs = q ? `?q=${encodeURIComponent(q)}` : '';
+      const rows = await apiGet<DocAnalysis[]>(`/api/documents${qs}`);
+      setArchiveRows(rows ?? []);
+    } catch {
+      setArchiveRows([]);
+    } finally {
+      setArchiveLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadStats(); }, [loadStats]);
+
+  useEffect(() => {
+    if (view === 'archive') void loadArchive(archiveQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  const handleFileSelected = (f: File | null) => {
+    if (f && !acceptExt(f.name)) {
+      setNotice('Only .pdf, .txt, and .eml files are supported.');
+      return;
+    }
+    setFile(f);
+    setCurrentAnalysis(null);
+    setNotice(null);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragActive(false);
+    const dropped = e.dataTransfer.files?.[0];
+    if (dropped) handleFileSelected(dropped);
+  };
 
   const handleAnalyze = async () => {
-    if (!file || analyzing) return;
+    if (analyzing) return;
+    if (inputMode === 'upload' && !file) return;
+    if (inputMode === 'paste' && !pasteText.trim()) return;
+
     setAnalyzing(true);
     setNotice(null);
-    setChecklist([]);
+    setCurrentAnalysis(null);
     try {
-      const formData = new FormData();
-      formData.append('document', file);
-      const data = await apiPost<{
-        timecodes?: unknown[];
-        revisions?: unknown[];
-        deliverables?: unknown[];
-        deadlines?: unknown[];
-        degraded?: boolean;
-        message?: string;
-      } | null>('/api/documents/analyze', formData);
-
-      if (!data) {
-        setNotice('Document analysis is unavailable in demo mode.');
-        return;
+      let result: DocAnalysis;
+      if (inputMode === 'upload' && file) {
+        const formData = new FormData();
+        formData.append('document', file);
+        result = await apiPost<DocAnalysis>('/api/documents/analyze', formData);
+      } else {
+        result = await apiPost<DocAnalysis>('/api/documents/analyze', {
+          text: pasteText,
+          filename: pasteFilename.trim() || undefined,
+        });
       }
-
-      const toItems = (v: unknown[] | undefined): string[] =>
-        Array.isArray(v) ? v.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) : [];
-
-      const groups = [
-        { category: 'Timecodes', items: toItems(data.timecodes) },
-        { category: 'Revisions', items: toItems(data.revisions) },
-        { category: 'Deliverables', items: toItems(data.deliverables) },
-        { category: 'Deadlines', items: toItems(data.deadlines) },
-      ].filter((g) => g.items.length > 0);
-
-      setChecklist(groups);
-      if (data.degraded || groups.length === 0) {
-        setNotice(data.message ?? 'No items extracted. Configure LLM_NARRATIVE_API_KEY for AI analysis.');
-      }
+      setCurrentAnalysis(result);
+      if (result.degraded) setNotice(result.degradedReason ?? 'Analysis completed with limited results.');
+      void loadStats();
     } catch {
       setNotice('Could not analyze the document. Please try again.');
     } finally {
@@ -1383,65 +2322,334 @@ const TabDocumentAssistant = () => {
     }
   };
 
+  const clearNew = () => {
+    setFile(null);
+    setPasteText('');
+    setPasteFilename('');
+    setCurrentAnalysis(null);
+    setNotice(null);
+  };
+
+  // ---- Actions shared by both the "just analyzed" and "reopened from archive" views ----
+
+  const applyChecklistUpdate = async (id: string, body: Record<string, unknown>) => {
+    const updated = (await apiPut(`/api/documents/${id}/checklist`, body)) as DocAnalysis;
+    if (currentAnalysis?.id === id) setCurrentAnalysis(updated);
+    setArchiveRows((rows) => rows.map((r) => (r.id === id ? updated : r)));
+    void loadStats();
+    return updated;
+  };
+
+  const handleToggleItem = (id: string) => (itemId: string, done: boolean) => {
+    void applyChecklistUpdate(id, { action: 'toggle', itemId, done });
+  };
+  const handleEditItem = (id: string) => (itemId: string, patch: { text?: string; priority?: DocChecklistPriority; category?: string }) => {
+    void applyChecklistUpdate(id, { action: 'edit', itemId, ...patch });
+  };
+  const handleAddItem = (id: string) => (text: string, priority: DocChecklistPriority) => {
+    void applyChecklistUpdate(id, { action: 'add', text, priority, category: 'Manual' });
+  };
+  const handleRemoveItem = (id: string) => (itemId: string) => {
+    void applyChecklistUpdate(id, { action: 'remove', itemId });
+  };
+
+  const downloadPdf = async (analysis: DocAnalysis) => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/documents/${analysis.id}/export`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${analysis.filename.replace(/[^a-z0-9.-]/gi, '_')}-analysis.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setNotice('Could not export the PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const sendEmail = async (analysis: DocAnalysis, to: string, note: string) => {
+    setEmailing(true);
+    try {
+      await apiPost(`/api/documents/${analysis.id}/email`, { to, note: note || undefined });
+      setNotice(`Sent to ${to}.`);
+    } catch {
+      setNotice('Could not send the email. Check SMTP setup in Gatekeeper Hub → Security.');
+    } finally {
+      setEmailing(false);
+    }
+  };
+
+  const deleteAnalysis = async (analysis: DocAnalysis) => {
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/documents/${analysis.id}`);
+      setArchiveRows((rows) => rows.filter((r) => r.id !== analysis.id));
+      if (openArchiveId === analysis.id) setOpenArchiveId(null);
+      if (currentAnalysis?.id === analysis.id) setCurrentAnalysis(null);
+      void loadStats();
+    } catch {
+      setNotice('Could not delete this analysis. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Clicking an "Upcoming Deadlines" entry jumps straight to that
+  // analysis in the Archive view, loading the archive first if it
+  // hasn't been fetched yet this session.
+  const openDeadlineAnalysis = async (analysisId: string) => {
+    setView('archive');
+    if (archiveRows.length === 0) await loadArchive();
+    setOpenArchiveId(analysisId);
+  };
+
+  const openArchiveRow = archiveRows.find((r) => r.id === openArchiveId) || null;
+  const pasteCharColor = pasteText.length > DOC_MAX_CHARS ? '#c0463a' : pasteText.length > DOC_SINGLE_CALL_LIMIT ? '#b8863a' : 'var(--text-dim-color)';
+
+  const filteredArchive = archiveRows
+    .filter((r) => archiveTypeFilter === 'all' || r.fileType === archiveTypeFilter)
+    .filter((r) => !archiveOpenOnly || r.checklist.some((i) => !i.done))
+    .sort((a, b) => {
+      if (archiveSort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (archiveSort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      const openA = a.checklist.filter((i) => !i.done).length;
+      const openB = b.checklist.filter((i) => !i.done).length;
+      return openB - openA;
+    });
+
   return (
     <div className="space-y-4">
       <div className="adm-panel">
         <div className="adm-panel-title">Document Assistant</div>
-        <p className="adm-panel-subtitle">Upload a brief/contract (.pdf, .txt, .eml) to pull out timecodes, revisions, deliverables, and deadlines.</p>
+        <p className="adm-panel-subtitle">
+          Upload or paste a brief, contract, or project email — get a structured summary, deadlines, deliverables,
+          payment terms, and a prioritized action checklist you can check off, export, or email.
+        </p>
 
-        <div
-          className="adm-dropzone"
-          onClick={() => fileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-        >
-          {file ? (
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{file.name}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted-color)', marginTop: 4 }}>
-                Click to choose a different file
+        <DocGuideBox />
+
+        <DocOverviewStrip stats={stats} loading={statsLoading} onOpenDeadline={(id) => void openDeadlineAnalysis(id)} />
+
+        <div className="adm-chip-row mt-3">
+          <button className={`adm-chip${view === 'new' ? ' adm-chip--active' : ''}`} onClick={() => setView('new')}>New Analysis</button>
+          <button className={`adm-chip${view === 'archive' ? ' adm-chip--active' : ''}`} onClick={() => setView('archive')}>Archive</button>
+        </div>
+      </div>
+
+      {view === 'new' && (
+        <div className="adm-panel space-y-3">
+          <div className="adm-chip-row">
+            <button className={`adm-chip${inputMode === 'upload' ? ' adm-chip--active' : ''}`} onClick={() => { setInputMode('upload'); setCurrentAnalysis(null); setNotice(null); }}>Upload a file</button>
+            <button className={`adm-chip${inputMode === 'paste' ? ' adm-chip--active' : ''}`} onClick={() => { setInputMode('paste'); setCurrentAnalysis(null); setNotice(null); }}>Paste text</button>
+          </div>
+
+          {inputMode === 'upload' ? (
+            <>
+              <div
+                className={`adm-dropzone adm-doc-dropzone${dragActive ? ' adm-dropzone--active' : ''}${file ? ' adm-doc-dropzone--filled' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={handleDrop}
+              >
+                {file ? (
+                  <div className="adm-doc-dropzone-filled">
+                    <DocFileTypeBadge type={acceptExt(file.name) ? (file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : file.name.toLowerCase().endsWith('.eml') ? 'eml' : 'txt') : 'txt'} />
+                    <div className="adm-doc-dropzone-filled-info">
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{file.name}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted-color)', marginTop: 2 }}>
+                        {(file.size / 1024).toFixed(0)} KB
+                      </div>
+                    </div>
+                    <button type="button" className="adm-btn adm-btn--ghost adm-btn--sm" onClick={() => fileInputRef.current?.click()}>
+                      Change File
+                    </button>
+                  </div>
+                ) : (
+                  <motion.div animate={{ scale: dragActive ? 1.03 : 1 }} transition={{ duration: 0.15 }} className="adm-doc-dropzone-empty">
+                    <div style={{ fontSize: '1.7rem', marginBottom: 6, color: 'var(--accent-color)' }} aria-hidden>{'↪'}</div>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Drag & drop a file here</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted-color)', margin: '4px 0 12px' }}>.pdf, .txt, or .eml — up to 15MB</div>
+                    <div className="adm-doc-dropzone-or">or</div>
+                    <button type="button" className="adm-btn adm-btn--primary adm-btn--sm" onClick={() => fileInputRef.current?.click()}>
+                      Choose File
+                    </button>
+                  </motion.div>
+                )}
               </div>
-            </div>
+              <input ref={fileInputRef} type="file" accept=".pdf,.txt,.eml" style={{ display: 'none' }} onChange={(e) => handleFileSelected(e.target.files?.[0] || null)} />
+            </>
           ) : (
-            <div>
-              <div style={{ fontSize: '1.6rem', marginBottom: 6, color: 'var(--accent-color)' }} aria-hidden>⇪</div>
-              <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Drop or click to upload</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted-color)', marginTop: 4 }}>.pdf, .txt, or .eml</div>
+            <>
+              <input
+                className="adm-input"
+                placeholder="Optional label for this text (e.g. Email from Acme Studios, March)"
+                value={pasteFilename}
+                onChange={(e) => setPasteFilename(e.target.value)}
+              />
+              <textarea
+                className="adm-textarea"
+                placeholder="Paste the brief, contract, or email text here…"
+                rows={8}
+                value={pasteText}
+                onChange={(e) => { setPasteText(e.target.value); setCurrentAnalysis(null); }}
+              />
+              <div className="adm-doc-char-count" style={{ color: pasteCharColor }}>
+                {pasteText.length.toLocaleString('en-US')} characters
+                {pasteText.length > DOC_SINGLE_CALL_LIMIT && pasteText.length <= DOC_MAX_CHARS && ' — long documents are processed in sections automatically'}
+                {pasteText.length > DOC_MAX_CHARS && ` — this exceeds the ${DOC_MAX_CHARS.toLocaleString('en-US')} character limit; the excess will be left out of the analysis`}
+              </div>
+            </>
+          )}
+
+          <div className="adm-row" style={{ alignItems: 'center' }}>
+            <button
+              onClick={handleAnalyze}
+              disabled={analyzing || (inputMode === 'upload' ? !file : !pasteText.trim())}
+              className="adm-btn adm-btn--primary"
+            >
+              {analyzing ? 'Analyzing…' : 'Analyze'}
+            </button>
+            <button onClick={clearNew} className="adm-btn adm-btn--ghost">Clear</button>
+            <AnimatePresence>
+              {analyzing && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="adm-doc-analyzing-step"
+                >
+                  <span className="adm-doc-analyzing-dot" />
+                  {analyzeStepLabel}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+          {notice && !currentAnalysis && <p className="adm-notice">{notice}</p>}
+        </div>
+      )}
+
+      <AnimatePresence mode="wait">
+        {view === 'new' && currentAnalysis && (
+          <div key="new-result">
+            {notice && <p className="adm-notice">{notice}</p>}
+            <DocAnalysisView
+              analysis={currentAnalysis}
+              onToggleItem={handleToggleItem(currentAnalysis.id)}
+              onEditItem={handleEditItem(currentAnalysis.id)}
+              onAddItem={handleAddItem(currentAnalysis.id)}
+              onRemoveItem={handleRemoveItem(currentAnalysis.id)}
+              onExport={() => downloadPdf(currentAnalysis)}
+              onEmail={(to, note) => sendEmail(currentAnalysis, to, note)}
+              exporting={exporting}
+              emailing={emailing}
+              deleting={deleting}
+              showDelete={false}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
+      {view === 'archive' && (
+        <div className="adm-panel space-y-3">
+          <input
+            className="adm-input"
+            placeholder="Search by filename or summary…"
+            value={archiveQuery}
+            onChange={(e) => setArchiveQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void loadArchive(archiveQuery); }}
+          />
+          <div className="adm-doc-archive-filters">
+            <div className="adm-chip-row">
+              {(['all', 'pdf', 'txt', 'eml', 'paste'] as const).map((t) => (
+                <button key={t} className={`adm-chip adm-chip--sm${archiveTypeFilter === t ? ' adm-chip--active' : ''}`} onClick={() => setArchiveTypeFilter(t)}>
+                  {t === 'all' ? 'All' : DOC_FILE_TYPE_META[t].label}
+                </button>
+              ))}
+            </div>
+            <div className="adm-chip-row">
+              <button className={`adm-chip adm-chip--sm${archiveOpenOnly ? ' adm-chip--active' : ''}`} onClick={() => setArchiveOpenOnly((v) => !v)}>Open items only</button>
+            </div>
+            <div className="adm-chip-row">
+              {(['newest', 'oldest', 'mostOpen'] as const).map((s) => (
+                <button key={s} className={`adm-chip adm-chip--sm${archiveSort === s ? ' adm-chip--active' : ''}`} onClick={() => setArchiveSort(s)}>
+                  {s === 'newest' ? 'Newest' : s === 'oldest' ? 'Oldest' : 'Most open'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {archiveLoading ? (
+            <p className="adm-doc-empty">Loading…</p>
+          ) : filteredArchive.length === 0 ? (
+            <p className="adm-doc-empty">{archiveRows.length === 0 ? 'No saved analyses yet. Run one from "New Analysis".' : 'No analyses match these filters.'}</p>
+          ) : (
+            <div className="adm-doc-archive-grid">
+              {filteredArchive.map((row) => {
+                const doneCount = row.checklist.filter((i) => i.done).length;
+                const openHigh = row.checklist.filter((i) => !i.done && i.priority === 'high').length;
+                return (
+                  <motion.div
+                    key={row.id}
+                    layout
+                    className={`adm-doc-archive-card${openArchiveId === row.id ? ' adm-doc-archive-card--active' : ''}`}
+                    onClick={() => setOpenArchiveId(openArchiveId === row.id ? null : row.id)}
+                  >
+                    <div className="adm-doc-archive-card-top">
+                      <DocFileTypeBadge type={row.fileType} size="sm" />
+                      <span className="adm-doc-archive-card-date">
+                        {new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <div className="adm-doc-archive-card-title" title={row.filename}>{row.filename}</div>
+                    <div className="adm-doc-archive-card-summary">{row.summary || 'No summary available.'}</div>
+                    <div className="adm-doc-archive-card-footer">
+                      {row.checklist.length > 0 ? (
+                        <>
+                          <DocProgressRing done={doneCount} total={row.checklist.length} size={24} />
+                          <span className="adm-doc-archive-card-progress-label">{doneCount}/{row.checklist.length} done</span>
+                        </>
+                      ) : <span className="adm-doc-archive-card-progress-label">No checklist</span>}
+                      {row.trackMatches.length > 0 && (
+                        <span className="adm-doc-archive-card-track-badge" title={`${row.trackMatches.length} matched track(s)`}>{'\u266a'}</span>
+                      )}
+                      {openHigh > 0 && <span className="adm-doc-archive-card-urgent">{openHigh} urgent</span>}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.txt,.eml"
-          style={{ display: 'none' }}
-          onChange={(e) => { setFile(e.target.files?.[0] || null); setChecklist([]); setNotice(null); }}
-        />
+      )}
 
-        {file && (
-          <div className="adm-row mt-4">
-            <button onClick={handleAnalyze} disabled={analyzing} className="adm-btn adm-btn--primary">
-              {analyzing ? 'Analyzing…' : 'Analyze'}
-            </button>
-            <button onClick={() => { setFile(null); setChecklist([]); setNotice(null); }} className="adm-btn adm-btn--ghost">
-              Clear
-            </button>
+      <AnimatePresence mode="wait">
+        {view === 'archive' && openArchiveRow && (
+          <div key={`archive-detail-${openArchiveRow.id}`}>
+            {notice && <p className="adm-notice">{notice}</p>}
+            <DocAnalysisView
+              analysis={openArchiveRow}
+              onToggleItem={handleToggleItem(openArchiveRow.id)}
+              onEditItem={handleEditItem(openArchiveRow.id)}
+              onAddItem={handleAddItem(openArchiveRow.id)}
+              onRemoveItem={handleRemoveItem(openArchiveRow.id)}
+              onExport={() => downloadPdf(openArchiveRow)}
+              onEmail={(to, note) => sendEmail(openArchiveRow, to, note)}
+              onDelete={() => deleteAnalysis(openArchiveRow)}
+              exporting={exporting}
+              emailing={emailing}
+              deleting={deleting}
+              showDelete
+            />
           </div>
         )}
-        {notice && <p className="adm-notice mt-3">{notice}</p>}
-      </div>
-      {checklist.length > 0 && (
-        <div className="adm-panel space-y-3">
-          {checklist.map((group, i) => (
-            <div key={i}>
-              <h4 className="font-semibold text-sm mb-1">{group.category}</h4>
-              <ul className="list-disc pl-5 text-xs text-[var(--text-muted-color)] space-y-0.5">
-                {group.items.map((item, j) => <li key={j}>{item}</li>)}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
+      </AnimatePresence>
     </div>
   );
 };

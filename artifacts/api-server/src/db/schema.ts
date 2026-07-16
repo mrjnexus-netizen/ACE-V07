@@ -362,6 +362,53 @@ export const chatLogs = pgTable(
   })
 );
 
+// ============================================================
+// Document Assistant — saved analyses (2026-07-16).
+// One row per uploaded/pasted document ever run through AI analysis.
+// Checklist items are persisted as a jsonb array so admin check/uncheck
+// state survives across sessions instead of being a one-shot in-memory
+// result, matching every other "review panel" pattern in this project
+// (Media Pipeline, Poster Studio) where AI output becomes a durable,
+// admin-editable record rather than a disposable response.
+// ============================================================
+export const documentAnalyses = pgTable(
+  'document_analyses',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    filename: text('filename').notNull(),
+    fileType: text('file_type').notNull(), // 'pdf' | 'txt' | 'eml' | 'paste'
+    sourceFileUrl: text('source_file_url'), // S3 — null for pasted-text analyses (no original file)
+    summary: text('summary'),
+    parties: jsonb('parties').notNull().default([]), // [{name, role}]
+    deliverables: jsonb('deliverables').notNull().default([]), // [string]
+    deadlines: jsonb('deadlines').notNull().default([]), // [{item, date}] — date is a free-text string (AI-extracted, not always ISO)
+    paymentTerms: jsonb('payment_terms').notNull().default([]), // [string]
+    timecodes: jsonb('timecodes').notNull().default([]), // [string]
+    risks: jsonb('risks').notNull().default([]), // [string] — ambiguities/risks worth flagging to the composer
+    checklist: jsonb('checklist').notNull().default([]), // [{id, text, priority:'high'|'medium'|'low', category, done}]
+    // 2026-07-16 — cross-referenced music tracks. When the document
+    // mentions a track/file name, this holds the matched track(s) from
+    // the tracks table plus an AI-generated one-line assessment of
+    // whether the brief's stated requirements fit that track's REAL
+    // audio characteristics (BPM/mood/key/genre + the AI's own prior
+    // listening analysis, already computed by Media Pipeline). [{trackId,
+    // title, coverUrl, bpm, mood, keySignature, genre, aiListenAnalysis,
+    // matchedFrom, fitAssessment}]
+    trackMatches: jsonb('track_matches').notNull().default([]),
+    degraded: boolean('degraded').default(false), // true when AI was unavailable and this is a bare-extraction fallback
+    sourceTextLength: integer('source_text_length').default(0),
+    truncated: boolean('truncated').default(false), // true if the source text exceeded the AI prompt cap and was trimmed
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    createdAtIdx: index('idx_document_analyses_created_at').on(table.createdAt),
+  })
+);
+
+export type DocumentAnalysisRow = typeof documentAnalyses.$inferSelect;
+export type NewDocumentAnalysis = typeof documentAnalyses.$inferInsert;
+
 export const composerIdentityRelations = relations(composerIdentity, ({ many }) => ({
   projects: many(projects),
 }));

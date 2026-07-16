@@ -471,12 +471,21 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs =
   return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
+// `maxTokens` is optional and defaults to the original hardcoded 220 —
+// every existing caller (narrative captions, business-scanner AI
+// scoring, chat, etc.) keeps its exact prior behavior unchanged. Added
+// 2026-07-16 for the Document Assistant, whose structured JSON
+// responses (multiple arrays + a checklist) were silently getting cut
+// off mid-generation at 220 tokens and failing to parse — this was a
+// real, previously-undiagnosed cause of inconsistent analysis quality,
+// not just "which provider is active."
 export async function callTextProvider(
   provider: TextProvider,
   model: string,
   apiKey: string,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  maxTokens = 220
 ): Promise<string> {
   if (provider.compatMode === 'openai') {
     const res = await fetchWithTimeout(provider.baseUrl, {
@@ -489,7 +498,7 @@ export async function callTextProvider(
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.85,
-        max_tokens: 220,
+        max_tokens: maxTokens,
       }),
     });
     if (!res.ok) throw new Error(await friendlyProviderError(provider.label, res.status, res));
@@ -506,7 +515,7 @@ export async function callTextProvider(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-        generationConfig: { temperature: 0.85, maxOutputTokens: 220 },
+        generationConfig: { temperature: 0.85, maxOutputTokens: maxTokens },
       }),
     });
     if (!res.ok) throw new Error(await friendlyProviderError(provider.label, res.status, res));
@@ -526,7 +535,7 @@ export async function callTextProvider(
       },
       body: JSON.stringify({
         model,
-        max_tokens: 220,
+        max_tokens: maxTokens,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
@@ -542,7 +551,7 @@ export async function callTextProvider(
     const res = await fetchWithTimeout(provider.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, message: userPrompt, preamble: systemPrompt, temperature: 0.85 }),
+      body: JSON.stringify({ model, message: userPrompt, preamble: systemPrompt, temperature: 0.85, max_tokens: maxTokens }),
     });
     if (!res.ok) throw new Error(await friendlyProviderError(provider.label, res.status, res));
     const data = await res.json();
