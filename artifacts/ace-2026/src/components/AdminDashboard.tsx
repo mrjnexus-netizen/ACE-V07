@@ -6079,6 +6079,178 @@ function SeoMetadataEditor() {
   );
 }
 
+// ---------------------------------------------------------------------
+// Site Identity — Favicon & Link Preview (2026-07-16, per Reza)
+//
+// The four files index.html's <link>/<meta> tags point to (favicon.ico,
+// favicon.svg, apple-touch-icon.png, og-image.jpg) need to physically exist
+// on disk -- unlike the "Preview Image URL" field in SeoMetadataEditor
+// above (which only affects what SeoHead.tsx sets at runtime, after the
+// app's JS has loaded). This panel lets the admin upload a real photo/logo
+// once; the server resizes it into every required file and writes them
+// directly into public/, so link-preview bots and the browser tab -- which
+// never run the site's JS -- see something real instead of a 404.
+// ---------------------------------------------------------------------
+type SiteIdentityFileStatus = { exists: boolean; updatedAt: string | null };
+type SiteIdentityStatus = {
+  favicon: SiteIdentityFileStatus;
+  faviconSvg: SiteIdentityFileStatus;
+  appleTouchIcon: SiteIdentityFileStatus;
+  ogImage: SiteIdentityFileStatus;
+};
+
+function SiteBrandingPanel() {
+  const [status, setStatus] = useState<SiteIdentityStatus | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [socialPreview, setSocialPreview] = useState<string | null>(null);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [uploadingSocial, setUploadingSocial] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [cacheBust, setCacheBust] = useState(() => Date.now());
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const result = await apiGet<SiteIdentityStatus>('/api/site-identity/status');
+      setStatus(result);
+    } catch {
+      setStatus(null);
+    }
+  }, []);
+
+  useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  const uploadIcon = async (f: File) => {
+    setUploadingIcon(true);
+    setNotice(null);
+    setIconPreview(URL.createObjectURL(f));
+    try {
+      const form = new FormData();
+      form.append('image', f);
+      await apiPost('/api/site-identity/icon', form);
+      setCacheBust(Date.now());
+      await loadStatus();
+      setNotice('Favicon and app icon updated. Browsers cache favicons aggressively — fully close and reopen the tab to see the change.');
+    } catch {
+      setNotice('Could not process that image. Try a JPEG, PNG, or WEBP under 15MB.');
+    } finally {
+      setUploadingIcon(false);
+    }
+  };
+
+  const uploadSocial = async (f: File) => {
+    setUploadingSocial(true);
+    setNotice(null);
+    setSocialPreview(URL.createObjectURL(f));
+    try {
+      const form = new FormData();
+      form.append('image', f);
+      await apiPost('/api/site-identity/social', form);
+      setCacheBust(Date.now());
+      await loadStatus();
+      setNotice('Link-preview image updated.');
+    } catch {
+      setNotice('Could not process that image. Try a JPEG, PNG, or WEBP under 15MB.');
+    } finally {
+      setUploadingSocial(false);
+    }
+  };
+
+  const faviconUrl = iconPreview ?? (status?.favicon.exists ? `/favicon.ico?v=${cacheBust}` : null);
+  const appleUrl = iconPreview ?? (status?.appleTouchIcon.exists ? `/apple-touch-icon.png?v=${cacheBust}` : null);
+  const ogUrl = socialPreview ?? (status?.ogImage.exists ? `/og-image.jpg?v=${cacheBust}` : null);
+
+  return (
+    <div className="adm-panel space-y-3">
+      <div className="adm-panel-title">Site Identity — Favicon &amp; Link Preview</div>
+      <p className="adm-panel-subtitle adm-seo-justify">
+        These are the real files the browser tab, the iPhone home-screen icon, and link previews on WhatsApp,
+        Twitter, and LinkedIn actually read. Unlike the Preview Image URL field above, these are physical files
+        baked into the site, so they're what bots and link-unfurlers see even before any JavaScript runs.
+      </p>
+
+      <div className="adm-brand-slots">
+        <div className="adm-brand-slot">
+          <div className="adm-brand-slot-label">Icon Image</div>
+          <p className="adm-brand-slot-hint">A square logo or close portrait. Produces the browser tab icon and the iPhone home-screen icon.</p>
+          <div className="adm-dropzone adm-brand-dropzone">
+            <label className="adm-btn adm-btn--ghost adm-btn--sm" style={{ display: 'inline-flex', cursor: 'pointer', position: 'relative' }}>
+              {uploadingIcon ? 'Processing…' : 'Choose Image'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploadingIcon}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadIcon(f); e.target.value = ''; }}
+                style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+              />
+            </label>
+          </div>
+          <div className="adm-brand-preview-row">
+            {faviconUrl ? (
+              <div className="adm-brand-tab-mock">
+                <img src={faviconUrl} alt="" />
+                <span>Amir Moslehi</span>
+              </div>
+            ) : (
+              <span className="adm-brand-status">Not set yet</span>
+            )}
+            {appleUrl && (
+              <img
+                src={appleUrl}
+                alt=""
+                style={{ width: 36, height: 36, borderRadius: 9, objectFit: 'cover', border: '1px solid var(--adm-border)' }}
+              />
+            )}
+          </div>
+          <div className={`adm-brand-status${status?.favicon.exists ? ' adm-brand-status--set' : ''}`} style={{ marginTop: 6 }}>
+            {status?.favicon.exists && status.favicon.updatedAt
+              ? `Updated ${new Date(status.favicon.updatedAt).toLocaleString('en-US')}`
+              : 'No favicon uploaded yet'}
+          </div>
+        </div>
+
+        <div className="adm-brand-slot">
+          <div className="adm-brand-slot-label">
+            Social Preview Image <span style={{ opacity: 0.6, textTransform: 'none' }}>(optional)</span>
+          </div>
+          <p className="adm-brand-slot-hint">A wider, more cinematic shot for link previews. If skipped, the Icon Image above is used instead.</p>
+          <div className="adm-dropzone adm-brand-dropzone">
+            <label className="adm-btn adm-btn--ghost adm-btn--sm" style={{ display: 'inline-flex', cursor: 'pointer', position: 'relative' }}>
+              {uploadingSocial ? 'Processing…' : 'Choose Image'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploadingSocial}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadSocial(f); e.target.value = ''; }}
+                style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+              />
+            </label>
+          </div>
+          <div className="adm-brand-preview-row">
+            {ogUrl ? (
+              <div className="adm-brand-card-mock">
+                <img src={ogUrl} alt="" />
+                <div className="adm-brand-card-mock-body">
+                  <div className="adm-brand-card-mock-title">Amir Moslehi — Cinematic Composer</div>
+                  <div className="adm-brand-card-mock-url">amirmoslehi.com</div>
+                </div>
+              </div>
+            ) : (
+              <span className="adm-brand-status">Not set yet — will fall back to the Icon Image</span>
+            )}
+          </div>
+          <div className={`adm-brand-status${status?.ogImage.exists ? ' adm-brand-status--set' : ''}`} style={{ marginTop: 6 }}>
+            {status?.ogImage.exists && status.ogImage.updatedAt
+              ? `Updated ${new Date(status.ogImage.updatedAt).toLocaleString('en-US')}`
+              : 'No preview image uploaded yet'}
+          </div>
+        </div>
+      </div>
+
+      {notice && <p className="adm-notice">{notice}</p>}
+    </div>
+  );
+}
+
 const TabSeoAccessibility = () => {
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -6223,6 +6395,7 @@ const TabSeoAccessibility = () => {
       )}
 
       <SeoMetadataEditor />
+      <SiteBrandingPanel />
     </div>
   );
 };
