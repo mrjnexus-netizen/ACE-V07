@@ -4,6 +4,7 @@ import { useChromatic } from '../context/ChromaticContext';
 import { useSmoothScroll } from '../hooks/useSmoothScroll';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import BackgroundMusic from '../components/BackgroundMusic';
+import SeoHead from '../components/SeoHead';
 
 // Lazy-loaded components for code splitting
 const LivingScore = lazy(() => import('../components/LivingScore'));
@@ -36,10 +37,16 @@ export default function MainApp() {
   // Global Lenis smooth scroll (safe: native scroll preserved if unavailable).
   useSmoothScroll();
 
+  // Mounted unconditionally (above the locale gate below) so title/meta/
+  // <html lang> are correct even on the language-picker screen itself,
+  // not just after a locale is chosen.
+  const seoHead = <SeoHead />;
+
   // Show Linguistic Portal if locale not yet selected
   if (!locale) {
     return (
       <div className="ace-main-shell">
+        {seoHead}
         <Suspense fallback={<LoadingFallback />}>
           <LinguisticPortal />
         </Suspense>
@@ -49,6 +56,7 @@ export default function MainApp() {
 
   return (
     <div className="ace-main-shell min-h-screen relative" style={{ backgroundColor: 'var(--surface-color)', color: 'var(--text-color)' }}>
+      {seoHead}
       {/* Living Score â€” global fixed 3D particle field behind all content (S5) */}
       <ErrorBoundary>
         <Suspense fallback={null}>

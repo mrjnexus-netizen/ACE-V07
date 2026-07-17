@@ -96,7 +96,7 @@ export default function ContactBar() {
   const { t } = useT();
 
   return (
-    <div
+    <nav
       className="fixed top-0 left-0 right-0"
       style={{ zIndex: 200, height: 44, pointerEvents: 'none' }}
       aria-label={t('Contact')}
@@ -131,6 +131,6 @@ export default function ContactBar() {
           </a>
         ))}
       </div>
-    </div>
+    </nav>
   );
 }

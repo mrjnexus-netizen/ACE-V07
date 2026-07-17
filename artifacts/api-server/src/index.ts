@@ -25,6 +25,7 @@ import pipelineRoutes from "./routes/pipeline";
 import modelDiscoveryRoutes from "./routes/modelDiscoveryRoutes";
 import posterStudioRoutes from "./routes/posterStudioRoutes";
 import positionsRoutes from "./routes/positionsRoutes";
+import seoAuditRoutes from "./routes/seoAudit";
 import { initScheduler } from "./services/positionScanner/scheduler";
 import { startModelDiscoverySchedule } from "./services/modelDiscovery";
 import { hydrateModelOverrides } from "./services/aiProviders";
@@ -96,6 +97,7 @@ app.use("/api/chat-logs", chatLogsRoutes);
 app.use("/api/keys", keysRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/documents", documentsRoutes);
+app.use("/api/seo", seoAuditRoutes);
 app.use("/api/health", healthRoutes);
 
 // Error handling middleware (must be last)

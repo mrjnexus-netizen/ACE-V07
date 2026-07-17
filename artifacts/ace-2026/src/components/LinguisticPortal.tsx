@@ -614,13 +614,18 @@ const HeadstockSelector = ({
       {/* Whole assembly scaled + dropped as one unit. The pegs are measured
           AFTER this transform, so the silk strings tie to the new positions. */}
       <g transform={`translate(${ASM_TX} ${ASM_TY}) scale(${ASM_SCALE})`}>
-      {/* The luxury crystal headstock photo, sitting where the silhouette was. */}
+      {/* The luxury crystal headstock photo, sitting where the silhouette was.
+          Purely decorative -- the real accessible controls are the language
+          <g role="button"> hit-groups below, so this needs its own
+          aria-hidden rather than one on the shared <svg> root (which also
+          contains those controls). */}
       <image
         href="/headstock.png"
         x={IMG_X} y={IMG_Y} width={IMG_W} height={IMG_H}
         preserveAspectRatio="xMidYMid meet"
         mask="url(#hsMask)"
         style={{ pointerEvents: 'none' }}
+        aria-hidden="true"
       />
 
       {/* invisible geometry markers — measured live (in screen px) and handed
@@ -664,6 +669,18 @@ const HeadstockSelector = ({
             onMouseEnter={() => onHover(l.code)}
             onMouseLeave={onLeave}
             onClick={() => onSelect(l.code)}
+            onFocus={() => onHover(l.code)}
+            onBlur={onLeave}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect(l.code);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={l.label}
+            aria-pressed={selectedLang === l.code}
             data-cursor="go"
             style={{
               pointerEvents: 'auto', cursor: 'pointer',
@@ -1052,6 +1069,13 @@ export const LinguisticPortal = () => {
   return (
     <div ref={containerRef} className="fixed inset-0 z-50 overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
       <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap'); @keyframes labelFadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes wgSigRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } } @keyframes wgSigRule { from { opacity: 0; transform: scaleX(0.2); } to { opacity: 0.6; transform: scaleX(1); } } @keyframes wgSigDot { from { opacity: 0; transform: rotate(45deg) scale(0.2); } to { opacity: 0.65; transform: rotate(45deg) scale(1); } } @keyframes wgSigShimmer { 0% { background-position: 0% 0%; } 100% { background-position: 0% 200%; } } .wg-sig-wrap { position: absolute; inset: 0; pointer-events: none; display: flex; align-items: center; justify-content: flex-start; } .wg-sig-ch { display: flex; align-items: center; justify-content: center; width: clamp(2.2rem, 6vh, 3.4rem); height: clamp(2.3rem, 6.4vh, 3.6rem); font-family: 'Cinzel','Cormorant Garamond',Didot,Georgia,serif; font-weight: 500; font-style: normal; font-size: clamp(1.7rem, 4.6vh, 2.9rem); line-height: 1; letter-spacing: 0; text-align: center; color: #F1DFA6; background: linear-gradient(180deg,#8A6A26 0%,#F6E9BE 22%,#E9C879 42%,#FBF0CC 58%,#D9B45E 78%,#8A6A26 100%); background-size: 100% 200%; background-position: 0% 0%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55)); opacity: 0; animation: wgSigRise 1.2s cubic-bezier(0.22,1,0.36,1) both, wgSigShimmer 6.5s ease-in-out infinite; } .wg-sig-rule { display: block; width: 1px; height: clamp(14px,2.4vh,26px); background: linear-gradient(180deg,rgba(217,180,94,0) 0%,rgba(246,233,190,0.95) 50%,rgba(217,180,94,0) 100%); opacity: 0; animation: wgSigRule 1.3s ease both; } .wg-sig-diamond { display: block; width: 6px; height: 6px; margin: 0.9vh 0; background: linear-gradient(135deg,#FBF0CC,#D9B45E);  opacity: 0; animation: wgSigDot 1s ease both; } .wg-sig-sub { margin-top: 1.1vh; font-family: 'Cinzel','Cormorant Garamond',Georgia,serif; font-weight: 400; font-size: clamp(0.5rem, 1.15vh, 0.72rem); letter-spacing: 0.42em; padding-left: 0.42em; color: #C9AC6A;  opacity: 0; animation: wgSigRise 1.2s ease both; } @media (max-width: 767px) { .wg-sig-wrap { display: none; } } @media (prefers-reduced-motion: reduce) { .wg-sig-ch, .wg-sig-rule, .wg-sig-diamond, .wg-sig-sub { animation: none; opacity: 1; } .wg-sig-rule { opacity: 0.6; } .wg-sig-diamond { opacity: 0.65; transform: rotate(45deg); } }" }} />
+      {/* 2026-07-16 (SEO/Accessibility pass, per Reza) -- visible focus
+          ring for the language picker's keyboard/screen-reader support
+          added above. SVG <g> elements DO support :focus-visible in all
+          current browsers; this is the only addition needed on top of
+          the role/tabIndex/aria-label/onKeyDown already added to each
+          hit-group. */}
+      <style dangerouslySetInnerHTML={{ __html: 'g[role="button"]:focus-visible { outline: 2px solid rgba(255,255,255,0.85); outline-offset: 4px; border-radius: 4px; }' }} />
 
       {/* The living starfield is always present — it backs both the welcome
           gate and the language portal so the transition feels continuous. */}

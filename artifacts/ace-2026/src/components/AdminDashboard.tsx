@@ -9,6 +9,7 @@ import { usePipeline } from '../context/PipelineContext';
 import { useContent } from '../context/ContentContext';
 import { FONTS_BY_LOCALE, loadGoogleFonts } from '../constants/fonts';
 import type { ComposerIdentity, AudioTrack, MultiLingual, Locale } from '../types';
+import { SEO_DEFAULT_TITLE, SEO_DEFAULT_DESCRIPTION } from './SeoHead';
 
 // ---------- shared helpers ----------
 const emptyMultiLingual = (): MultiLingual => ({ en: '', es: '', fr: '', zh: '', ja: '', ko: '' });
@@ -5789,6 +5790,443 @@ const TabSecurity = () => {
 };
 
 
+// ============================================================
+// SEO & Accessibility tab, 2026-07-16 (per Reza).
+// Real Google Lighthouse audits (not estimates), a score trend chart
+// built from real audit history, AI-prioritized plain-language
+// explanations of real findings, and an admin-editable title/
+// description/OG image that reuses the exact same ContentContext +
+// cascade-translation pipeline every other piece of site text already
+// goes through.
+// ============================================================
+
+type SeoIssueSeverity = 'high' | 'medium' | 'low';
+
+interface SeoAuditIssue {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  score: number | null;
+}
+
+interface SeoAuditPriority {
+  title: string;
+  explanation: string;
+  severity: SeoIssueSeverity;
+}
+
+interface SeoAuditHistoryPoint {
+  id: string;
+  createdAt: string;
+  seoScore: number;
+  accessibilityScore: number;
+  performanceScore: number;
+  bestPracticesScore: number;
+}
+
+interface SeoAuditFull extends SeoAuditHistoryPoint {
+  auditedUrl: string;
+  issues: SeoAuditIssue[];
+  aiSummary: string | null;
+  aiPriorities: SeoAuditPriority[];
+}
+
+const SEO_SEVERITY_COLOR: Record<SeoIssueSeverity, string> = {
+  high: '#c0463a',
+  medium: '#b8863a',
+  low: '#5c8a5c',
+};
+
+function seoScoreColor(score: number): string {
+  if (score >= 90) return '#5c8a5c';
+  if (score >= 50) return '#b8863a';
+  return '#c0463a';
+}
+
+const SEO_CATEGORY_LABEL: Record<string, string> = {
+  seo: 'SEO',
+  accessibility: 'Accessibility',
+  performance: 'Performance',
+  'best-practices': 'Best Practices',
+};
+
+// ---------------------------------------------------------------
+// Score ring -- same visual language as Document Assistant's
+// DocProgressRing, sized up and labeled with the raw 0-100 score
+// instead of a fraction.
+// ---------------------------------------------------------------
+function SeoScoreRing({ label, score, size = 84 }: { label: string; score: number; size?: number }) {
+  const stroke = 6;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - score / 100);
+  const color = seoScoreColor(score);
+  return (
+    <div className="adm-seo-score-card">
+      <div className="adm-seo-ring" style={{ width: size, height: size }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(169,129,47,0.14)" strokeWidth={stroke} />
+          <motion.circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={false}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </svg>
+        <span className="adm-seo-ring-value" style={{ color }}>{score}</span>
+      </div>
+      <div className="adm-seo-score-label">{label}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------
+// Trend chart -- plain SVG, no charting dependency (matches this
+// project's own stated zero-new-dependency preference for exactly this
+// kind of thing). Plots all 4 score series across real audit history.
+// ---------------------------------------------------------------
+function SeoTrendChart({ history }: { history: SeoAuditHistoryPoint[] }) {
+  const W = 640;
+  const H = 200;
+  const PAD_L = 32;
+  const PAD_R = 12;
+  const PAD_T = 12;
+  const PAD_B = 24;
+
+  if (history.length < 2) {
+    return (
+      <div className="adm-seo-trend-empty">
+        <svg viewBox="0 0 32 20" width={32} height={20} className="adm-seo-trend-empty-icon" aria-hidden>
+          <path d="M2 17 L10 9 L15 13 L22 4 L30 10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span>Run at least two audits to see a score trend over time.</span>
+      </div>
+    );
+  }
+
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+  const xFor = (i: number) => PAD_L + (i / (history.length - 1)) * innerW;
+  const yFor = (score: number) => PAD_T + innerH - (score / 100) * innerH;
+
+  const series: { key: keyof SeoAuditHistoryPoint; label: string; color: string }[] = [
+    { key: 'seoScore', label: 'SEO', color: '#a9812f' },
+    { key: 'accessibilityScore', label: 'Accessibility', color: '#5c7a8a' },
+    { key: 'performanceScore', label: 'Performance', color: '#c0463a' },
+    { key: 'bestPracticesScore', label: 'Best Practices', color: '#8a6ac0' },
+  ];
+
+  const pathFor = (key: keyof SeoAuditHistoryPoint) =>
+    history.map((h, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i)} ${yFor(h[key] as number)}`).join(' ');
+
+  return (
+    <div className="adm-seo-trend">
+      <svg viewBox={`0 0 ${W} ${H}`} className="adm-seo-trend-svg" preserveAspectRatio="none">
+        {[0, 25, 50, 75, 100].map((g) => (
+          <g key={g}>
+            <line x1={PAD_L} x2={W - PAD_R} y1={yFor(g)} y2={yFor(g)} stroke="rgba(169,129,47,0.1)" strokeWidth={1} />
+            <text x={PAD_L - 6} y={yFor(g) + 3} textAnchor="end" fontSize={9} fill="var(--text-dim-color)" opacity={0.6}>{g}</text>
+          </g>
+        ))}
+        {series.map((s) => (
+          <motion.path
+            key={s.key}
+            d={pathFor(s.key)}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+          />
+        ))}
+      </svg>
+      <div className="adm-seo-trend-legend">
+        {series.map((s) => (
+          <span key={s.key} className="adm-seo-trend-legend-item">
+            <span className="adm-seo-trend-legend-dot" style={{ background: s.color }} />
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SeoSeverityTag({ severity }: { severity: SeoIssueSeverity }) {
+  return (
+    <span className="adm-seo-severity-tag" style={{ color: SEO_SEVERITY_COLOR[severity], borderColor: SEO_SEVERITY_COLOR[severity] }}>
+      {severity}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------
+// Metadata editor -- reuses useContent() exactly like every other
+// admin-editable text on this site. English is the master; saving
+// cascades an automatic translation into the other 5 locales via the
+// same Groq pipeline the rest of the site already uses.
+// ---------------------------------------------------------------
+function SeoMetadataEditor() {
+  const { resolve, saveWithCascade, save } = useContent();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [ogImage, setOgImage] = useState('');
+  const [savingTitle, setSavingTitle] = useState(false);
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTitle(resolve('seo.meta_title', 'en') ?? SEO_DEFAULT_TITLE);
+    setDescription(resolve('seo.meta_description', 'en') ?? SEO_DEFAULT_DESCRIPTION);
+    setOgImage(resolve('seo.og_image', 'en') ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveTitle = async () => {
+    setSavingTitle(true);
+    setNotice(null);
+    try {
+      const { cascadeErrors } = await saveWithCascade('seo.meta_title', title);
+      setNotice(cascadeErrors.length > 0 ? `Saved in English. Translation failed for: ${cascadeErrors.join(', ')}.` : 'Title saved and translated into all languages.');
+    } catch {
+      setNotice('Could not save the title. Please try again.');
+    } finally {
+      setSavingTitle(false);
+    }
+  };
+
+  const saveDescription = async () => {
+    setSavingDescription(true);
+    setNotice(null);
+    try {
+      const { cascadeErrors } = await saveWithCascade('seo.meta_description', description);
+      setNotice(cascadeErrors.length > 0 ? `Saved in English. Translation failed for: ${cascadeErrors.join(', ')}.` : 'Description saved and translated into all languages.');
+    } catch {
+      setNotice('Could not save the description. Please try again.');
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  const saveImage = async () => {
+    setSavingImage(true);
+    setNotice(null);
+    try {
+      await save('seo.og_image', 'en', 'image', ogImage);
+      setNotice('Preview image saved.');
+    } catch {
+      setNotice('Could not save the preview image. Please try again.');
+    } finally {
+      setSavingImage(false);
+    }
+  };
+
+  return (
+    <div className="adm-panel space-y-3">
+      <div className="adm-panel-title">Page Title & Description</div>
+      <p className="adm-panel-subtitle adm-seo-justify">
+        This is what shows in the browser tab and in Google search results while visitors are on the site. Edit in
+        English -- it's automatically translated into all 6 languages, same as everywhere else on this site.
+        Link previews (WhatsApp, Twitter, etc.) always use the fixed English default baked into the site's HTML,
+        not these live values -- ask Claude to update that default directly if it needs to change.
+      </p>
+
+      <div>
+        <label className="adm-label">Title</label>
+        <div className="adm-row">
+          <input className="adm-input" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1 }} />
+          <button onClick={saveTitle} disabled={savingTitle || !title.trim()} className="adm-btn adm-btn--primary adm-btn--sm">
+            {savingTitle ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label className="adm-label">Description</label>
+        <textarea className="adm-textarea" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <div className="adm-row mt-2">
+          <button onClick={saveDescription} disabled={savingDescription || !description.trim()} className="adm-btn adm-btn--primary adm-btn--sm">
+            {savingDescription ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label className="adm-label">Preview Image URL (for link previews and search)</label>
+        <div className="adm-row">
+          <input className="adm-input" value={ogImage} onChange={(e) => setOgImage(e.target.value)} placeholder="https://…" style={{ flex: 1 }} />
+          <button onClick={saveImage} disabled={savingImage} className="adm-btn adm-btn--ghost adm-btn--sm">
+            {savingImage ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {notice && <p className="adm-notice">{notice}</p>}
+    </div>
+  );
+}
+
+const TabSeoAccessibility = () => {
+  const [running, setRunning] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [latest, setLatest] = useState<SeoAuditFull | null>(null);
+  const [history, setHistory] = useState<SeoAuditHistoryPoint[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [issuesOpen, setIssuesOpen] = useState(false);
+  const runStepLabel = useStagedProgress(running, ['Launching a headless browser', 'Running the full Lighthouse audit', 'Asking AI to prioritize the findings']);
+
+  const loadHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const rows = await apiGet<SeoAuditHistoryPoint[]>('/api/seo/audit/history');
+      setHistory(rows ?? []);
+      if (rows && rows.length > 0) {
+        const last = rows[rows.length - 1]!;
+        const full = await apiGet<SeoAuditFull>(`/api/seo/audit/${last.id}`);
+        setLatest(full);
+      }
+    } catch {
+      setHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadHistory(); }, [loadHistory]);
+
+  const runAudit = async () => {
+    if (running) return;
+    setRunning(true);
+    setNotice(null);
+    try {
+      const result = await apiPost<SeoAuditFull>('/api/seo/audit/run', {});
+      setLatest(result);
+      void loadHistory();
+    } catch {
+      setNotice('The audit could not run. Make sure Chrome is installed on the server machine and the site is reachable from it.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="adm-panel">
+        <div className="adm-panel-title">CEO Growth & SEO Intelligence</div>
+        <p className="adm-panel-subtitle adm-seo-justify">
+          Real Google Lighthouse audits -- the same engine behind Google's own PageSpeed Insights, not an estimate.
+          Run an audit any time to see exactly where the site stands and what to fix next, explained in plain language.
+        </p>
+        <div className="adm-row mt-3" style={{ alignItems: 'center' }}>
+          <button onClick={runAudit} disabled={running} className="adm-btn adm-btn--primary">
+            {running ? 'Running…' : 'Run Audit'}
+          </button>
+          <AnimatePresence>
+            {running && (
+              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="adm-doc-analyzing-step">
+                <span className="adm-doc-analyzing-dot" />
+                {runStepLabel} — this can take 20–40 seconds
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+        {notice && <p className="adm-notice">{notice}</p>}
+      </div>
+
+      {latest && (
+        <div className="adm-panel">
+          <div className="adm-panel-title" style={{ marginBottom: 2 }}>Latest Audit</div>
+          <p className="adm-panel-subtitle" style={{ margin: 0 }}>
+            {latest.auditedUrl} — {new Date(latest.createdAt).toLocaleString('en-US')}
+          </p>
+          <div className="adm-seo-score-row">
+            <SeoScoreRing label="SEO" score={latest.seoScore} />
+            <SeoScoreRing label="Accessibility" score={latest.accessibilityScore} />
+            <SeoScoreRing label="Performance" score={latest.performanceScore} />
+            <SeoScoreRing label="Best Practices" score={latest.bestPracticesScore} />
+          </div>
+        </div>
+      )}
+
+      <div className="adm-panel">
+        <div className="adm-panel-title">Score Trend</div>
+        {loadingHistory ? <p className="adm-doc-empty">Loading…</p> : <SeoTrendChart history={history} />}
+      </div>
+
+      {latest && (
+        <div className="adm-panel space-y-3">
+          <div className="adm-panel-title">What To Fix</div>
+          {latest.aiSummary && <p className="adm-doc-summary">{latest.aiSummary}</p>}
+
+          {latest.aiPriorities.length > 0 ? (
+            <div className="adm-seo-priorities">
+              {latest.aiPriorities.map((p, i) => (
+                <div key={i} className="adm-seo-priority-row">
+                  <SeoSeverityTag severity={p.severity} />
+                  <div>
+                    <div className="adm-seo-priority-title">{p.title}</div>
+                    <p className="adm-seo-priority-text">{p.explanation}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="adm-doc-empty">
+              {latest.issues.length === 0 ? 'No failing checks found.' : 'AI analysis is unavailable right now -- see the raw findings below.'}
+            </p>
+          )}
+
+          {latest.issues.length > 0 && (
+            <div>
+              <button type="button" className="adm-chip" onClick={() => setIssuesOpen((v) => !v)}>
+                {issuesOpen ? 'Hide' : 'Show'} all {latest.issues.length} raw findings
+              </button>
+              <AnimatePresence initial={false}>
+                {issuesOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="adm-seo-raw-issues">
+                      {latest.issues.map((issue) => (
+                        <div key={issue.id} className="adm-seo-raw-issue">
+                          <span className="adm-seo-raw-issue-category">{SEO_CATEGORY_LABEL[issue.category] ?? issue.category}</span>
+                          <div>
+                            <div className="adm-seo-raw-issue-title">{issue.title}</div>
+                            {issue.description && <p className="adm-seo-raw-issue-desc">{issue.description}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      )}
+
+      <SeoMetadataEditor />
+    </div>
+  );
+};
+
 export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: () => void; initialTab?: number }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const { enterEditMode } = useContent();
@@ -5820,6 +6258,12 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
       label: 'Business Tools',
       tabs: [
         { id: 8, label: 'Business' },
+      ],
+    },
+    {
+      label: 'Site Health',
+      tabs: [
+        { id: 12, label: 'CEO SEO Suite' },
       ],
     },
     {
@@ -5887,6 +6331,7 @@ export default function AdminDashboard({ onClose, initialTab = 1 }: { onClose: (
                 {activeTab === 9 && <TabSecurity />}
                 {activeTab === 10 && <TabFonts />}
                 {activeTab === 11 && <TabPromoScreen />}
+                {activeTab === 12 && <TabSeoAccessibility />}
               </motion.div>
             </AnimatePresence>
           </div>

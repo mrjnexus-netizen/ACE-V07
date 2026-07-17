@@ -409,6 +409,29 @@ export const documentAnalyses = pgTable(
 export type DocumentAnalysisRow = typeof documentAnalyses.$inferSelect;
 export type NewDocumentAnalysis = typeof documentAnalyses.$inferInsert;
 
+// ============================================================
+// SEO & Accessibility audits (2026-07-16).
+// One row per "Run Audit" click in the admin's SEO & Accessibility tab.
+// Real Google Lighthouse scores (not estimates) + the specific failing
+// checks Lighthouse found + an AI plain-language prioritization of
+// them. History lets the admin tab chart real score trends over time.
+// ============================================================
+export const seoAudits = pgTable('seo_audits', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  auditedUrl: text('audited_url').notNull(),
+  seoScore: integer('seo_score').notNull(),
+  accessibilityScore: integer('accessibility_score').notNull(),
+  performanceScore: integer('performance_score').notNull(),
+  bestPracticesScore: integer('best_practices_score').notNull(),
+  issues: jsonb('issues').notNull().default([]), // [{id, title, description, category, score}]
+  aiSummary: text('ai_summary'),
+  aiPriorities: jsonb('ai_priorities').notNull().default([]), // [{title, explanation, severity}]
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+export type SeoAuditRow = typeof seoAudits.$inferSelect;
+export type NewSeoAudit = typeof seoAudits.$inferInsert;
+
 export const composerIdentityRelations = relations(composerIdentity, ({ many }) => ({
   projects: many(projects),
 }));
