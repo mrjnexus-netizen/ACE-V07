@@ -14,7 +14,15 @@ export default function EditModeIndicator() {
     <div
       className="fixed flex items-center gap-3"
       style={{
-        bottom: '1.25rem',
+        // 2026-07-17 (site-wide responsive audit, per Reza): was a fixed
+        // 1.25rem, which sat directly under PersistentAudioPlayer whenever
+        // a track was playing WHILE editing (a very normal combination —
+        // checking how a change sounds/looks is part of editing) — the
+        // player's z-9999 beat this pill's z-500 and covered "Exit to
+        // Admin". --pap-h (published by PersistentAudioPlayer itself, 0px
+        // when no track is loaded) means this always clears the bar by
+        // exactly 1.25rem of breathing room, at any of its three heights.
+        bottom: 'calc(1.25rem + var(--pap-h, 0px))',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 500,
@@ -25,6 +33,7 @@ export default function EditModeIndicator() {
         WebkitBackdropFilter: 'blur(10px)',
         border: '1px solid rgba(var(--accent-rgb), 0.4)',
         boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+        transition: 'bottom 300ms ease',
       }}
     >
       <span

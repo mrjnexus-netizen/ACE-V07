@@ -1,8 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAudio } from '../context/AudioContext';
 import { useIdentity } from '../context/IdentityContext';
 import WaveformRenderer from './WaveformRenderer';
 import { useT } from '../context/TranslationContext';
+
+// 2026-07-17 (site-wide responsive audit, per Reza): this bar's real
+// on-screen height was previously a mystery to every OTHER fixed-position
+// element (EditModeIndicator, ExecutiveStudioBot) — they each guessed a
+// fixed `bottom` offset, so when this bar was actually taller than they
+// assumed (e.g. expanded on mobile), they silently sat underneath it.
+// Publishing the TRUE current height as a CSS custom property means any
+// other fixed-bottom element can write `bottom: calc(X + var(--pap-h))`
+// and simply never collide with this bar again, no matter how tall it is
+// at any given moment. Falls back to 0px via each consumer's own
+// `var(--pap-h, 0px)` when this component isn't mounted at all (no track
+// loaded yet).
+const PAP_HEIGHT_VAR = '--pap-h';
 
 // Inline SVG icons (no emoji / no unicode glyphs — they corrupt across encodings)
 const Icon = ({ d, size = 18 }: { d: string; size?: number }) => (
@@ -26,6 +39,25 @@ export default function PersistentAudioPlayer() {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
+  // Keep --pap-h in sync with the bar's REAL rendered height at all times —
+  // including the desktop height (72px, set by the .pap-shell media rule in
+  // index.css, not by this JS at all) so other components don't need their
+  // own copy of the 768px breakpoint to know which number applies.
+  useEffect(() => {
+    if (!currentTrack) {
+      document.documentElement.style.setProperty(PAP_HEIGHT_VAR, '0px');
+      return;
+    }
+    const sync = () => {
+      const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+      const h = isDesktop ? 72 : mobileExpanded ? 120 : 56;
+      document.documentElement.style.setProperty(PAP_HEIGHT_VAR, `${h}px`);
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
+  }, [currentTrack, mobileExpanded]);
+
   if (!currentTrack) return null;
 
   const handlePlayPause = () => { if (isPlaying) pauseTrack(); else void resumeTrack(); };
@@ -43,7 +75,7 @@ export default function PersistentAudioPlayer() {
 
   return (
     <div style={{ backdropFilter: 'blur(40px) saturate(200%) brightness(0.8)', WebkitBackdropFilter: 'blur(40px) saturate(200%) brightness(0.8)', background: 'rgba(var(--surface-rgb), 0.55)', borderTop: '1px solid var(--border-color)', height: mobileExpanded ? 120 : 56, boxShadow: `0 -4px 40px ${shadowColor}`, transition: 'box-shadow 800ms ease, height 300ms' }}
-      className="fixed bottom-0 left-0 right-0 z-[9999]">
+      className="pap-shell fixed bottom-0 left-0 right-0 z-[9999]">
       <div className="hidden md:flex items-center h-[72px] px-6 gap-4">
         <div className="w-[52px] h-[52px] rounded overflow-hidden bg-[var(--surface3-color)] flex-shrink-0">
           {coverUrl && <img src={coverUrl} alt={title} className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} onLoad={() => setImageLoaded(true)} />}

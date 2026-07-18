@@ -3,7 +3,7 @@ import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
 import EditableText from './EditableText';
-import EditableImage from './EditableImage';
+import ResponsiveEditableImage from './ResponsiveEditableImage';
 import type { ComposerIdentity, Locale } from '../types';
 
 function localText(
@@ -66,7 +66,7 @@ export default function GridLayoutEngine() {
           }}
         >
           {portraitUrl ? (
-            <EditableImage contentKey="hero.backgroundImage" defaultUrl={portraitUrl}>
+            <ResponsiveEditableImage contentKey="hero.backgroundImage" defaultUrl={portraitUrl}>
               {(url) => (
                 <img
                   src={url}
@@ -79,7 +79,7 @@ export default function GridLayoutEngine() {
                   }}
                 />
               )}
-            </EditableImage>
+            </ResponsiveEditableImage>
           ) : (
             <div className="absolute inset-0" style={{ backgroundColor: 'var(--surface-color)' }} />
           )}

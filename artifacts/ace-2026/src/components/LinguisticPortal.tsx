@@ -13,6 +13,19 @@ import LiquidSeam, { type SeamPin } from './LiquidSeam';
 import WelcomeGate from './WelcomeGate';
 import ScaleStage from './ScaleStage';
 
+// 2026-07-17 (site-wide responsive audit, per Reza): a plain `width < 768`
+// check sent portrait tablets (768-1023px wide, e.g. an iPad held upright)
+// into the DESKTOP branch below -- a 1920x1080 landscape-oriented
+// composition, uniformly scaled down (by ScaleStage) to fit that narrower
+// width, leaving a lot of dead space top/bottom on a screen that's
+// actually taller than it is wide. Adding "and taller than wide" routes
+// any portrait-oriented viewport under 1024px into the MOBILE branch
+// instead (built vertically, exactly suited to that shape) while leaving
+// landscape tablets/laptops on the desktop branch untouched.
+function isMobileLayoutWidth(width: number, height: number): boolean {
+  return width < 768 || (width < 1024 && height > width);
+}
+
 const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'ENGLISH' },
   { code: 'es', label: 'ESPA\u00d1OL' },
@@ -818,13 +831,13 @@ export const LinguisticPortal = () => {
   const animFrameId = useRef<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && isMobileLayoutWidth(window.innerWidth, window.innerHeight));
 
   // Keep the mobile/desktop layout in sync when the window is resized or leaves
   // fullscreen, so the whole composition re-lays-out (and re-measures) cleanly
   // instead of staying frozen at the size it first loaded at.
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
+    const onResize = () => setIsMobile(isMobileLayoutWidth(window.innerWidth, window.innerHeight));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -1047,7 +1060,18 @@ export const LinguisticPortal = () => {
       // to show; otherwise defer it to PromoScreen's onDone.
       const enabled = resolveAmbientOverride('promoScreen.enabled', 'en') === 'true';
       const mediaType = resolveAmbientOverride('promoScreen.mediaType', 'en');
-      const mediaUrl = resolveAmbientOverride('promoScreen.mediaUrl', 'en');
+      // 2026-07-17 (per Reza): Promo Screen media now supports a
+      // device-specific variant per breakpoint (uploaded in the admin
+      // panel's Promo Screen tab), using the same content-key-suffix
+      // convention and breakpoints as everywhere else in this pass
+      // (mobile <768, tablet 768-1279, desktop >=1280) — falls back
+      // upward (mobile -> tablet -> desktop) exactly like
+      // ResponsiveEditableImage does on the public site.
+      const promoWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
+      const desktopMediaUrl = resolveAmbientOverride('promoScreen.mediaUrl', 'en');
+      const tabletMediaUrl = resolveAmbientOverride('promoScreen.mediaUrl.tablet', 'en') || desktopMediaUrl;
+      const mobileMediaUrl = resolveAmbientOverride('promoScreen.mediaUrl.mobile', 'en') || tabletMediaUrl;
+      const mediaUrl = promoWidth < 768 ? mobileMediaUrl : promoWidth < 1280 ? tabletMediaUrl : desktopMediaUrl;
       const durationSecondsRaw = resolveAmbientOverride('promoScreen.imageDurationSeconds', 'en');
       const durationMs = durationSecondsRaw ? Number(durationSecondsRaw) * 1000 : undefined;
       if (enabled && mediaUrl && (mediaType === 'video' || mediaType === 'image')) {

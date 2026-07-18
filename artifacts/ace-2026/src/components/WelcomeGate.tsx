@@ -55,7 +55,15 @@ const WG_STYLES = `
 
 .wg-signtext{
   font-family:'Great Vibes',cursive;font-weight:400;
-  font-size:clamp(3.8rem,13vw,8.2rem);line-height:1.05;letter-spacing:.005em;
+  /* 2026-07-17 (site-wide responsive audit, per Reza): the old floor
+     (3.8rem = 60.8px) was HIGHER than what 13vw actually gives on a
+     375px phone (~48.75px = 3.05rem) -- clamp() can never go below its
+     floor, so narrow phones were forced to 60.8px regardless, leaving
+     "Amir Moslehi" in a script font tight against (or past) the 24px
+     side padding in .wg-stage. Lowering the floor to 2.6rem lets the
+     real fluid value apply all the way down to small phones; the 8.2rem
+     ceiling (desktop) is untouched. */
+  font-size:clamp(2.6rem,13vw,8.2rem);line-height:1.05;letter-spacing:.005em;
   padding:.22em .1em .16em;
   /* 2026-07-13 (per Reza — minimal theme support): this used to be a fixed
      silver/white gradient (several literal #FFFFFF stops) — beautiful on a

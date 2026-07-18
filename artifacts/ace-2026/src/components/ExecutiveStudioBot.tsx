@@ -224,11 +224,20 @@ export default function ExecutiveStudioBot() {
           setIsOpen(!isOpen);
           setIsMinimized(false);
         }}
-        className="fixed bottom-24 right-6 w-12 h-12 rounded-full flex items-center justify-center shadow-lg z-50 hover:scale-105 active:scale-95 transition-all csb-launcher"
+        className="fixed right-6 w-12 h-12 rounded-full flex items-center justify-center shadow-lg z-50 hover:scale-105 active:scale-95 transition-all csb-launcher"
         style={{
           background: 'linear-gradient(145deg, var(--surface3-color), var(--surface2-color))',
           color: 'var(--accent-color)',
           border: '1px solid var(--border-accent-color)',
+          // 2026-07-17 (site-wide responsive audit, per Reza): was a fixed
+          // bottom-24 (96px) — on mobile, once PersistentAudioPlayer is
+          // tapped open (120px expanded), this launcher sat partly BEHIND
+          // it (player is z-9999, launcher z-50). --pap-h is 0px whenever
+          // no track is loaded, so this is a no-op until it's actually needed.
+          bottom: 'calc(6rem + var(--pap-h, 0px))',
+          // 'all' (not just 'bottom') so this inline transition doesn't
+          // clobber the className's transition-all (hover/active scale).
+          transition: 'all 300ms ease',
         }}
         aria-label={t('Studio Bot')}
       >
@@ -247,8 +256,12 @@ export default function ExecutiveStudioBot() {
             }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="fixed bottom-24 right-6 w-[300px] max-w-[86vw] rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden csb-panel"
+            className="fixed right-6 w-[300px] max-w-[86vw] rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden csb-panel"
             style={{
+              // Same --pap-h offset as the launcher button above, so the
+              // open chat panel never sits partly behind the audio player
+              // either.
+              bottom: 'calc(6rem + var(--pap-h, 0px))',
               background: 'linear-gradient(175deg, rgba(var(--surface-rgb),0.94), rgba(var(--surface-rgb),0.82))',
               backdropFilter: 'blur(36px) saturate(180%)',
               WebkitBackdropFilter: 'blur(36px) saturate(180%)',

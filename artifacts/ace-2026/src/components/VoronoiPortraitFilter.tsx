@@ -219,8 +219,26 @@ export default function VoronoiPortraitFilter({
     let textureReady = false;
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin('anonymous');
+    // 2026-07-17 (real bug, confirmed via console + a direct-navigation
+    // test, per Reza): ShardPiece (in this same file) loads this EXACT
+    // same `src` as a plain CSS background-image, which is always a
+    // no-cors request — no way to set crossOrigin on a CSS background.
+    // That request lands in the browser's HTTP cache first (shards render
+    // before this WebGL layer). When THIS loader then requests the exact
+    // same URL WITH crossOrigin=anonymous, some browsers (confirmed:
+    // Chrome) reuse the already-cached no-cors ("opaque") response instead
+    // of re-fetching in CORS mode — and an opaque cached response can
+    // never be read as pixel data, so the texture load fails with
+    // naturalWidth/naturalHeight stuck at 0, REGARDLESS of how permissive
+    // the server's actual CORS policy is (confirmed: this bucket's CORS
+    // config is wide open, AllowedOrigins: "*" — ruled out as the cause).
+    // A harmless, stable-per-mount query param makes this load a
+    // DIFFERENT cache key from the shard's plain <img>/background-image
+    // request, so the two can never collide — the browser fetches this
+    // one fresh, in CORS mode, exactly once.
+    const textureSrc = `${src}${src.includes('?') ? '&' : '?'}three-tex=1`;
     loader.load(
-      src,
+      textureSrc,
       (tex) => {
         texture = tex;
         material.uniforms.picture!.value = tex;

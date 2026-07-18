@@ -98,7 +98,11 @@ export default function ContactBar() {
   return (
     <nav
       className="fixed top-0 left-0 right-0"
-      style={{ zIndex: 200, height: 44, pointerEvents: 'none' }}
+      // 2026-07-17 (site-wide responsive audit, per Reza): bumped 44 -> 48
+      // to match SoundToggle's own 48px control size, and to give the
+      // pills room now that they grow to a proper 44px touch target on
+      // coarse (touch) pointers (see .contactbar-pill in index.css).
+      style={{ zIndex: 200, height: 48, pointerEvents: 'none' }}
       aria-label={t('Contact')}
     >
       {/* hairline glass backdrop, separate layer so the pills row can opt

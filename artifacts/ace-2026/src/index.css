@@ -2916,3 +2916,283 @@ p, blockquote, figcaption, .text-wrap-pretty {
   letter-spacing: 0.03em;
   margin-top: 0.15rem;
 }
+
+/* ============================================================
+   2026-07-17 (site-wide responsive/UX audit, per Reza) -- fixes for
+   findings from the full desktop/tablet/mobile pass: touch-target sizing,
+   and coordinating fixed-position elements that compete for the same
+   bottom-of-viewport space. Additive at the end of the file per this
+   project's standing CSS rule.
+   ============================================================ */
+
+/* --- Bug #1: PersistentAudioPlayer's outer box is height-driven by JS
+   (56/120 for the two mobile states) but the >=768px row inside it is a
+   fixed 72px tall -- neither JS value matched, so ~16px of the desktop
+   bar rendered past its own background/blur/border. JS can't easily know
+   Tailwind's own `md` breakpoint number without duplicating it, so this
+   single CSS rule is the one authoritative source for the desktop height,
+   overriding the inline JS value (which only actually applies below
+   768px, where this rule doesn't fire). !important is required here
+   specifically because it's overriding an inline style attribute, which
+   normal cascade specificity cannot do. */
+@media (min-width: 768px) {
+  .pap-shell {
+    height: 72px !important;
+  }
+}
+
+/* --- Bug #4: WorksGallery.tsx piano-key concept buttons were ~27-37px
+   tall (clamp(1.7rem,3.4vh,2.3rem)) with only ~5-8px between adjacent
+   lanes (clamp(0.3rem,0.7vh,0.5rem)) -- under the 44px touch-target
+   minimum, with real risk of tapping the neighbouring concept on a phone.
+   This invisible pseudo-element extends each button's actual hit area
+   into exactly HALF of that gap on each side (the same half-gap value the
+   component already uses for its own black-key offset, so lanes meet
+   edge-to-edge with zero new overlap between neighbours) -- reclaims
+   previously-dead space instead of shrinking the gap or growing the
+   visible key, so nothing about the look changes. */
+.pk-hit-slop::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * clamp(0.15rem, 0.35vh, 0.25rem));
+  bottom: calc(-1 * clamp(0.15rem, 0.35vh, 0.25rem));
+  left: 0;
+  right: 0;
+}
+
+/* --- Bug #5: ContactBar pills were a fixed 30px tall with a hover-only
+   label reveal -- on touch (no hover), that's a 30px target AND the label
+   text is permanently invisible. Auto-showing all 4 labels on mobile risks
+   overflowing a narrow phone width, so instead of that, this only grows
+   the tap target on coarse (touch) pointers -- the icons stay
+   self-explanatory (envelope / camera / "in" / play-triangle), same
+   restrained look, just an honestly-sized target underneath. */
+@media (pointer: coarse) {
+  .contactbar-pill {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+
+/* ============================================================
+   2026-07-17 (per Reza, v2 UX review) -- ResponsiveEditableImage.tsx:
+   a single small trigger button (same corner/style language as
+   EditableImage's own toolbar) opens a clean modal with one full
+   EditableImage slot per device (Desktop/Tablet/Mobile), instead of a
+   permanent panel cluttering the image itself.
+   ============================================================ */
+.rei-trigger {
+  z-index: 99991;
+  /* 2026-07-17 (real bug #1, per Reza): some callers (e.g. WorksGallery's
+     mirror portrait wrapper) sit inside an ancestor with
+     pointer-events:none (by design — only the photo itself re-enables
+     it via its own pointer-events-auto class). CSS pointer-events
+     inherits, so without this explicit override this button rendered
+     but was completely unclickable — exactly "looks like a button, does
+     nothing" bug Reza hit. auto here makes this element hit-testable
+     regardless of what any ancestor sets.
+     2026-07-17 (real bug #2, per Reza): position/top/right removed —
+     this is now portaled to document.body with position:fixed and its
+     top/left/transform computed in JS from the wrapper's real on-screen
+     rect (see ResponsiveEditableImage.tsx), exactly like
+     .ace-editable-toolbar already does. A plain position:absolute here
+     put the button inside whatever local stacking context its caller
+     happened to have (e.g. GridLayoutEngine's Hero: a continuously
+     scale-animated motion.div inside an overflow:hidden ancestor),
+     which could bury or clip it entirely depending on the caller's own
+     layout — exactly the "the edit box completely disappeared" bug. */
+  pointer-events: auto;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.85);
+  background: rgba(8, 8, 10, 0.9);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.rei-trigger:hover {
+  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--accent-color);
+}
+
+.rei-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99990;
+  background: rgba(4, 4, 5, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.rei-modal {
+  width: min(920px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: rgba(10, 10, 11, 0.98);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  padding: 22px 24px 26px;
+  font-family: var(--font-mono);
+}
+.rei-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.rei-modal-title {
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  color: var(--accent-color);
+  text-transform: uppercase;
+}
+.rei-modal-close {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 234, 0.85);
+  background: rgba(var(--accent-rgb), 0.16);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+  border-radius: 6px;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+.rei-modal-close:hover {
+  background: rgba(var(--accent-rgb), 0.28);
+}
+.rei-modal-subtitle {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: rgba(244, 241, 234, 0.55);
+  margin-bottom: 20px;
+  max-width: 68ch;
+}
+.rei-modal-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 720px) {
+  .rei-modal-slots {
+    grid-template-columns: 1fr;
+  }
+}
+.rei-modal-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rei-modal-slot-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rei-modal-slot-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-color, #F4F1EA);
+}
+.rei-modal-slot-hint {
+  font-size: 0.6rem;
+  color: rgba(244, 241, 234, 0.4);
+  letter-spacing: 0.02em;
+}
+.rei-modal-slot-frame {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  background: rgba(255, 255, 255, 0.03);
+}
+.rei-modal-slot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ============================================================
+   2026-07-17 (per Reza) -- real collapsible concept-folders for the
+   Media Pipeline tab's Playlist, replacing one flat unsectioned list of
+   every track. Visual language matches the existing .adm-* admin system
+   (--adm-border, gold accent) since this sits directly inside that same
+   panel.
+   ============================================================ */
+.adm-folder {
+  border: 1px solid var(--adm-border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.adm-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(107, 82, 38, 0.04);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+.adm-folder-header:hover {
+  background: rgba(107, 82, 38, 0.09);
+}
+.adm-folder-chevron {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: var(--text-dim-color);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+.adm-folder-chevron--open {
+  transform: rotate(90deg);
+}
+.adm-folder-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-color);
+  flex: 1;
+  min-width: 0;
+}
+.adm-folder-count {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  color: var(--text-dim-color);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  padding: 1px 8px;
+  flex-shrink: 0;
+}
+.adm-folder-star {
+  color: var(--accent-color);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.adm-folder-attention {
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #E3B97A;
+  background: rgba(227, 185, 122, 0.12);
+  border: 1px solid rgba(227, 185, 122, 0.3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+.adm-folder-body {
+  padding: 4px 12px 10px;
+  border-top: 1px solid var(--adm-border);
+}

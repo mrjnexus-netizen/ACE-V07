@@ -50,12 +50,22 @@ function localText(
   const rec = ml as unknown as Record<string, string>; return rec[locale] || rec.en || '';
 }
 
+// 2026-07-17 (site-wide responsive audit, per Reza): same reasoning as the
+// identical helper in LinguisticPortal.tsx — a plain width check routed
+// portrait tablets (768-1023px wide, taller than wide) into the DESKTOP
+// 1600x900 landscape composition, scaled down small with dead space
+// top/bottom, instead of the vertically-built MOB_W x MOB_H one actually
+// designed for that shape.
+function isMobileLayoutWidth(width: number, height: number): boolean {
+  return width < 768 || (width < 1024 && height > width);
+}
+
 function useIsMobile(): boolean {
   const [m, setM] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+    typeof window !== 'undefined' ? isMobileLayoutWidth(window.innerWidth, window.innerHeight) : false
   );
   useEffect(() => {
-    const on = () => setM(window.innerWidth < 768);
+    const on = () => setM(isMobileLayoutWidth(window.innerWidth, window.innerHeight));
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);

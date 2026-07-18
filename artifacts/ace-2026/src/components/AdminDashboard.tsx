@@ -233,6 +233,19 @@ const TabMediaPipeline = () => {
   const { playTrack } = useAudio();
   const { currentJob, stagedAudio, uploading, loadingMessage, uploadAudio, clearStagedAudio, startPipeline, approvePipeline, regeneratePipeline, resetJob } = usePipeline();
   const [savingId, setSavingId] = useState<string | null>(null);
+  // 2026-07-17 (per Reza — reorganizing the Playlist into real folders):
+  // which concept-folders are expanded. "__unassigned__" starts open since
+  // those are the tracks that most need attention (nothing sorted yet);
+  // every real concept starts collapsed so the admin sees an organized
+  // list of folders first, not one long flat wall of tracks.
+  const [openConcepts, setOpenConcepts] = useState<Set<string>>(() => new Set(['__unassigned__']));
+  const toggleConcept = (key: string) => {
+    setOpenConcepts((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   // Review-panel state (per Reza, 2026-07-09): cover and caption are two
   // fully independent boxes. Nothing auto-generates — each box only acts
@@ -665,14 +678,22 @@ const TabMediaPipeline = () => {
           )}
         </div>
       )}
-      <div className="adm-panel">
-        <div className="adm-panel-title">Playlist</div>
-        <p className="adm-panel-subtitle">
-          Assign each track a concept, and star one per concept to feature it on the home page.
-        </p>
-        <div>
-          {tracks.map(track => (
-            <div key={track.id}>
+      {/* 2026-07-17 (per Reza): "Playlist" was one flat, unsectioned list of
+          every track — no sense of what belonged where, nothing separating
+          tracks that still need a concept assigned from ones already
+          organized. Real collapsible folders instead: one per concept
+          (the same 12 that already drive the piano keys on the home page),
+          plus an "Unassigned" folder for anything with no concept yet.
+          Each folder's own header shows its track count and whether it
+          already has a featured (starred) track, so the whole state of the
+          library is visible at a glance without opening anything. */}
+      {(() => {
+        const unassigned = tracks.filter((t) => !t.concept || !(CONCEPT_OPTIONS as readonly string[]).includes(t.concept));
+        const byConcept: Record<string, AudioTrack[]> = {};
+        CONCEPT_OPTIONS.forEach((c) => { byConcept[c] = tracks.filter((t) => t.concept === c); });
+
+        const renderTrackRow = (track: AudioTrack) => (
+          <div key={track.id}>
             <div className="adm-track-row">
               {/* Cover thumbnail */}
               <div style={{ width: 38, height: 38, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--adm-border)' }}>
@@ -701,7 +722,10 @@ const TabMediaPipeline = () => {
                 )}
               </div>
 
-              {/* Concept selector */}
+              {/* Concept selector — moving a track OUT of the folder it's
+                  currently displayed in is expected: it'll simply appear
+                  under its new concept's folder (or Unassigned) the next
+                  time tracks refreshes. */}
               <select
                 value={track.concept ?? ''}
                 onChange={e => { void updateTrack(track, { concept: e.target.value || null }); }}
@@ -805,14 +829,58 @@ const TabMediaPipeline = () => {
                 </div>
               </div>
             )}
-            </div>
-          ))}
-          {tracks.length === 0 && (
-            <p className="adm-notice">No tracks yet. Upload one above.</p>
-          )}
-        </div>
-      </div>
+          </div>
+        );
 
+        const renderFolder = (key: string, label: string, folderTracks: AudioTrack[], attention: boolean) => {
+          const isOpen = openConcepts.has(key);
+          const featuredCount = folderTracks.filter((t) => t.isFeatured).length;
+          return (
+            <div key={key} className="adm-folder">
+              <button
+                type="button"
+                onClick={() => toggleConcept(key)}
+                className="adm-folder-header"
+                aria-expanded={isOpen}
+              >
+                <span className={`adm-folder-chevron ${isOpen ? 'adm-folder-chevron--open' : ''}`}>▸</span>
+                <span className="adm-folder-name">{label}</span>
+                <span className="adm-folder-count">{folderTracks.length}</span>
+                {featuredCount > 0 && <span className="adm-folder-star" title="Has a featured track">★</span>}
+                {attention && folderTracks.length > 0 && (
+                  <span className="adm-folder-attention" title="Needs a concept assigned">needs sorting</span>
+                )}
+              </button>
+              {isOpen && (
+                <div className="adm-folder-body">
+                  {folderTracks.length === 0 ? (
+                    <p className="adm-notice" style={{ padding: '0.5rem 0' }}>No tracks in this concept yet.</p>
+                  ) : (
+                    folderTracks.map(renderTrackRow)
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="adm-panel">
+            <div className="adm-panel-title">Playlist</div>
+            <p className="adm-panel-subtitle">
+              Organized by concept — click a folder to open it. Assign each track a concept, and star one per
+              concept to feature it on the home page.
+            </p>
+            <div>
+              {renderFolder('__unassigned__', 'Unassigned', unassigned, true)}
+              {CONCEPT_OPTIONS.map((c) => renderFolder(c, c, byConcept[c], false))}
+              {tracks.length === 0 && (
+                <p className="adm-notice">No tracks yet. Upload one above.</p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       {showLibrary && createPortal(
         <>
           <div onClick={() => setShowLibrary(false)} style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.5)' }} />
@@ -4213,21 +4281,60 @@ const FontsLanguageSection = ({ localeCode, label }: { localeCode: Locale; label
 // mechanism as everything else — no new table. mediaUrl is saved as type
 // 'link' (just a URL either way; ContentType has no separate 'video'
 // variant) — mediaType is what actually tells the frontend how to render it.
+// 2026-07-17 (per Reza): Promo Screen media now supports up to 3
+// device-specific files (Desktop/Tablet/Mobile) instead of one, using the
+// exact same content-key-suffix convention as the public-site
+// ResponsiveEditableImage component (contentKey, contentKey.tablet,
+// contentKey.mobile) — so the same fallback logic (mobile -> tablet ->
+// desktop) is consistent everywhere on the site, admin included. Storage
+// is still the plain content_entries system; no schema change.
+type PromoDevice = 'desktop' | 'tablet' | 'mobile';
+const PROMO_DEVICES: PromoDevice[] = ['desktop', 'tablet', 'mobile'];
+const PROMO_DEVICE_LABEL: Record<PromoDevice, string> = { desktop: 'Desktop', tablet: 'Tablet', mobile: 'Mobile' };
+const PROMO_DEVICE_HINT: Record<PromoDevice, string> = {
+  desktop: '\u2265 1280px \u2014 master, used as fallback',
+  tablet: '768\u20131279px',
+  mobile: '< 768px',
+};
+// 2026-07-17 (per Reza): 3 identical square frames gave no sense of how a
+// crop would actually look on each device — a Desktop banner is
+// landscape, a Mobile one is tall/portrait. Real device-shaped frames
+// (shown even before a file is chosen) let the admin visually judge the
+// crop up front, matching ResponsiveEditableImage's same convention on
+// the public site.
+const PROMO_DEVICE_ASPECT: Record<PromoDevice, string> = { desktop: '16 / 9', tablet: '3 / 4', mobile: '9 / 16' };
+function promoDeviceKey(device: PromoDevice): string {
+  return device === 'desktop' ? 'promoScreen.mediaUrl' : `promoScreen.mediaUrl.${device}`;
+}
+
+interface PromoVariantState {
+  savedUrl: string | null;
+  stagedFile: File | null;
+  stagedPreviewUrl: string | null;
+}
+const EMPTY_PROMO_VARIANT: PromoVariantState = { savedUrl: null, stagedFile: null, stagedPreviewUrl: null };
+
 const TabPromoScreen = () => {
   const { resolve, save } = useContent();
   const [enabled, setEnabled] = useState(false);
   const [mediaType, setMediaType] = useState<'video' | 'image'>('image');
   const [imageDurationSeconds, setImageDurationSeconds] = useState(10);
-  const [savedMediaUrl, setSavedMediaUrl] = useState<string | null>(null);
-  const [stagedFile, setStagedFile] = useState<File | null>(null);
-  const [stagedPreviewUrl, setStagedPreviewUrl] = useState<string | null>(null);
+  const [variants, setVariants] = useState<Record<PromoDevice, PromoVariantState>>({
+    desktop: EMPTY_PROMO_VARIANT,
+    tablet: EMPTY_PROMO_VARIANT,
+    mobile: EMPTY_PROMO_VARIANT,
+  });
   const [savedEnabled, setSavedEnabled] = useState(false);
   const [savedMediaType, setSavedMediaType] = useState<'video' | 'image'>('image');
   const [savedImageDurationSeconds, setSavedImageDurationSeconds] = useState(10);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRefs = {
+    desktop: useRef<HTMLInputElement>(null),
+    tablet: useRef<HTMLInputElement>(null),
+    mobile: useRef<HTMLInputElement>(null),
+  };
 
   useEffect(() => {
     const en = resolve('promoScreen.enabled', 'en') === 'true';
@@ -4242,59 +4349,88 @@ const TabPromoScreen = () => {
     const safeDur = Number.isFinite(dur) && dur > 0 ? dur : 10;
     setImageDurationSeconds(safeDur);
     setSavedImageDurationSeconds(safeDur);
-    setSavedMediaUrl(resolve('promoScreen.mediaUrl', 'en'));
+    setVariants({
+      desktop: { ...EMPTY_PROMO_VARIANT, savedUrl: resolve(promoDeviceKey('desktop'), 'en') },
+      tablet: { ...EMPTY_PROMO_VARIANT, savedUrl: resolve(promoDeviceKey('tablet'), 'en') },
+      mobile: { ...EMPTY_PROMO_VARIANT, savedUrl: resolve(promoDeviceKey('mobile'), 'en') },
+    });
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Revoke the local object URL when it's replaced/unmounted (avoids leaking).
+  // Revoke every staged local object URL on unmount (avoids leaking).
   useEffect(() => {
-    return () => { if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl); };
-  }, [stagedPreviewUrl]);
+    return () => {
+      PROMO_DEVICES.forEach((d) => {
+        const url = variants[d]?.stagedPreviewUrl;
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const dirty = enabled !== savedEnabled || mediaType !== savedMediaType || imageDurationSeconds !== savedImageDurationSeconds || !!stagedFile;
-  const displayUrl = stagedPreviewUrl ?? savedMediaUrl;
+  const dirty =
+    enabled !== savedEnabled ||
+    mediaType !== savedMediaType ||
+    imageDurationSeconds !== savedImageDurationSeconds ||
+    PROMO_DEVICES.some((d) => !!variants[d].stagedFile);
 
-  const chooseFile = (file: File) => {
-    if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl);
-    setStagedFile(file);
-    setStagedPreviewUrl(URL.createObjectURL(file));
+  const chooseFile = (device: PromoDevice, file: File) => {
+    setVariants((prev) => {
+      const current = prev[device];
+      if (current.stagedPreviewUrl) URL.revokeObjectURL(current.stagedPreviewUrl);
+      return { ...prev, [device]: { ...current, stagedFile: file, stagedPreviewUrl: URL.createObjectURL(file) } };
+    });
   };
 
-  const clearStagedOrSaved = () => {
-    if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl);
-    setStagedFile(null);
-    setStagedPreviewUrl(null);
-    setSavedMediaUrl(null);
+  const clearVariant = (device: PromoDevice) => {
+    setVariants((prev) => {
+      const current = prev[device];
+      if (current.stagedPreviewUrl) URL.revokeObjectURL(current.stagedPreviewUrl);
+      return { ...prev, [device]: { savedUrl: null, stagedFile: null, stagedPreviewUrl: null } };
+    });
   };
 
-  // The ONE action that actually persists anything — uploads the staged
-  // file first (if there is one), then saves enabled + mediaType +
-  // mediaUrl together. Nothing else on this screen saves by itself
-  // (2026-07-14, per Reza: was three separate save-ish actions before —
-  // confusing; now exactly one).
+  // The ONE action that actually persists anything — uploads whichever
+  // device variants have a staged file, then saves enabled + mediaType +
+  // duration + all three media URLs together. Nothing else on this screen
+  // saves by itself (2026-07-14, per Reza: was three separate save-ish
+  // actions before — confusing; now exactly one — kept true for the
+  // 3-device version too).
   const submit = async () => {
     setSaving(true);
     setNotice(null);
     try {
-      let finalUrl = savedMediaUrl ?? '';
-      if (stagedFile) {
-        const form = new FormData();
-        form.append('media', stagedFile, stagedFile.name);
-        form.append('entity_type', 'content');
-        form.append('entity_id', 'promoScreen.mediaUrl');
-        const asset = await apiPost<{ url: string }>('/api/media/upload', form);
-        finalUrl = asset.url;
+      const finalUrls: Record<PromoDevice, string> = { desktop: '', tablet: '', mobile: '' };
+      for (const device of PROMO_DEVICES) {
+        const variant = variants[device];
+        let url = variant.savedUrl ?? '';
+        if (variant.stagedFile) {
+          const form = new FormData();
+          form.append('media', variant.stagedFile, variant.stagedFile.name);
+          form.append('entity_type', 'content');
+          form.append('entity_id', promoDeviceKey(device));
+          const asset = await apiPost<{ url: string }>('/api/media/upload', form);
+          url = asset.url;
+        }
+        finalUrls[device] = url;
       }
+
       await save('promoScreen.enabled', 'en', 'text', enabled ? 'true' : 'false');
       await save('promoScreen.mediaType', 'en', 'text', mediaType);
       await save('promoScreen.imageDurationSeconds', 'en', 'text', String(imageDurationSeconds));
-      await save('promoScreen.mediaUrl', 'en', 'link', finalUrl);
+      await save(promoDeviceKey('desktop'), 'en', 'link', finalUrls.desktop);
+      await save(promoDeviceKey('tablet'), 'en', 'link', finalUrls.tablet);
+      await save(promoDeviceKey('mobile'), 'en', 'link', finalUrls.mobile);
 
-      if (stagedPreviewUrl) URL.revokeObjectURL(stagedPreviewUrl);
-      setStagedFile(null);
-      setStagedPreviewUrl(null);
-      setSavedMediaUrl(finalUrl || null);
+      setVariants((prev) => {
+        const next = { ...prev };
+        PROMO_DEVICES.forEach((d) => {
+          if (next[d].stagedPreviewUrl) URL.revokeObjectURL(next[d].stagedPreviewUrl!);
+          next[d] = { savedUrl: finalUrls[d] || null, stagedFile: null, stagedPreviewUrl: null };
+        });
+        return next;
+      });
       setSavedEnabled(enabled);
       setSavedMediaType(mediaType);
       setSavedImageDurationSeconds(imageDurationSeconds);
@@ -4368,52 +4504,83 @@ const TabPromoScreen = () => {
         </div>
       )}
 
-      <div style={{
-        padding: 20, borderRadius: 14, marginBottom: 20,
-        background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.05), rgba(255,255,255,0.015))',
-        border: '1px solid rgba(var(--accent-rgb),0.14)', maxWidth: 480,
-      }}>
-        {displayUrl ? (
-          <div>
-            {mediaType === 'video' ? (
-              <video src={displayUrl} controls style={{ width: '100%', borderRadius: 10, marginBottom: 12 }} />
-            ) : (
-              <img src={displayUrl} alt="" style={{ width: '100%', borderRadius: 10, marginBottom: 12 }} />
-            )}
-            {stagedFile && (
-              <div style={{ fontSize: '0.72rem', color: 'var(--accent-color)', marginBottom: 8 }}>
-                New file staged — press Save &amp; Submit below to upload it.
+      <p style={{ fontSize: '0.72rem', opacity: 0.55, marginBottom: 12, maxWidth: 640 }}>
+        Set a different {mediaType} for each device. Leave Tablet or Mobile empty and it automatically falls back to
+        the one above it (Mobile &rarr; Tablet &rarr; Desktop).
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 20, maxWidth: 780 }}>
+        {PROMO_DEVICES.map((device) => {
+          const variant = variants[device];
+          const displayUrl = variant.stagedPreviewUrl ?? variant.savedUrl;
+          const inputRef = fileInputRefs[device];
+          return (
+            <div
+              key={device}
+              style={{
+                padding: 16, borderRadius: 14,
+                background: 'linear-gradient(145deg, rgba(var(--accent-rgb),0.05), rgba(255,255,255,0.015))',
+                border: '1px solid rgba(var(--accent-rgb),0.14)',
+              }}
+            >
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: '0.72rem', letterSpacing: '0.04em', fontWeight: 600 }}>{PROMO_DEVICE_LABEL[device]}</div>
+                <div style={{ fontSize: '0.62rem', opacity: 0.45 }}>{PROMO_DEVICE_HINT[device]}</div>
               </div>
-            )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" style={AMBIENT_BTN_GHOST} onClick={() => fileInputRef.current?.click()}>
-                Choose different {mediaType === 'video' ? 'video' : 'image'}
-              </button>
-              <button type="button" style={AMBIENT_BTN_GHOST} onClick={clearStagedOrSaved}>
-                Remove
-              </button>
+              {displayUrl ? (
+                <div>
+                  <div style={{ position: 'relative', aspectRatio: PROMO_DEVICE_ASPECT[device], borderRadius: 10, overflow: 'hidden', marginBottom: 10, background: 'rgba(255,255,255,0.03)' }}>
+                    {mediaType === 'video' ? (
+                      <video src={displayUrl} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <img src={displayUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )}
+                  </div>
+                  {variant.stagedFile && (
+                    <div style={{ fontSize: '0.68rem', color: 'var(--accent-color)', marginBottom: 8 }}>
+                      New file staged — press Save &amp; Submit below.
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button type="button" style={{ ...AMBIENT_BTN_GHOST, fontSize: '0.68rem', padding: '5px 10px' }} onClick={() => inputRef.current?.click()}>
+                      Replace
+                    </button>
+                    <button type="button" style={{ ...AMBIENT_BTN_GHOST, fontSize: '0.68rem', padding: '5px 10px' }} onClick={() => clearVariant(device)}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    position: 'relative', aspectRatio: PROMO_DEVICE_ASPECT[device], borderRadius: 10,
+                    background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(var(--accent-rgb),0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+                  }}
+                >
+                  <button
+                    type="button"
+                    style={{ ...AMBIENT_BTN_NEON, fontSize: '0.7rem', padding: '8px 14px' }}
+                    onClick={() => inputRef.current?.click()}
+                  >
+                    {`Choose ${mediaType === 'video' ? 'a video' : 'an image'}`}
+                  </button>
+                </div>
+              )}
+              <input
+                ref={inputRef}
+                type="file"
+                accept={mediaType === 'video' ? 'video/*' : 'image/*'}
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) chooseFile(device, file);
+                  e.target.value = '';
+                }}
+              />
             </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            style={AMBIENT_BTN_NEON}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {`Choose ${mediaType === 'video' ? 'a video' : 'an image'}`}
-          </button>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={mediaType === 'video' ? 'video/*' : 'image/*'}
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) chooseFile(file);
-            e.target.value = '';
-          }}
-        />
+          );
+        })}
       </div>
 
       {/* The ONE save action for this whole screen. */}

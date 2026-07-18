@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
@@ -141,6 +141,99 @@ function AnimatedFace({ seed, active }: { seed: number; active: boolean }) {
         <div className="sse-anim" style={{ position: 'absolute', top: 0, bottom: 0, width: '34%', background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.05), transparent)', animation: `sseSheen ${7 + (seed % 4)}s linear infinite` }} />
       )}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// 2026-07-17 (per Reza) — MOBILE-ONLY scroll-driven card fade.
+//
+// Reza's explicit scope: touch NOTHING about the cards themselves (their
+// design, features, internal animations — VinylCardFace, the play state,
+// the text block below) — ONLY change how they move/reveal as the person
+// scrolls. Reference behaviour (codepen.io/JavaScriptJunkie/pen/BGNELL):
+// each card fades and scales up as it approaches the center of the
+// viewport while scrolling, then fades back down as it moves past —
+// a continuous, reversible "focus" effect, not the one-time
+// whileInView-and-done reveal this had before (which also never played
+// again if you scrolled back up).
+//
+// Framer-motion's useScroll needs a real per-instance target ref, which
+// means a real per-instance component (can't call hooks inside the
+// .map() callback below — that would call hooks a variable number of
+// times per render, which breaks React's rules of hooks). Everything
+// inside the returned JSX — the button, VinylCardFace, the text block —
+// is copied verbatim from the previous version; only the outer
+// motion.article's animation source changed.
+function MobileWorkCard({
+  concept,
+  title,
+  desc,
+  cover,
+  track,
+  isCurrent,
+  isPlaying,
+  seed,
+  currentTime,
+  duration,
+  onActivate,
+  t,
+}: {
+  concept: string;
+  title: string;
+  desc: string;
+  cover: string;
+  track: AudioTrack | null;
+  isCurrent: boolean;
+  isPlaying: boolean;
+  seed: number;
+  currentTime: number;
+  duration: number;
+  onActivate: (track: AudioTrack | null) => void;
+  t: (s: string) => string;
+}) {
+  const reduce = useReducedMotion() ?? false;
+  const cardRef = useRef<HTMLElement>(null);
+
+  // Progress 0 -> the card's top edge is at the viewport's bottom edge
+  // (just about to enter, from below). Progress 1 -> the card's bottom
+  // edge is at the viewport's top edge (just about to leave, off the
+  // top). 0.5 lands close to the card passing through the viewport's
+  // center for typical card/viewport proportions — exactly the "focus"
+  // point the fade should peak at.
+  const { scrollYProgress } = useScroll({ target: cardRef, offset: ['start end', 'end start'] });
+
+  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], reduce ? [1, 1, 1] : [0.15, 1, 0.15]);
+  const scale = useTransform(scrollYProgress, [0, 0.5, 1], reduce ? [1, 1, 1] : [0.88, 1, 0.88]);
+
+  return (
+    <motion.article ref={cardRef} style={{ opacity, scale }}>
+      <button
+        type="button"
+        data-cursor={track ? 'play' : undefined}
+        onClick={() => onActivate(track)}
+        className="block w-full text-left focus:outline-none"
+        style={{ cursor: track ? 'pointer' : 'default' }}
+        aria-label={track ? `${isPlaying ? t('Pause') : t('Play')} ${title}` : `${t(concept)} — ${t('coming soon')}`}
+      >
+        <div className="relative overflow-hidden rounded-3xl" style={{ aspectRatio: '16 / 10' }}>
+          <VinylCardFace
+            cover={cover}
+            fallback={<AnimatedFace seed={seed} active={false} />}
+            title={title}
+            isPlaying={isPlaying}
+            isCurrent={isCurrent}
+            currentTime={currentTime}
+            duration={duration}
+            dim={false}
+          />
+        </div>
+        <div className="mt-4">
+          <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">{t(concept)}</span>
+          <h3 className="text-2xl font-display text-[var(--text-color)] leading-tight mt-1 mb-1">{title}</h3>
+          {desc && <p className="text-sm text-[var(--text-muted-color)]">{desc}</p>}
+        </div>
+      </button>
+    </motion.article>
   );
 }
 
@@ -371,40 +464,21 @@ export default function SpatialScrollEngine() {
             const isCurrent = !!track && audioState.currentTrack?.id === track.id;
             const isPlaying = isCurrent && audioState.isPlaying;
             return (
-              <motion.article
+              <MobileWorkCard
                 key={concept}
-                initial={{ opacity: 0, y: 24, filter: 'blur(8px)' }}
-                whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                viewport={{ once: true, margin: '-60px' }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <button
-                  type="button"
-                  data-cursor={track ? 'play' : undefined}
-                  onClick={() => onCardClick(track)}
-                  className="block w-full text-left focus:outline-none"
-                  style={{ cursor: track ? 'pointer' : 'default' }}
-                  aria-label={track ? `${isPlaying ? t('Pause') : t('Play')} ${title}` : `${t(concept)} — ${t('coming soon')}`}
-                >
-                  <div className="relative overflow-hidden rounded-3xl" style={{ aspectRatio: '16 / 10' }}>
-                    <VinylCardFace
-                      cover={cover}
-                      fallback={<AnimatedFace seed={ci} active={false} />}
-                      title={title}
-                      isPlaying={isPlaying}
-                      isCurrent={isCurrent}
-                      currentTime={audioState.currentTime}
-                      duration={audioState.duration}
-                      dim={false}
-                    />
-                  </div>
-                  <div className="mt-4">
-                    <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">{t(concept)}</span>
-                    <h3 className="text-2xl font-display text-[var(--text-color)] leading-tight mt-1 mb-1">{title}</h3>
-                    {desc && <p className="text-sm text-[var(--text-muted-color)]">{desc}</p>}
-                  </div>
-                </button>
-              </motion.article>
+                concept={concept}
+                title={title}
+                desc={desc}
+                cover={cover}
+                track={track}
+                isCurrent={isCurrent}
+                isPlaying={isPlaying}
+                seed={ci}
+                currentTime={audioState.currentTime}
+                duration={audioState.duration}
+                onActivate={onCardClick}
+                t={t}
+              />
             );
           })}
         </div>

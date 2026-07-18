@@ -287,7 +287,7 @@ function PianoLane({
         onMouseLeave={() => setPressed(false)}
         onFocus={press}
         onBlur={() => setPressed(false)}
-        className="relative h-full focus:outline-none"
+        className="relative h-full focus:outline-none pk-hit-slop"
         style={{
           x,
           opacity,
@@ -953,9 +953,24 @@ export default function WorksGallery() {
       {/* Mirror portrait (2026-07-10, per Reza): sits on the right, a mirror
           of the piano keys on the left, and assembles itself from scattered
           shards on the SAME scroll timeline as the keys sliding in (see
-          MirrorShatterPortrait.tsx). Hidden below the `lg` breakpoint via
+          MirrorShatterPortrait.tsx). Hidden below the `xl` breakpoint via
           the wrapper's Tailwind classes — there's no room for a mirrored
           column once the piano keys stack to full width on small screens.
+          2026-07-17 (site-wide responsive audit, per Reza's live iPad Pro
+          test): this was `lg` (1024px) until a real portrait-tablet test
+          showed the actual bug — at exactly 1024px wide, the box math
+          (width: clamp(220px,22vw,380px) against height: min(68vh,620px))
+          resolves to roughly 225x620px, an extremely narrow/tall shape.
+          cover-cropping a landscape source photo into that shape crops
+          away most of its width, leaving only a tight zoomed sliver (what
+          Reza saw: just an eye/glasses, not the intended composition).
+          `xl` (1280px) keeps this off the whole portrait-tablet range
+          entirely, so it only ever appears once there's enough width for
+          the box's aspect ratio to look intentional rather than accidental.
+          2026-07-17 (per Reza): tried the 3-device (ResponsiveEditableImage)
+          system here first, but Reza decided this specific photo should
+          stay on the plain single-version toolbar — the 3-device system is
+          reserved for the Hero portrait and the Promo Screen media instead.
           Reuses EditableImage (contentKey 'worksSection.mirrorPortrait') so
           it gets upload/crop/replace/delete in the admin panel for free,
           exactly like every other admin-managed photo on the site. Falls
@@ -963,7 +978,7 @@ export default function WorksGallery() {
           specifically here. */}
       {composerIdentity?.portrait?.url && (
         <div
-          className="hidden lg:block absolute pointer-events-none"
+          className="hidden xl:block absolute pointer-events-none"
           style={{ right: 'clamp(1.5rem, 6vw, 7rem)', top: '50%', transform: 'translateY(-50%)', width: 'clamp(220px, 22vw, 380px)', height: 'min(68vh, 620px)', zIndex: 15 }}
         >
           <EditableImage contentKey="worksSection.mirrorPortrait" defaultUrl={composerIdentity.portrait.url}>

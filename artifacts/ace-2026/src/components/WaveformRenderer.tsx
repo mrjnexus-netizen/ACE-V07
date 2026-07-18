@@ -16,8 +16,22 @@ const WaveformRenderer = ({ color }: WaveformRendererProps) => {
     if (!canvas) return;
 
     const resizeCanvas = () => {
-      canvas.width = canvas.parentElement?.clientWidth || 300;
-      canvas.height = 40; // Fixed height for waveform
+      // 2026-07-17 (site-wide responsive audit, per Reza): the backing
+      // buffer was set to the CSS pixel size 1:1, so on any high-DPI phone
+      // (DPR 2-3, which is most phones today) the 1.5px line got upscaled
+      // and read as blurry. Sizing the actual buffer at CSS-size * DPR and
+      // scaling the drawing context back down keeps every draw call below
+      // in plain CSS-pixel coordinates (no other changes needed) while the
+      // GPU composites a full-resolution buffer.
+      const dpr = window.devicePixelRatio || 1;
+      const cssWidth = canvas.parentElement?.clientWidth || 300;
+      const cssHeight = 40; // Fixed CSS height for waveform
+      canvas.width = cssWidth * dpr;
+      canvas.height = cssHeight * dpr;
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
+      const ctx = canvas.getContext('2d');
+      ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
     resizeCanvas();
@@ -44,10 +58,21 @@ const WaveformRenderer = ({ color }: WaveformRendererProps) => {
         return;
       }
 
-      const width = canvas.width;
-      const height = canvas.height;
+      // CSS-pixel dimensions, NOT canvas.width/height (those are now the
+      // DPR-scaled backing-buffer size) -- ctx's transform already maps
+      // these back up to the real buffer, so every coordinate below stays
+      // in the same simple space it always was.
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
 
-      ctx.clearRect(0, 0, width, height);
+      // clearRect must cover the FULL backing buffer, not just the CSS
+      // size, or old pixels persist in the DPR-scaled margin) -- easiest
+      // correct way is to clear in raw device-pixel space via a fresh
+      // identity transform, then restore ours for drawing.
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
 
       const bufferLength = timeDomainData.length;
       const hasAudio = audioState.isPlaying && bufferLength > 0;
