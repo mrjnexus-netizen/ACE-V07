@@ -1,6 +1,7 @@
 import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
 import EditableText from './EditableText';
+import CreatorMark from './CreatorMark';
 
 // Luxury cinematic footer (2026-07-02 redesign). Self-contained .ftr-* classes
 // (see the Footer block appended to index.css) so it never depends on the
@@ -85,6 +86,8 @@ export const Footer = () => {
           © {new Date().getFullYear()} <EditableText contentKey="identity.name" defaultValue="Amir Moslehi" as="span" />.{' '}
           <EditableText contentKey="footer.rights" defaultValue={t('All rights reserved.')} as="span" />
         </div>
+
+        <CreatorMark />
       </div>
     </footer>
   );

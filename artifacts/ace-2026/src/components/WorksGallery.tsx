@@ -807,20 +807,46 @@ function OverlayPanel({
                       placeholder: true,
                       tint: conceptTint(group.label),
                     }))
-                  : group.tracks.map((tk) => {
-                      const isCurrent = audioState.currentTrack?.id === tk.id;
-                      return {
-                        key: tk.id,
-                        cover: trackCover(tk),
-                        title: trackTitle(tk),
-                        caption: trackCaption(tk),
-                        concept: group.label,
-                        isCurrent,
-                        isPlaying: isCurrent && audioState.isPlaying,
-                        placeholder: false,
-                        onSelectPlay: () => onTrackClick(tk),
-                      };
-                    })
+                  : (() => {
+                      // 2026-07-18 (per Reza): with only 1-2 real tracks,
+                      // the carousel's own geometry (built for a full
+                      // loop) rendered mostly empty space either side of
+                      // one lonely card — not broken exactly, just
+                      // visually sparse and unfinished-looking. Same fix
+                      // as the zero-track branch above, but cycling
+                      // through the REAL tracks instead of fake
+                      // placeholders — a minimum of 6 slots, repeating
+                      // the same handful of real tracks as many times as
+                      // needed. Every repeat still points at the exact
+                      // same track object (same cover/title/caption/
+                      // click handler) — clicking any copy plays the
+                      // same thing; only the React key differs so React
+                      // doesn't collide on duplicate ids.
+                      const real = group.tracks.map((tk) => {
+                        const isCurrent = audioState.currentTrack?.id === tk.id;
+                        return {
+                          key: tk.id,
+                          cover: trackCover(tk),
+                          title: trackTitle(tk),
+                          caption: trackCaption(tk),
+                          concept: group.label,
+                          isCurrent,
+                          isPlaying: isCurrent && audioState.isPlaying,
+                          placeholder: false,
+                          onSelectPlay: () => onTrackClick(tk),
+                        };
+                      });
+                      const MIN_LOOP = 6;
+                      if (real.length >= MIN_LOOP) return real;
+                      const padded = [...real];
+                      let cycle = 0;
+                      while (padded.length < MIN_LOOP) {
+                        const source = real[cycle % real.length];
+                        padded.push({ ...source, key: `${source.key}-loop${Math.floor(cycle / real.length) + 1}` });
+                        cycle += 1;
+                      }
+                      return padded;
+                    })()
               }
             />
           </div>

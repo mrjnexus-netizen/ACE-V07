@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
 
 /* Custom font utilities (map to runtime CSS vars injected by ChromaticContext).
    Defined as plain CSS so they override Tailwind's core font-* utilities and
@@ -965,9 +966,10 @@ p, blockquote, figcaption, .text-wrap-pretty {
   position: relative;
   width: 100%;
   margin-top: auto;
-  padding: 3.25rem 1.5rem 2.5rem;
+  padding: 3.25rem 1.5rem calc(2.5rem + var(--pap-h, 0px));
   background: linear-gradient(180deg, transparent 0%, rgba(var(--surface-rgb, 8, 8, 8), 0.35) 100%);
   overflow: hidden;
+  transition: padding-bottom 300ms ease;
 }
 /* soft luminous divider that fades toward both edges (no hard line) */
 .ftr-rule {
@@ -3195,4 +3197,266 @@ p, blockquote, figcaption, .text-wrap-pretty {
 .adm-folder-body {
   padding: 4px 12px 10px;
   border-top: 1px solid var(--adm-border);
+}
+
+
+
+
+
+/* ============================================================
+   2026-07-18 (per Reza, v6) -- CreatorMark.tsx: dropped circles/rings/
+   dots entirely (kept looking off across several rounds) for a clean
+   brass-plaque rectangle -- a rounded rect, a thin metallic border, and
+   four small corner accents is about as low-risk a "premium" shape as
+   exists: no freehand curves, no radial math that can misjudge spacing,
+   just straight lines. Mouse parallax is now a real 3D tilt
+   (perspective + rotateX/rotateY) on the plaque itself, the same
+   well-tested technique used for premium product-card hover effects,
+   rather than juggling several SVG depth layers. Mr.J / Nexus are now
+   tight together (no gap) inside the plaque. Colors still follow
+   var(--accent-color)/var(--accent-rgb) (the site's per-language color
+   system). Still deliberately modest in size.
+   ============================================================ */
+.crm-seal {
+  position: relative;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 132px;
+  margin: 0.8rem auto 0;
+  padding: 0;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.crm-seal:focus-visible .crm-seal-plaque {
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 212, 175, 55), 0.5);
+}
+.crm-seal-plaque {
+  position: relative;
+  width: 100%;
+  padding: 1.1rem 0.5rem 0.9rem;
+  border-radius: 8px;
+  background: linear-gradient(160deg, rgba(var(--accent-rgb, 212, 175, 55), 0.06), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(var(--accent-rgb, 212, 175, 55), 0.32);
+  transform: perspective(600px) rotateX(0deg) rotateY(0deg);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease;
+}
+.crm-seal:hover .crm-seal-plaque,
+.crm-seal:focus-visible .crm-seal-plaque {
+  border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.55);
+  transform: perspective(600px) rotateX(4deg) rotateY(-4deg) scale(1.03);
+}
+.crm-seal-corner {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-color: var(--accent-color, #d4af37);
+  opacity: 0.5;
+}
+.crm-seal-corner--tl { top: 4px; left: 4px; border-top: 1px solid; border-left: 1px solid; }
+.crm-seal-corner--tr { top: 4px; right: 4px; border-top: 1px solid; border-right: 1px solid; }
+.crm-seal-corner--bl { bottom: 4px; left: 4px; border-bottom: 1px solid; border-left: 1px solid; }
+.crm-seal-corner--br { bottom: 4px; right: 4px; border-bottom: 1px solid; border-right: 1px solid; }
+.crm-seal-sign-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  pointer-events: none;
+}
+.crm-seal-signtext {
+  position: relative;
+  font-family: 'Great Vibes', 'Brush Script MT', cursive;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 2.1rem;
+  line-height: 1;
+  color: var(--accent-color, #d4af37);
+  filter: drop-shadow(0 0 4px rgba(var(--accent-rgb, 212, 175, 55), 0.2));
+  clip-path: polygon(-60% -40%, 10% -40%, -54% 140%, -60% 140%);
+  animation: crmSignSweep 1400ms cubic-bezier(0.5, 0.08, 0.35, 1) 300ms forwards;
+}
+@keyframes crmSignSweep {
+  to { clip-path: polygon(-60% -40%, 154% -40%, 90% 140%, -60% 140%); }
+}
+.crm-seal-nexus {
+  margin-top: -0.42rem;
+  font-family: 'Cinzel', serif;
+  font-weight: 400;
+  font-size: 0.5rem;
+  letter-spacing: 0.42em;
+  padding-left: 0.42em;
+  color: rgba(var(--accent-rgb, 212, 175, 55), 0.7);
+  opacity: 0;
+  animation: crmFadeIn 600ms ease 1500ms forwards;
+}
+@keyframes crmFadeIn {
+  to { opacity: 1; }
+}
+.crm-seal-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.crm-seal-tag-main {
+  font-family: 'Cinzel', serif;
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  padding-left: 0.14em;
+  color: rgba(233, 228, 218, 0.5);
+}
+
+/* -- fullscreen expanded state -- */
+.crm-fs-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99996;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 24px;
+  animation: crmFsBackdropIn 0.3s ease forwards;
+}
+@keyframes crmFsBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes crmFsBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.crm-fs-backdrop.crm-fs-closing {
+  animation: crmFsBackdropOut 0.32s ease forwards;
+}
+.crm-fs-box {
+  position: relative;
+  display: flex;
+  width: min(88vw, 380px);
+  animation: crmFsBoxIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.6rem 1.4rem 1.8rem;
+  border-radius: 22px;
+  background: rgb(1, 3, 0);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(var(--accent-rgb, 212, 175, 55), 0.22);
+  box-shadow: 0 36px 100px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(var(--accent-rgb, 212, 175, 55), 0.12);
+  max-height: 92vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.crm-fs-box::-webkit-scrollbar {
+  display: none;
+}
+@keyframes crmFsBoxIn {
+  from { opacity: 0; transform: scale(0.9) translateY(18px); filter: blur(6px); }
+  60% { filter: blur(0); }
+  to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+@keyframes crmFsBoxOut {
+  from { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+  to { opacity: 0; transform: scale(0.94) translateY(10px); filter: blur(4px); }
+}
+.crm-fs-box.crm-fs-closing {
+  animation: crmFsBoxOut 0.32s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.crm-fs-frame {
+  position: relative;
+  width: min(38vh, 240px);
+}
+.crm-fs-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 464 / 848;
+  border-radius: 10px;
+}
+.crm-fs-socials {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  mix-blend-mode: normal;
+}
+.crm-fs-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: rgba(var(--accent-rgb, 212, 175, 55), 0.85);
+  background: rgba(8, 6, 3, 0.55);
+  border: 1px solid rgba(var(--accent-rgb, 212, 175, 55), 0.35);
+  text-decoration: none;
+  opacity: 0;
+  animation: crmSocialIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, background 0.25s ease, color 0.25s ease;
+}
+.crm-fs-social svg {
+  width: 13px;
+  height: 13px;
+}
+.crm-fs-social:nth-child(1) { animation-delay: 0.5s; }
+.crm-fs-social:nth-child(2) { animation-delay: 0.58s; }
+.crm-fs-social:nth-child(3) { animation-delay: 0.66s; }
+.crm-fs-social:nth-child(4) { animation-delay: 0.74s; }
+.crm-fs-social:nth-child(5) { animation-delay: 0.82s; }
+@keyframes crmSocialIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.85); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.crm-fs-social:hover {
+  color: #050403;
+  background: linear-gradient(135deg, var(--accent-color, #d4af37), var(--accent2-color, #f3d77e));
+  transform: translateY(-3px) scale(1.08);
+  box-shadow: 0 10px 26px rgba(var(--accent-rgb, 212, 175, 55), 0.4);
+}
+.crm-fs-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: rgba(233, 228, 218, 0.55);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(233, 228, 218, 0.14);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.crm-fs-close:hover {
+  color: var(--accent-color, #d4af37);
+  border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.4);
+  background: rgba(0, 0, 0, 0.4);
+}
+.crm-fs-close:hover {
+  color: var(--accent-color, #d4af37);
+  border-color: rgba(var(--accent-rgb, 212, 175, 55), 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .crm-seal-plaque { transition: none; }
+  .crm-seal-signtext { animation: none; clip-path: none; }
+  .crm-seal-nexus { animation: none; opacity: 1; }
+  .crm-fs-backdrop { animation: none; }
+  .crm-fs-backdrop.crm-fs-closing { animation: none; }
+  .crm-fs-box { animation: none; opacity: 1; transform: none; filter: none; }
+  .crm-fs-box.crm-fs-closing { animation: none; }
+  .crm-fs-social { animation: none; opacity: 1; transform: none; }
 }

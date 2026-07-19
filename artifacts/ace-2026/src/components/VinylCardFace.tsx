@@ -19,14 +19,17 @@ import type { ReactNode } from 'react';
 //     viewBox — no percentage-of-unclear-container math anywhere,
 //     precise at any card size, small and refined (corner badge, not a
 //     headline element) — the centre play button is the real affordance.
+//
+// v3 (per Reza, 2026-07-18): no title/time text on the card anymore — it
+// duplicated the <h3> SpatialScrollEngine already renders outside the
+// card, and cluttered what should be a clean showcase for the AI-generated
+// cover art. Cover art blur removed too — it existed only to keep that
+// now-gone title legible; the artwork shows crisp and full now. The play
+// button moved from a large centred circle to a small badge mirroring the
+// turntable (same size, same bottom alignment, opposite side) — the
+// turntable's own tonearm animation (already driven by `isPlaying`,
+// completely unchanged) IS the "now playing" feedback.
 // ============================================================
-
-function formatTime(s: number): string {
-  if (!Number.isFinite(s) || s < 0) return '0:00';
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, '0')}`;
-}
 
 export const VINYL_CARD_STYLES = `
 @keyframes vinylSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -37,12 +40,9 @@ export const VINYL_CARD_STYLES = `
   100% { opacity: 0;   transform: translateY(-26px) scale(1.1); }
 }
 .vinyl-note { position: absolute; bottom: 8%; font-size: 10px; animation: vinylNoteFloat 1.9s ease-in infinite; }
-@keyframes vinylPlayRing { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.7; } }
-.vinyl-play-ring { animation: vinylPlayRing 3.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .vinyl-disc-spin { animation: none !important; }
   .vinyl-note { animation: none !important; opacity: 0 !important; }
-  .vinyl-play-ring { animation: none !important; }
 }
 `;
 
@@ -75,21 +75,20 @@ function TurntableBadge({ spinning, playing }: { spinning: boolean; playing: boo
     <svg viewBox="0 0 64 64" className="w-full h-full" aria-hidden>
       {/* soft neon bloom behind the disc */}
       <circle cx="32" cy="34" r="24" fill="rgba(var(--accent-rgb),0.22)" style={{ filter: 'blur(6px)' }} />
-      {/* tonearm base pivot */}
-      <circle cx="54" cy="10" r="3.4" fill="#cfcfcf" />
-      {/* tonearm — short, precise, rotates around the pivot only. Only
-          play/pause moves this, never the idle spin. */}
-      <g style={{ transformOrigin: '54px 10px', transform: playing ? 'rotate(34deg)' : 'rotate(2deg)', transition: 'transform 1.1s cubic-bezier(0.45,0,0.15,1)' }}>
-        <rect x="52.3" y="9" width="2.4" height="24" rx="1.2" fill="#d8d8d8" />
-        <circle cx="53.5" cy="32" r="2.2" fill="#bdbdbd" />
-      </g>
       {/* record — spins whenever this card is the front/active one,
           regardless of play state. Grooves are deliberately IRREGULAR
           (varied dash lengths, slightly offset radii/rotations) rather
           than perfectly uniform concentric rings — a perfectly symmetric
           disc reads as motionless even while rotating (no detail for the
           eye to track). A handful of scratch-like dashes plus one bright
-          sweeping sheen streak give the spin something real to catch. */}
+          sweeping sheen streak give the spin something real to catch.
+          2026-07-18 (real bug, per Reza): this record used to be drawn
+          BEFORE the tonearm below — SVG paints in document order, so the
+          disc was covering the needle every time it rotated onto the
+          record ("needle goes under the record"). Painting the record
+          FIRST and the tonearm SECOND (below) fixes that permanently —
+          the needle is now always on top of the disc surface, exactly
+          like a real turntable. */}
       <g className={spinning ? 'vinyl-disc-spin' : undefined} style={{ transformOrigin: '32px 34px' }}>
         <circle cx="32" cy="34" r="21" fill="#0c0c0c" />
         {/* irregular scratch grooves — varied dash patterns + radii, not
@@ -112,6 +111,14 @@ function TurntableBadge({ spinning, playing }: { spinning: boolean; playing: boo
         <circle cx="32" cy="34" r="7.5" fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="0.6" />
         <circle cx="32" cy="34" r="1.6" fill="#0c0c0c" />
       </g>
+      {/* tonearm base pivot */}
+      <circle cx="54" cy="10" r="3.4" fill="#cfcfcf" />
+      {/* tonearm — short, precise, rotates around the pivot only. Only
+          play/pause moves this, never the idle spin. */}
+      <g style={{ transformOrigin: '54px 10px', transform: playing ? 'rotate(34deg)' : 'rotate(2deg)', transition: 'transform 1.1s cubic-bezier(0.45,0,0.15,1)' }}>
+        <rect x="52.3" y="9" width="2.4" height="24" rx="1.2" fill="#d8d8d8" />
+        <circle cx="53.5" cy="32" r="2.2" fill="#bdbdbd" />
+      </g>
     </svg>
   );
 }
@@ -121,9 +128,9 @@ export default function VinylCardFace({
   fallback,
   title,
   isPlaying,
-  isCurrent,
-  currentTime,
-  duration,
+  isCurrent: _isCurrent,
+  currentTime: _currentTime,
+  duration: _duration,
   dim,
 }: {
   cover: string;
@@ -136,15 +143,20 @@ export default function VinylCardFace({
   dim: boolean; // true when this card is not the active/front one
 }) {
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      {/* Blurred glass background — the cover art itself, heavily blurred,
-          replacing the old solid #0B0B0E fill. */}
+    <div className="relative w-full h-full overflow-hidden" aria-label={title}>
+      {/* 2026-07-18 (per Reza): the cover art now shows crisp and full —
+          no blur. It used to be heavily blurred specifically to keep the
+          title text legible on top of it; now that the card carries no
+          text at all (see below), there's nothing for the blur to protect
+          and it was just degrading the AI-generated poster. Dimming for
+          non-active cards stays (brightness/grayscale) for visual
+          hierarchy, but never blur — the artwork itself always stays
+          sharp. */}
       <div
         aria-hidden
-        className="absolute"
+        className="absolute inset-0"
         style={{
-          inset: '-12%',
-          filter: dim ? 'blur(22px) brightness(0.5) grayscale(55%)' : 'blur(22px) brightness(0.82)',
+          filter: dim ? 'brightness(0.55) grayscale(45%)' : 'brightness(0.94)',
           transition: 'filter 0.5s ease',
         }}
       >
@@ -154,44 +166,30 @@ export default function VinylCardFace({
           fallback
         )}
       </div>
-      {/* Thin glass veil for text legibility — still transparent enough that
-          the blurred art reads through. */}
-      <div className="absolute inset-0" style={{ background: 'rgba(10,10,14,0.3)', backdropFilter: 'blur(1.5px)', WebkitBackdropFilter: 'blur(1.5px)' }} />
 
-      {/* Track title (+ elapsed/total, only for the actually-playing card) */}
-      <div className="absolute left-0 right-0 top-0" style={{ padding: '9% 10% 0' }}>
-        <span
-          className="block font-display font-light"
-          style={{ fontSize: 'clamp(0.68rem, 1.05vw, 0.95rem)', lineHeight: 1.25, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}
-        >
-          {title}
-        </span>
-        {isCurrent && (
-          <span className="block font-mono mt-1" style={{ fontSize: '0.56rem', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.65)' }}>
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
-        )}
-      </div>
+      {/* 2026-07-18 (per Reza): no title/time text on the card anymore —
+          "the cards shouldn't have writing on them", since the title is
+          already shown outside the card (SpatialScrollEngine's own <h3>
+          right below it) and duplicating it here was cluttering the clean
+          cover-art surface. `title` is still passed through to the
+          wrapper's aria-label above, so screen-reader users don't lose it — 
+          this was a purely visual redundancy, not an accessibility one. */}
 
-      {/* THE PLAY/PAUSE AFFORDANCE — explicit, centred, luxury-neon (same
-          gradient + glow recipe as the site's .btn--media system). This is
-          what you click; the turntable badge below is decoration. */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* THE PLAY/PAUSE AFFORDANCE — mirrored with the turntable badge:
+          same size, same bottom alignment, opposite (left) side of the
+          card. See the comment on TurntableBadge's position below — 2026-07-18
+          (per Reza): moved from a large centred button to this smaller
+          mirrored badge; the turntable's own tonearm animation (already
+          driven by the same `isPlaying` state) IS the "play" feedback now
+          — clicking this button sets isPlaying exactly like before
+          (SpatialScrollEngine owns that click handler, untouched here),
+          which is what makes the tonearm on the right drop onto the
+          record. Nothing about the turntable's own design, animation, or
+          position changed. */}
+      <div className="absolute" style={{ left: '7%', bottom: '7%', width: '30%', maxWidth: 52, aspectRatio: '1' }}>
         <div
-          className="vinyl-play-ring"
+          className="w-full h-full flex items-center justify-center"
           style={{
-            position: 'absolute',
-            width: '30%',
-            aspectRatio: '1',
-            borderRadius: '50%',
-            border: '1px solid rgba(var(--accent-rgb),0.5)',
-          }}
-        />
-        <div
-          className="flex items-center justify-center"
-          style={{
-            width: '26%',
-            aspectRatio: '1',
             borderRadius: '50%',
             background: 'linear-gradient(180deg, color-mix(in srgb, var(--accent-color) 52%, #fff 48%), color-mix(in srgb, var(--accent-color) 76%, #fff 24%))',
             boxShadow: dim ? '0 0 10px rgba(var(--accent-rgb),0.28)' : '0 0 20px rgba(var(--accent-rgb),0.45)',
@@ -201,7 +199,8 @@ export default function VinylCardFace({
         </div>
       </div>
 
-      {/* The turntable — small, precise, refined corner flourish. */}
+      {/* The turntable — small, precise, refined corner flourish. Unchanged:
+          same design, same position, same animation as before. */}
       <div className="absolute" style={{ right: '7%', bottom: '7%', width: '30%', maxWidth: 52 }}>
         <TurntableBadge spinning={!dim} playing={isPlaying} />
       </div>

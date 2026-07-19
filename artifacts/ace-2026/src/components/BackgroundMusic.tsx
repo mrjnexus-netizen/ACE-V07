@@ -55,10 +55,14 @@ export default function BackgroundMusic() {
   const analyser = audioState.analyserNode;
   const trackPlaying = audioState.isPlaying;
 
-  // Smoothly ramp the bed gain toward a target (0 .. BG_VOLUME).
+  // Smoothly ramp the bed gain toward a target (0 .. BG_VOLUME). Also sets
+  // the native <audio> element's own .volume directly as a fallback path —
+  // see the 2026-07-18 fix note above the ducking effect below for why.
   const rampTo = (target: number) => {
     const ctx = audioState.audioContext;
     const gain = gainRef.current;
+    const el = elRef.current;
+    if (el) el.volume = Math.max(0, Math.min(1, target));
     if (!ctx || !gain) return;
     const now = ctx.currentTime;
     gain.gain.cancelScheduledValues(now);

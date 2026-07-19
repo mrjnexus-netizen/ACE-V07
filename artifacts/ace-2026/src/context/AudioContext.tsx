@@ -91,6 +91,7 @@ interface AudioContextType {
   audioState: AudioState;
   playTrack: (track: AudioTrack) => Promise<void>;
   pauseTrack: () => void;
+  stopTrack: () => void;
   resumeTrack: () => Promise<void>;
   seekTrack: (time: number) => void;
   setVolume: (volume: number) => void;
@@ -277,6 +278,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setAudioState(prev => ({ ...prev, isPlaying: false }));
   }, []);
 
+  // 2026-07-18 (per Reza): pauseTrack keeps currentTrack set (by design —
+  // that's what lets a paused track resume from where it left off), so
+  // PersistentAudioPlayer stays mounted after a pause. stopTrack is the
+  // new "actually dismiss the bar" action for the player's close button —
+  // pauses AND clears currentTrack, which unmounts the bar entirely
+  // (PersistentAudioPlayer returns null once currentTrack is null).
+  const stopTrack = useCallback(() => {
+    const el = audioElRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+    setAudioState(prev => ({ ...prev, isPlaying: false, currentTrack: null, currentTime: 0, duration: 0 }));
+  }, []);
+
   const resumeTrack = useCallback(async (): Promise<void> => {
     await initAudioContext();
     try {
@@ -383,6 +399,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     audioState,
     playTrack,
     pauseTrack,
+    stopTrack,
     resumeTrack,
     seekTrack,
     setVolume,
@@ -395,6 +412,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     audioState,
     playTrack,
     pauseTrack,
+    stopTrack,
     resumeTrack,
     seekTrack,
     setVolume,

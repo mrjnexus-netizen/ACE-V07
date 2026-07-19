@@ -366,7 +366,10 @@ export default function SpatialScrollEngine() {
     if (isMobile) return;
     let raf = 0;
     const EASE = 0.07; // one luxury easing for transit AND settle
-    const FADE_ZONE = 0.1; // fraction of scroll range used for in/out fade
+    const FADE_ZONE = 0.02; // 2026-07-18 (per Reza): was 0.1 — on this section's
+    // very tall pinned scroll height, that meant a large amount of actual
+    // scrolling before the cylinder reached full opacity ("starts very late").
+    // 0.02 completes the fade almost immediately on entering the section.
 
     const loop = () => {
       if (!inViewRef.current) {
@@ -579,6 +582,55 @@ export default function SpatialScrollEngine() {
                 const isCurrent = !!track && audioState.currentTrack?.id === track.id;
                 const isPlaying = isCurrent && audioState.isPlaying;
 
+                // 2026-07-18 (per Reza): the card whose track is loaded in
+                // the player should visually pop out and hold attention —
+                // brought above its neighbours in stacking order — this
+                // is INDEPENDENT of isActive/isFront (rotational position
+                // in the cylinder): even a card that has scrolled away
+                // from the front should still visibly stand out while its
+                // track is loaded. Keyed on isCurrent, NOT isPlaying — a
+                // paused-but-loaded track should stay highlighted too; it
+                // only clears when a different track gets selected
+                // (currentTrack changes) or the bar is closed (stopTrack,
+                // which clears currentTrack entirely).
+                //
+                // 2026-07-18 (real bug #1, per Reza — pixelated on first
+                // try): this card already gets GPU-composited as a single
+                // rasterized layer because of the 3D transform it needs
+                // for the cylinder effect. The first version MULTIPLIED a
+                // 1.5x "playing" boost on top of the existing positional
+                // scale (up to 1.15x for isFront) — compounding to ~1.72x
+                // total, well past where that rasterized layer visibly
+                // stretches and blurs. Fixed with a flat, capped scale
+                // instead of a multiplier.
+                //
+                // 2026-07-18 (real bug #2, per Reza — "these are two
+                // separate systems, don't cross them"): the SAME fix also
+                // pulled the card forward in Z (toward the viewer, out of
+                // its assigned ring radius) to read as "coming forward".
+                // That physically moved it out of its rotational slot in
+                // the cylinder, so it started overlapping/colliding with
+                // neighbouring cards as the ring rotated during scroll —
+                // exactly the "breaks the scrolling system" Reza saw. The
+                // Z-boost is removed entirely now: scale + zIndex (paint
+                // order only, not position) achieve "stands out" without
+                // ever touching the card's real position in the ring, so
+                // scrolling/rotation and the play-highlight are now
+                // completely decoupled, as they should be.
+                // 2026-07-18 (per Reza, clarified): the enlarge-on-play
+                // highlight should ONLY hold while the card is ALSO still
+                // the front-facing one — the moment the person scrolls it
+                // away, it shrinks back to whatever its normal rotational-
+                // position size would be (1.08/1.15/1) and rejoins the
+                // cylinder's rotation completely normally, exactly like
+                // any other non-playing card. The AUDIO itself is fully
+                // independent of this and keeps playing in the bottom bar
+                // regardless of scroll — that was never tied to scroll
+                // position in the first place, only the visual emphasis
+                // was (incorrectly) staying pinned before this fix.
+                const scale = isCurrent && isFront ? 1.35 : isActive ? 1.15 : isFront ? 1.08 : 1;
+                const highlighted = isCurrent && isFront;
+
                 return (
                   <div
                     key={card.concept}
@@ -591,9 +643,9 @@ export default function SpatialScrollEngine() {
                       left: -cardW / 2,
                       top: -cardH / 2,
                       transformStyle: 'preserve-3d',
-                      transform: `translate3d(${x}px, ${y}px, ${z}px) rotateY(${theta}deg) scale(${isActive ? 1.15 : isFront ? 1.08 : 1})`,
+                      transform: `translate3d(${x}px, ${y}px, ${z}px) rotateY(${theta}deg) scale(${scale})`,
                       transition: 'transform 0.5s cubic-bezier(0.22,1,0.36,1), border-color 0.4s ease, box-shadow 0.4s ease',
-                      zIndex: isFront ? 40 : 1,
+                      zIndex: highlighted ? 50 : isFront ? 40 : 1,
                     }}
                   >
                     <button
@@ -607,12 +659,14 @@ export default function SpatialScrollEngine() {
                       <div
                         className="relative w-full h-full rounded-3xl overflow-hidden"
                         style={{
-                          border: isCurrent ? '1px solid rgba(var(--accent-rgb),0.9)' : isFront ? '1px solid rgba(var(--accent-rgb),0.4)' : '1px solid rgba(255,255,255,0.07)',
-                          boxShadow: isActive
-                            ? '0 26px 64px rgba(0,0,0,0.6), 0 0 34px rgba(var(--accent-rgb),0.32)'
-                            : isFront
-                              ? '0 20px 48px rgba(0,0,0,0.58), 0 0 20px rgba(var(--accent-rgb),0.16)'
-                              : '0 14px 34px rgba(0,0,0,0.55)',
+                          border: highlighted ? '1.5px solid var(--accent-color)' : isFront ? '1px solid rgba(var(--accent-rgb),0.4)' : '1px solid rgba(255,255,255,0.07)',
+                          boxShadow: highlighted
+                            ? '0 32px 76px rgba(0,0,0,0.65), 0 0 46px rgba(var(--accent-rgb),0.5)'
+                            : isActive
+                              ? '0 26px 64px rgba(0,0,0,0.6), 0 0 34px rgba(var(--accent-rgb),0.32)'
+                              : isFront
+                                ? '0 20px 48px rgba(0,0,0,0.58), 0 0 20px rgba(var(--accent-rgb),0.16)'
+                                : '0 14px 34px rgba(0,0,0,0.55)',
                           background: '#0B0B0E',
                           transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
                         }}
@@ -625,7 +679,7 @@ export default function SpatialScrollEngine() {
                           isCurrent={isCurrent}
                           currentTime={audioState.currentTime}
                           duration={audioState.duration}
-                          dim={!isActive}
+                          dim={!isActive && !highlighted}
                         />
                       </div>
                     </button>
