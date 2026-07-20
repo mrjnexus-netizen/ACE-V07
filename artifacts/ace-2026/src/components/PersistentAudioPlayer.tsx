@@ -18,8 +18,8 @@ import { useT } from '../context/TranslationContext';
 const PAP_HEIGHT_VAR = '--pap-h';
 
 // Inline SVG icons (no emoji / no unicode glyphs — they corrupt across encodings)
-const Icon = ({ d, size = 18 }: { d: string; size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+const Icon = ({ d, size = 18, stroke }: { d: string; size?: number; stroke?: boolean }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={stroke ? 'none' : 'currentColor'} stroke={stroke ? 'currentColor' : 'none'} strokeWidth={stroke ? 2 : 0} strokeLinecap="round" aria-hidden="true">
     <path d={d} />
   </svg>
 );
@@ -91,13 +91,13 @@ export default function PersistentAudioPlayer() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0" style={{ color: 'var(--text-color)' }}>
           <button onClick={() => setMuted(!isMuted)} className="hover:text-[var(--accent-color)]" aria-label={isMuted ? t('Unmute') : t('Mute')}><Icon d={isMuted ? MUTE : VOL} /></button>
-          <input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="hidden lg:block w-20 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label={t('Volume')} />
+          <input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="pap-volume hidden lg:block w-20 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label={t('Volume')} />
           {/* 2026-07-18 (per Reza): a way to fully dismiss the bar and stop
               playback mid-track, not just pause it — pauseTrack alone keeps
               the bar mounted (by design, so a paused track can resume).
               stopTrack (new in AudioContext) clears currentTrack entirely,
               which unmounts this whole bar. */}
-          <button onClick={stopTrack} className="hover:text-[var(--accent-color)] ml-1" aria-label={t('Close player')}><Icon d={CLOSE} size={16} /></button>
+          <button onClick={stopTrack} className="hover:text-[var(--accent-color)] ml-1" aria-label={t('Close player')}><Icon d={CLOSE} size={16} stroke /></button>
         </div>
       </div>
       <div className="flex md:hidden flex-col h-full" style={{ color: 'var(--text-color)' }}>
@@ -110,14 +110,14 @@ export default function PersistentAudioPlayer() {
             <div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-[10px] truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}</p></div>
           </div>
           <button onClick={handlePlayPause} className="btn btn--media btn--media-sm flex-shrink-0" aria-label={isPlaying ? t('Pause') : t('Play')}><span className="ring" aria-hidden="true" /><span className="bloom" aria-hidden="true" /><Icon d={isPlaying ? PAUSE : PLAY} size={16} /></button>
-          <button onClick={stopTrack} className="flex-shrink-0 hover:text-[var(--accent-color)]" aria-label={t('Close player')}><Icon d={CLOSE} size={14} /></button>
+          <button onClick={stopTrack} className="flex-shrink-0 hover:text-[var(--accent-color)]" aria-label={t('Close player')}><Icon d={CLOSE} size={14} stroke /></button>
         </div>
         {mobileExpanded && (
           <div className="flex flex-col px-3 pb-2 gap-2">
             <div className="h-10 cursor-pointer" onClick={handleProgressClick}><WaveformRenderer /></div>
             <div className="flex items-center justify-between">
               <div className="flex gap-3"><button onClick={prevTrack} aria-label={t('Previous track')}><Icon d={PREV} /></button><button onClick={nextTrack} aria-label={t('Next track')}><Icon d={NEXT} /></button></div>
-              <div className="flex items-center gap-2"><button onClick={() => setMuted(!isMuted)} aria-label={isMuted ? t('Unmute') : t('Mute')}><Icon d={isMuted ? MUTE : VOL} /></button><input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="w-16 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label={t('Volume')} /></div>
+              <div className="flex items-center gap-2"><button onClick={() => setMuted(!isMuted)} aria-label={isMuted ? t('Unmute') : t('Mute')}><Icon d={isMuted ? MUTE : VOL} /></button><input type="range" min={0} max={1} step={0.01} value={isMuted ? 0 : volume} onChange={e => setVolume(parseFloat(e.target.value))} className="pap-volume w-16 h-1 rounded-lg appearance-none cursor-pointer" style={{ accentColor: 'var(--accent-color)' }} aria-label={t('Volume')} /></div>
             </div>
           </div>
         )}

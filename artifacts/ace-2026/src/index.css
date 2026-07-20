@@ -3460,3 +3460,66 @@ p, blockquote, figcaption, .text-wrap-pretty {
   .crm-fs-box.crm-fs-closing { animation: none; }
   .crm-fs-social { animation: none; opacity: 1; transform: none; }
 }
+
+/* 2026-07-19 (per Reza): the persistent-player volume slider had zero
+   custom styling — with appearance-none applied but no replacement
+   track drawn, the native track rendered invisible/transparent against
+   the dark player background, leaving only the accent-colored thumb
+   visible (the "gold circle floating with no line" Reza reported).
+   Scoped to .pap-volume (added in PersistentAudioPlayer.tsx) so this
+   never affects any other range input on the site. */
+@layer components {
+  .pap-volume {
+    background: transparent;
+  }
+  .pap-volume::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .pap-volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    margin-top: -4px;
+    cursor: pointer;
+  }
+  .pap-volume::-moz-range-track {
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .pap-volume::-moz-range-thumb {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    border: none;
+    cursor: pointer;
+  }
+}
+
+/* 2026-07-19 (per Reza): browser's default cursor for a range-input
+   thumb/track has higher effective priority than the site's global
+   cursor:none rule, so the OS cursor was showing on hover/drag instead
+   of the site's custom cursor. Explicit cursor:none on the slider and
+   both pseudo-elements fixes it without touching the global rule. */
+/* 2026-07-19 round 2 (per Reza): the components-layer rule above still
+   lost to Tailwind's cursor-pointer utility (Tailwind's utilities layer
+   is intentionally ordered AFTER components, so it wins on equal
+   specificity) — the Windows pointer was showing alongside the site's
+   custom cursor. !important, scoped tightly to .pap-volume only, forces
+   this one to actually win without touching cursor rules anywhere else
+   on the site. */
+@layer components {
+  .pap-volume,
+  .pap-volume::-webkit-slider-thumb,
+  .pap-volume::-webkit-slider-runnable-track,
+  .pap-volume::-moz-range-thumb,
+  .pap-volume::-moz-range-track {
+    cursor: none !important;
+  }
+}
