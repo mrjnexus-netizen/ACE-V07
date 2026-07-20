@@ -23,7 +23,15 @@ const uploadBodySchema = z.object({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  // 2026-07-20 (per Reza — video upload support): 50MB was workable for
+  // audio but is far too small for real video files (even a short clip
+  // at decent quality routinely exceeds it). Raised for both — this
+  // route is admin-only (authGuard), not public-facing, so the larger
+  // ceiling isn't an abuse-surface concern, just a memory-buffering one
+  // (multer.memoryStorage() holds the whole file in RAM during upload,
+  // same as it always has for audio — just worth knowing as videos get
+  // uploaded here too).
+  limits: { fileSize: 500 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
       'audio/mpeg',
@@ -49,7 +57,7 @@ const upload = multer({
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      (cb as (err: Error | null, accept: boolean) => void)(new Error('Invalid file type. Only audio/mpeg, audio/wav, image/webp, image/jpeg, image/png are allowed.'), false);
+      (cb as (err: Error | null, accept: boolean) => void)(new Error('Invalid file type. Allowed: audio (mp3/wav/mp4), image (webp/jpeg/png/gif/svg/heic/bmp/tiff), or video (mp4/mov/webm/mkv).'), false);
     }
   },
 });

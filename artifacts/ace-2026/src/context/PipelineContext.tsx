@@ -18,14 +18,25 @@ export interface StagedAudio {
   fileName: string;
 }
 
+// 2026-07-20 (per Reza): the video upload box, mirroring StagedAudio
+// exactly — same "upload lands as a playable preview, AI processing is a
+// separate deliberate step" rule applies identically to video.
+export interface StagedVideo {
+  url: string;
+  fileName: string;
+}
+
 interface PipelineContextType {
   currentJob: PipelineJob | null;
   jobHistory: PipelineJob[];
   stagedAudio: StagedAudio | null;
+  stagedVideo: StagedVideo | null;
   uploading: boolean;
   loadingMessage: string | null;
   uploadAudio: (file: File) => Promise<void>;
+  uploadVideo: (file: File) => Promise<void>;
   clearStagedAudio: () => void;
+  clearStagedVideo: () => void;
   startPipeline: (input?: { youtubeUrl?: string }) => Promise<void>;
   approvePipeline: (jobId: string, overrides?: ApprovalOverrides) => Promise<void>;
   regeneratePipeline: (jobId: string, field: 'art' | 'art-wide' | 'narrative') => Promise<void>;
@@ -39,6 +50,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
   const [currentJob, setCurrentJob] = useState<PipelineJob | null>(null);
   const [jobHistory, setJobHistory] = useState<PipelineJob[]>([]);
   const [stagedAudio, setStagedAudio] = useState<StagedAudio | null>(null);
+  const [stagedVideo, setStagedVideo] = useState<StagedVideo | null>(null);
   const [uploading, setUploading] = useState(false);
   // Human-readable "what's happening right now" text, sourced from the
   // `message` field the server includes on SSE broadcasts (e.g. "Generating
@@ -83,6 +95,28 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
 
   const clearStagedAudio = useCallback(() => setStagedAudio(null), []);
 
+  // 2026-07-20 (per Reza): mirrors uploadAudio exactly — lands the video
+  // in S3 as a playable preview, no pipeline job / AI trigger here.
+  const uploadVideo = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('media', file);
+      form.append('entity_type', 'track-video');
+      form.append('entity_id', crypto.randomUUID());
+      const uploaded = await apiPost<{ url: string }>('/api/media/upload', form);
+      if (!uploaded?.url) throw new Error('Upload did not return a URL');
+      setStagedVideo({ url: uploaded.url, fileName: file.name });
+    } catch (err: unknown) {
+      console.error('Error uploading video:', err);
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  const clearStagedVideo = useCallback(() => setStagedVideo(null), []);
+
   // Step 2 — explicit, separate action. Uses the already-uploaded
   // stagedAudio (or a youtubeUrl) to kick off analysis + AI generation.
   const startPipeline = useCallback(async (input?: { youtubeUrl?: string }) => {
@@ -90,18 +124,26 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
       console.warn('A pipeline job is already in progress.');
       return;
     }
-    if (!stagedAudio && !input?.youtubeUrl) {
+    if (!stagedAudio && !stagedVideo && !input?.youtubeUrl) {
       console.warn('Nothing staged to process — upload a file first.');
       return;
     }
 
     stopPolling();
 
+    // 2026-07-20 (per Reza): video is its own upload box, mutually
+    // exclusive with the audio one — whichever is actually staged (video
+    // takes priority if somehow both ended up staged at once, which the
+    // UI shouldn't allow but this keeps the fallback sane) determines
+    // mediaType end-to-end.
+    const mediaType: 'audio' | 'video' = stagedVideo && !input?.youtubeUrl ? 'video' : 'audio';
+
     try {
       setCurrentJob({
         id: 'initiating',
         status: 'uploading',
         progress: 10,
+        mediaType,
         audioMetadata: null,
         generatedArtUrl: null,
         generatedArtUrlWide: null,
@@ -109,9 +151,11 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         errorMessage: null,
       });
 
-      const processBody: { audioUrl?: string; youtubeUrl?: string } = input?.youtubeUrl
+      const processBody: { audioUrl?: string; videoUrl?: string; youtubeUrl?: string } = input?.youtubeUrl
         ? { youtubeUrl: input.youtubeUrl }
-        : { audioUrl: stagedAudio!.url };
+        : mediaType === 'video'
+          ? { videoUrl: stagedVideo!.url }
+          : { audioUrl: stagedAudio!.url };
 
       // apiPost already unwraps the ApiResponse envelope, so the resolved
       // value IS the data object ({ jobId, trackId }).
@@ -137,6 +181,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
             ...prev,
             status: data.status as PipelineStatus,
             progress: (data.progress as number) ?? prev.progress,
+            mediaType: (data.mediaType as 'audio' | 'video') ?? prev.mediaType,
             audioMetadata: (data.audioMetadata as PipelineJob['audioMetadata']) ?? prev.audioMetadata,
             generatedArtUrl: (data.generatedArtUrl as string) ?? prev.generatedArtUrl,
             generatedArtUrlWide: (data.generatedArtUrlWide as string) ?? prev.generatedArtUrlWide,
@@ -172,6 +217,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         id: 'error',
         status: 'error',
         progress: 100,
+        mediaType,
         audioMetadata: null,
         generatedArtUrl: null,
         generatedArtUrlWide: null,
@@ -180,7 +226,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
       });
       stopPolling();
     }
-  }, [currentJob, stagedAudio, stopPolling]);
+  }, [currentJob, stagedAudio, stagedVideo, stopPolling]);
 
   const approvePipeline = useCallback(async (jobId: string, overrides?: ApprovalOverrides) => {
     try {
@@ -225,11 +271,12 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
     stopPolling();
     setCurrentJob(null);
     setStagedAudio(null);
+    setStagedVideo(null);
     setLoadingMessage(null);
   }, [stopPolling]);
 
   return (
-    <PipelineContext.Provider value={{ currentJob, jobHistory, stagedAudio, uploading, loadingMessage, uploadAudio, clearStagedAudio, startPipeline, approvePipeline, regeneratePipeline, cancelJob, resetJob }}>
+    <PipelineContext.Provider value={{ currentJob, jobHistory, stagedAudio, stagedVideo, uploading, loadingMessage, uploadAudio, uploadVideo, clearStagedAudio, clearStagedVideo, startPipeline, approvePipeline, regeneratePipeline, cancelJob, resetJob }}>
       {children}
     </PipelineContext.Provider>
   );

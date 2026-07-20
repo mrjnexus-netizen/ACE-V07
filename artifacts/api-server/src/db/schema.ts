@@ -45,6 +45,12 @@ export const tracks = pgTable(
     title: jsonb('title').notNull().default({}),
     narrative: jsonb('narrative').notNull().default({}),
     audioUrl: text('audio_url'),
+    // 2026-07-20 (per Reza): video pieces reuse this exact same tracks
+    // table and Media Pipeline — title/narrative/cover/genre/concept/
+    // isFeatured all work identically. mediaType is the only
+    // discriminator between an audio piece and a video piece.
+    mediaType: text('media_type').notNull().default('audio'), // 'audio' | 'video'
+    videoUrl: text('video_url'),
     coverUrl: text('cover_url'),
     coverBlur: text('cover_blur'),
     // 2026-07-19 (per Reza): a SEPARATELY generated, properly-composed
@@ -90,6 +96,9 @@ export const pipelineJobs = pgTable(
     trackId: uuid('track_id').references(() => tracks.id, { onDelete: 'cascade' }),
     status: text('status').notNull().default('idle'),
     progress: integer('progress').default(0),
+    // 2026-07-20 (per Reza): which upload box this job came from — drives
+    // whether the admin review panel shows an <audio> or <video> preview.
+    mediaType: text('media_type').notNull().default('audio'), // 'audio' | 'video'
     audioMetadata: jsonb('audio_metadata'),
     generatedArtUrl: text('generated_art_url'),
     // 2026-07-19 (per Reza): square cover and wide banner are now two
@@ -140,6 +149,9 @@ export const modelOverrides = pgTable(
     modelId: text('model_id').notNull(),
     label: text('label').notNull(),
     quality: integer('quality').notNull().default(3),
+    // 2026-07-19 (per Reza): drives the NEW badge in the Gatekeeper Hub
+    // model picker; cleared once the admin selects that model there.
+    isNew: boolean('is_new').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (table) => ({

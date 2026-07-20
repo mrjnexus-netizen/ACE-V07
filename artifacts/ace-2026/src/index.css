@@ -3523,3 +3523,19 @@ p, blockquote, figcaption, .text-wrap-pretty {
     cursor: none !important;
   }
 }
+
+/* 2026-07-20 (per Reza): the WorksGallery concept overlay (Selected
+   Works' expanded 'GALLERY' view) is rendered via createPortal straight
+   to document.body — same reason as .csb-panel/.ace-editable-toolbar
+   above: portaled content lives OUTSIDE .ace-main-shell, so the site-
+   wide .ace-main-shell * { cursor: none } rule never reaches it and
+   the native OS pointer showed alongside the custom cursor on every
+   interactive element inside (buttons, the carousel's drag cursor). */
+@media (pointer: fine) {
+  .works-gallery-overlay,
+  .works-gallery-overlay *,
+  .works-gallery-overlay *::before,
+  .works-gallery-overlay *::after {
+    cursor: none !important;
+  }
+}

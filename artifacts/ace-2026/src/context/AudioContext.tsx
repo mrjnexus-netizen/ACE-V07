@@ -25,7 +25,9 @@ import {
   useCallback,
   useMemo,
   type ReactNode,
+  type SyntheticEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import type { AudioState, AudioTrack, VibrantPalette } from '../types';
 import { extractPalette } from '../lib/vibrantExtractor';
 
@@ -100,6 +102,10 @@ interface AudioContextType {
   prevTrack: () => void;
   setPlaylist: (tracks: AudioTrack[]) => void;
   playEnvironmentalSound: (frequency: number, duration: number, volume: number) => void;
+  // 2026-07-20 (per Reza — video piece support): toggles the video
+  // element into/out of true browser fullscreen. A no-op if nothing is
+  // currently loaded there.
+  toggleVideoFullscreen: () => void;
 }
 
 const AudioCtx = createContext<AudioContextType | undefined>(undefined);
@@ -109,6 +115,16 @@ const AudioCtx = createContext<AudioContextType | undefined>(undefined);
 // ------------------------------------------------------------------
 export function AudioProvider({ children }: { children: ReactNode }) {
   const audioElRef   = useRef<HTMLAudioElement | null>(null);
+  // 2026-07-20 (per Reza — video piece support): a real, visible <video>
+  // element, rendered by this same provider (see the drawer JSX at the
+  // bottom of this file) so video playback is available site-wide,
+  // exactly like the persistent audio bar already is. Deliberately NOT
+  // routed through the Web Audio graph below (no MediaElementSource/
+  // analyser) — nothing in the spec calls for audio-reactive visuals on
+  // video, so this stays simpler and never risks the fragile "can only
+  // create a MediaElementSource once" constraint on the audio graph.
+  // Volume/mute are mirrored onto it directly (see setVolume/setMuted).
+  const videoElRef   = useRef<HTMLVideoElement | null>(null);
   const actxRef      = useRef<globalThis.AudioContext | null>(null);
   const analyserRef  = useRef<AnalyserNode | null>(null);
   const sourceRef    = useRef<MediaElementAudioSourceNode | null>(null);
@@ -202,16 +218,29 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // ------------------------------------------------------------------
   // Audio element event handlers
   // ------------------------------------------------------------------
-  const handleTimeUpdate = useCallback(() => {
-    if (audioElRef.current) {
-      setAudioState(prev => ({ ...prev, currentTime: audioElRef.current!.currentTime }));
-    }
+  // 2026-07-20: generic over audio/video — reads from e.currentTarget
+  // (both HTMLAudioElement and HTMLVideoElement share the HTMLMediaElement
+  // interface) instead of a hardcoded ref, so the exact same handler
+  // attaches to both elements below with zero duplication.
+  // 2026-07-20 (per Reza — critical fix): e.currentTarget can genuinely be
+  // null at the moment this fires in some browsers when switching away
+  // from real fullscreen (the crash reported: "Cannot read properties of
+  // null (reading 'currentTime')" — this threw INSIDE a setState updater,
+  // which crashed the whole AudioProvider and took down the entire site,
+  // since it sits above everything else in the tree). TypeScript's own
+  // typing for SyntheticEvent.currentTarget claims non-null, but that
+  // guarantee doesn't always hold at runtime for a rapidly-changing
+  // fullscreen/media element — a plain truthy check is the fix.
+  const handleTimeUpdate = useCallback((e: SyntheticEvent<HTMLMediaElement>) => {
+    const el = e.currentTarget;
+    if (!el) return;
+    setAudioState(prev => ({ ...prev, currentTime: el.currentTime }));
   }, []);
 
-  const handleLoadedMetadata = useCallback(() => {
-    if (audioElRef.current) {
-      setAudioState(prev => ({ ...prev, duration: audioElRef.current!.duration }));
-    }
+  const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLMediaElement>) => {
+    const el = e.currentTarget;
+    if (!el) return;
+    setAudioState(prev => ({ ...prev, duration: el.duration }));
   }, []);
 
   // handleEnded uses stateRef to avoid stale closure
@@ -248,17 +277,43 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const playTrack = useCallback(async (track: AudioTrack): Promise<void> => {
     await initAudioContext();
 
+    // Same fullscreen safety as stopTrack, for the same reason — starting
+    // a NEW track (including auto-advance to the next one when a video
+    // ends) should never leave the browser stuck in real fullscreen over
+    // whatever was playing before.
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => { /* nothing more we can do */ });
+    }
+
     const { playlist } = stateRef.current;
     const index = playlist.findIndex(t => t.id === track.id);
 
-    // Update audio element src before play
-    if (audioElRef.current) {
-      audioElRef.current.src = track.audioUrl;
-      audioElRef.current.load();
-      try {
-        await audioElRef.current.play();
-      } catch {
-        // Autoplay blocked — user gesture required (already handled via initAudioContext)
+    // 2026-07-20 (per Reza): video and audio share this exact same
+    // control surface but play through two different elements — always
+    // pause whichever one ISN'T needed for this track, so switching from
+    // a playing video straight to an audio track (or vice versa) never
+    // leaves the old one silently still running in the background.
+    if (track.mediaType === 'video') {
+      audioElRef.current?.pause();
+      if (videoElRef.current) {
+        videoElRef.current.src = track.videoUrl || '';
+        videoElRef.current.load();
+        try {
+          await videoElRef.current.play();
+        } catch {
+          // Autoplay blocked — user gesture required (already handled via initAudioContext)
+        }
+      }
+    } else {
+      videoElRef.current?.pause();
+      if (audioElRef.current) {
+        audioElRef.current.src = track.audioUrl;
+        audioElRef.current.load();
+        try {
+          await audioElRef.current.play();
+        } catch {
+          // Autoplay blocked — user gesture required (already handled via initAudioContext)
+        }
       }
     }
 
@@ -274,7 +329,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   }, [initAudioContext, extractAndApplyPalette]);
 
   const pauseTrack = useCallback(() => {
-    audioElRef.current?.pause();
+    if (stateRef.current.currentTrack?.mediaType === 'video') videoElRef.current?.pause();
+    else audioElRef.current?.pause();
     setAudioState(prev => ({ ...prev, isPlaying: false }));
   }, []);
 
@@ -283,9 +339,25 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // PersistentAudioPlayer stays mounted after a pause. stopTrack is the
   // new "actually dismiss the bar" action for the player's close button —
   // pauses AND clears currentTrack, which unmounts the bar entirely
-  // (PersistentAudioPlayer returns null once currentTrack is null).
+  // (PersistentAudioPlayer returns null once currentTrack is null). For a
+  // video track this also closes the drawer, since it's driven off the
+  // exact same currentTrack.mediaType check.
   const stopTrack = useCallback(() => {
-    const el = audioElRef.current;
+    // 2026-07-20 (per Reza — critical fix): browsers put a <video> into
+    // REAL, OS-level fullscreen not just via our own fullscreen button,
+    // but also natively (double-click on the video is a default browser
+    // behavior we never disabled). If that happened and the track is then
+    // stopped/closed without explicitly exiting fullscreen first, the
+    // browser stays stuck showing true fullscreen over an element that's
+    // about to be hidden — the entire screen goes black, not just this
+    // component. Unconditionally exiting fullscreen here, before anything
+    // else, guarantees this can never happen regardless of how fullscreen
+    // was entered.
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => { /* nothing more we can do */ });
+    }
+    const isVideo = stateRef.current.currentTrack?.mediaType === 'video';
+    const el: HTMLMediaElement | null = isVideo ? videoElRef.current : audioElRef.current;
     if (el) {
       el.pause();
       el.currentTime = 0;
@@ -296,7 +368,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const resumeTrack = useCallback(async (): Promise<void> => {
     await initAudioContext();
     try {
-      await audioElRef.current?.play();
+      const isVideo = stateRef.current.currentTrack?.mediaType === 'video';
+      const el: HTMLMediaElement | null = isVideo ? videoElRef.current : audioElRef.current;
+      await el?.play();
       setAudioState(prev => ({ ...prev, isPlaying: true }));
     } catch {
       // silently handle autoplay block
@@ -304,15 +378,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   }, [initAudioContext]);
 
   const seekTrack = useCallback((time: number) => {
-    if (audioElRef.current) {
-      audioElRef.current.currentTime = time;
+    const isVideo = stateRef.current.currentTrack?.mediaType === 'video';
+    const el: HTMLMediaElement | null = isVideo ? videoElRef.current : audioElRef.current;
+    if (el) {
+      el.currentTime = time;
       setAudioState(prev => ({ ...prev, currentTime: time }));
     }
   }, []);
 
   const setVolume = useCallback((volume: number) => {
     const clamped = Math.max(0, Math.min(1, volume));
+    // Set on both elements unconditionally — harmless (only one is ever
+    // actually playing at a time) and means volume stays in sync no
+    // matter which one becomes active next.
     if (audioElRef.current) audioElRef.current.volume = clamped;
+    if (videoElRef.current) videoElRef.current.volume = clamped;
     if (gainRef.current && actxRef.current && !stateRef.current.isMuted) {
       gainRef.current.gain.setValueAtTime(clamped, actxRef.current.currentTime);
     }
@@ -321,6 +401,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   const setMuted = useCallback((isMuted: boolean) => {
     if (audioElRef.current) audioElRef.current.muted = isMuted;
+    if (videoElRef.current) videoElRef.current.muted = isMuted;
     if (gainRef.current && actxRef.current) {
       gainRef.current.gain.setValueAtTime(isMuted ? 0 : stateRef.current.volume, actxRef.current.currentTime);
     }
@@ -381,6 +462,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // 2026-07-20 (per Reza): the fullscreen button lives in
+  // PersistentAudioPlayer.tsx, which has no access to videoElRef (private
+  // to this provider) — exposed as a context action instead. No-op if
+  // nothing is playing or the browser blocks it (Fullscreen API requires
+  // a user gesture, which a button click already satisfies).
+  const toggleVideoFullscreen = useCallback(() => {
+    const el = videoElRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void el.requestFullscreen().catch(() => { /* blocked — nothing more we can do */ });
+    }
+  }, []);
+
   // ------------------------------------------------------------------
   // Cleanup on unmount
   // ------------------------------------------------------------------
@@ -408,6 +504,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     prevTrack,
     setPlaylist,
     playEnvironmentalSound,
+    toggleVideoFullscreen,
   }), [
     audioState,
     playTrack,
@@ -421,6 +518,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     prevTrack,
     setPlaylist,
     playEnvironmentalSound,
+    toggleVideoFullscreen,
   ]);
 
   return (
@@ -436,6 +534,74 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         crossOrigin="anonymous"
         aria-hidden="true"
       />
+
+      {/* 2026-07-20 (per Reza) — Video drawer: slides up from behind the
+          persistent bottom bar whenever the current piece is a video,
+          shows it at full quality, autoplaying. Sits exactly above the
+          bar via the shared --pap-h CSS variable (the same one
+          PersistentAudioPlayer.tsx already publishes to coordinate every
+          fixed-position element against the bar's real height) so it
+          never gets a hardcoded pixel offset that drifts out of sync on
+          resize/mobile. The bar itself needs ZERO changes to work for
+          video — play/pause/prev/next/volume/close all already route
+          through the exact same functions above, now video-aware.
+
+          2026-07-20 ROUND 2 (real, hard-diagnosed bug): a z-index alone
+          could never win here, at ANY value — an ancestor further up the
+          tree has `isolation: isolate`, which creates its own stacking
+          context with z-index:auto. That pins this drawer's stacking
+          order to wherever that ANCESTOR sits among ITS OWN siblings,
+          completely ignoring whatever z-index this div claims for
+          itself — confirmed live via getComputedStyle() walking every
+          ancestor. A React Portal straight to document.body sidesteps
+          this permanently: the drawer is no longer a DOM descendant of
+          that isolating ancestor (or of the gallery overlay, or of
+          anything else that might introduce the same problem later), so
+          its z-index is finally compared at the true top level, where
+          10000 genuinely wins against the gallery overlay's 99999. */}
+      {typeof document !== 'undefined' && createPortal(
+        <div
+          aria-hidden={audioState.currentTrack?.mediaType !== 'video'}
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 'var(--pap-h, 64px)',
+            zIndex: 2147483000, // effectively unbeatable — see comment above on why a "reasonable" number isn't the fix, but this still needs to be genuinely huge now that it's compared at the true top level
+            display: 'flex',
+            justifyContent: 'center',
+            pointerEvents: audioState.currentTrack?.mediaType === 'video' ? 'auto' : 'none',
+            opacity: audioState.currentTrack?.mediaType === 'video' ? 1 : 0,
+            transform: audioState.currentTrack?.mediaType === 'video' ? 'translateY(0)' : 'translateY(16px)',
+            transition: 'opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)',
+          }}
+        >
+          <div style={{
+            width: '100%',
+            maxWidth: 960,
+            margin: '0 1rem',
+            borderRadius: '14px 14px 0 0',
+            overflow: 'hidden',
+            background: '#000',
+            boxShadow: '0 -12px 48px rgba(0,0,0,0.55)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: 'none',
+          }}>
+            <video
+              ref={videoElRef}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onEnded={handleEnded}
+              muted={audioState.isMuted}
+              playsInline
+              preload="metadata"
+              style={{ width: '100%', maxHeight: '62vh', display: 'block', background: '#000' }}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+
       {children}
     </AudioCtx.Provider>
   );

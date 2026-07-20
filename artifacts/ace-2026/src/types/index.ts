@@ -99,6 +99,13 @@ export interface AudioTrack {
   title: MultiLingual;
   narrative: MultiLingual;
   audioUrl: string;
+  // 2026-07-20 (per Reza): video pieces reuse this exact same track shape
+  // and pipeline — title/narrative/cover/genre/concept/isFeatured all work
+  // identically. mediaType is the only discriminator; audioUrl stays
+  // empty string for a video piece (never null, to avoid touching every
+  // existing `track.audioUrl` call site that assumes a string).
+  mediaType: 'audio' | 'video';
+  videoUrl: string | null;
   coverArt: MediaAsset | null;
   // Flat cover URL — matches the actual tracks.cover_url DB column and
   // what the API/UI use in practice (2026-07-10). coverArt above stays
@@ -172,6 +179,9 @@ export interface PipelineJob {
   id: string;
   status: PipelineStatus;
   progress: number;
+  // 2026-07-20 (per Reza): which upload box this job came from — drives
+  // whether the review panel shows an <audio> or <video> preview element.
+  mediaType: 'audio' | 'video';
   audioMetadata: AudioMetadata | null;
   generatedArtUrl: string | null;
   // 2026-07-19 (per Reza): square cover and wide banner are now two

@@ -231,7 +231,7 @@ function NeonAudioPlayer({ src }: { src: string }) {
 const TabMediaPipeline = () => {
   const { tracks, fetchTracks } = useIdentity();
   const { playTrack } = useAudio();
-  const { currentJob, stagedAudio, uploading, loadingMessage, uploadAudio, clearStagedAudio, startPipeline, approvePipeline, regeneratePipeline, resetJob } = usePipeline();
+  const { currentJob, stagedAudio, stagedVideo, uploading, loadingMessage, uploadAudio, uploadVideo, clearStagedAudio, clearStagedVideo, startPipeline, approvePipeline, regeneratePipeline, resetJob } = usePipeline();
   const [savingId, setSavingId] = useState<string | null>(null);
   // 2026-07-17 (per Reza — reorganizing the Playlist into real folders):
   // which concept-folders are expanded. "__unassigned__" starts open since
@@ -454,6 +454,16 @@ const TabMediaPipeline = () => {
     if (e.dataTransfer.files?.[0]) handleFileSelected(e.dataTransfer.files[0]);
   };
 
+  // 2026-07-20 (per Reza): mirrors the audio handlers exactly.
+  const handleVideoFileSelected = (f: File | null | undefined) => {
+    if (f) void uploadVideo(f);
+  };
+
+  const handleVideoFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.[0]) handleVideoFileSelected(e.dataTransfer.files[0]);
+  };
+
   // Persist a single field change for a track (concept or featured star).
   // For the star we also clear the star on every OTHER track in the same
   // concept first, so each concept keeps at most one featured track.
@@ -482,6 +492,12 @@ const TabMediaPipeline = () => {
   const [editCaption, setEditCaption] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const editCoverInputRef = useRef<HTMLInputElement>(null);
+  // 2026-07-20 (per Reza): the playlist's row-level Play button calls
+  // AudioContext.playTrack(), which is audio-only (it plays track.audioUrl
+  // through the hidden <audio> element) — for a video track that's empty/
+  // null, so instead of silently doing nothing, the video row toggles a
+  // small inline <video> preview right there in the list.
+  const [previewingVideoTrackId, setPreviewingVideoTrackId] = useState<string | null>(null);
 
   const startEditingTrack = (track: AudioTrack) => {
     setEditingTrackId(track.id);
@@ -530,19 +546,80 @@ const TabMediaPipeline = () => {
 
   return (
     <div className="space-y-5">
-      <div onDrop={handleFileDrop} onDragOver={e => e.preventDefault()} className="adm-dropzone">
-        <p className="adm-notice mb-1">Drag an .mp3 / .wav here, or</p>
-        <label className="adm-btn adm-btn--ghost adm-btn--sm" style={{ display: 'inline-flex', cursor: 'pointer', position: 'relative' }}>
-          Choose Audio File
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={e => handleFileSelected(e.target.files?.[0])}
-            style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
-          />
-        </label>
-        {uploading && <p className="adm-notice mt-3">Uploading…</p>}
+      {/* 2026-07-20 (per Reza): audio and video are two fully independent,
+          mutually-exclusive upload boxes, split evenly side by side. Only
+          one can be staged at a time — while one has a file sitting in
+          preview, the other box goes quiet (not gone — just disabled with
+          a one-line explanation) rather than letting two different pieces
+          get staged at once with no way to tell which "Start" would fire. */}
+      <div style={{ display: 'flex', gap: '1rem', alignItems: 'stretch' }}>
+        <div
+          onDrop={stagedVideo ? undefined : handleFileDrop}
+          onDragOver={e => e.preventDefault()}
+          className="adm-dropzone"
+          style={{ flex: 1, opacity: stagedVideo ? 0.45 : 1, pointerEvents: stagedVideo ? 'none' : 'auto', transition: 'opacity 0.2s ease' }}
+        >
+          <p className="adm-notice mb-1">Drag an .mp3 / .wav here, or</p>
+          <label className="adm-btn adm-btn--ghost adm-btn--sm" style={{ display: 'inline-flex', cursor: 'pointer', position: 'relative' }}>
+            Choose Audio File
+            <input
+              type="file"
+              accept="audio/*"
+              onChange={e => handleFileSelected(e.target.files?.[0])}
+              style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+            />
+          </label>
+          {uploading && !stagedVideo && <p className="adm-notice mt-3">Uploading…</p>}
+          {stagedVideo && <p className="adm-notice mt-3" style={{ fontSize: '0.62rem' }}>Discard the video below to upload audio instead.</p>}
+        </div>
+
+        <div
+          onDrop={stagedAudio ? undefined : handleVideoFileDrop}
+          onDragOver={e => e.preventDefault()}
+          className="adm-dropzone"
+          style={{ flex: 1, opacity: stagedAudio ? 0.45 : 1, pointerEvents: stagedAudio ? 'none' : 'auto', transition: 'opacity 0.2s ease' }}
+        >
+          <p className="adm-notice mb-1">Drag an .mp4 / .mov / .webm here, or</p>
+          <label className="adm-btn adm-btn--ghost adm-btn--sm" style={{ display: 'inline-flex', cursor: 'pointer', position: 'relative' }}>
+            Choose Video File
+            <input
+              type="file"
+              accept="video/*"
+              onChange={e => handleVideoFileSelected(e.target.files?.[0])}
+              style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
+            />
+          </label>
+          {uploading && !stagedAudio && <p className="adm-notice mt-3">Uploading…</p>}
+          {stagedAudio && <p className="adm-notice mt-3" style={{ fontSize: '0.62rem' }}>Discard the audio above to upload video instead.</p>}
+        </div>
       </div>
+
+      {/* Video preview — same "upload is a fully separate, complete step
+          from AI processing" rule as audio (per Reza, 2026-07-09). A real
+          <video> element (not a custom player) so it's genuinely, exactly
+          playable the moment upload finishes, at full quality. */}
+      {stagedVideo && !currentJob && (
+        <div className="adm-panel space-y-3">
+          <p className="adm-notice" style={{ color: 'var(--accent-color)' }}>{stagedVideo.fileName}</p>
+          <video
+            src={stagedVideo.url}
+            controls
+            playsInline
+            style={{
+              width: '100%', maxHeight: 340, borderRadius: 12, background: '#000',
+              border: '1px solid rgba(var(--accent-rgb),0.24)', boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+            }}
+          />
+          <div className="adm-row">
+            <button onClick={() => void startPipeline()} className="adm-btn adm-btn--primary">
+              Start AI Processing
+            </button>
+            <button onClick={() => clearStagedVideo()} className="adm-btn adm-btn--ghost adm-btn--sm">
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Preview — upload is fully done and sitting here as a listenable
           file. AI processing has NOT started; it only begins when Start AI
@@ -578,6 +655,18 @@ const TabMediaPipeline = () => {
 
           {currentJob.status === 'ready_for_review' && (
             <div className="space-y-4" style={{ borderTop: '1px solid var(--adm-border)', paddingTop: '0.9rem' }}>
+              {/* 2026-07-20 (per Reza): re-watchable while filling in cover/
+                  caption below — the staged preview above is gone by this
+                  point (upload → Start AI Processing already happened). */}
+              {currentJob.mediaType === 'video' && stagedVideo && (
+                <video
+                  src={stagedVideo.url}
+                  controls
+                  playsInline
+                  style={{ width: '100%', maxHeight: 220, borderRadius: 10, background: '#000', border: '1px solid var(--adm-border)' }}
+                />
+              )}
+
               {/* Title */}
               <div>
                 <label className="adm-label">Title</label>
@@ -848,12 +937,23 @@ const TabMediaPipeline = () => {
                 {CONCEPT_OPTIONS.map(c => <option key={c} value={c} style={DARK_OPTION_STYLE}>{c}</option>)}
               </select>
 
-              {/* Live badge + play */}
+              {/* Live badge + media-type badge + play */}
               <span className={`adm-badge ${track.isLive ? 'adm-badge--ok' : 'adm-badge--paid'}`}>
                 {track.isLive ? 'Live' : 'Draft'}
               </span>
+              {track.mediaType === 'video' && (
+                <span className="adm-badge" style={{ background: 'rgba(var(--accent-rgb),0.14)', color: 'var(--accent-color)', border: '1px solid rgba(var(--accent-rgb),0.35)' }}>
+                  Video
+                </span>
+              )}
               <button
-                onClick={() => { void playTrack(track); }}
+                onClick={() => {
+                  if (track.mediaType === 'video') {
+                    setPreviewingVideoTrackId((prev) => prev === track.id ? null : track.id);
+                  } else {
+                    void playTrack(track);
+                  }
+                }}
                 aria-label={`Play ${track.title?.en || 'track'}`}
                 title="Play"
                 style={{
@@ -902,6 +1002,20 @@ const TabMediaPipeline = () => {
                 </button>
               )}
             </div>
+
+            {/* Inline video preview — toggled by the row's Play button for
+                video tracks (2026-07-20, per Reza). */}
+            {previewingVideoTrackId === track.id && track.videoUrl && (
+              <div className="adm-panel" style={{ margin: '0.35rem 0 0.7rem 0', background: 'rgba(0,0,0,0.25)' }}>
+                <video
+                  src={track.videoUrl}
+                  controls
+                  playsInline
+                  autoPlay
+                  style={{ width: '100%', maxHeight: 300, borderRadius: 8, background: '#000' }}
+                />
+              </div>
+            )}
 
             {/* Inline edit panel */}
             {editingTrackId === track.id && (
@@ -1055,7 +1169,7 @@ interface PickerProvider {
   keyName: string;
   docsUrl: string;
   noKeyRequired?: boolean;
-  models: { id: string; label: string; quality: number }[];
+  models: { id: string; label: string; quality: number; isNew?: boolean }[];
 }
 
 function tierBadgeClass(tier?: string) {
@@ -1154,7 +1268,17 @@ function ProviderModelPicker({
                       color: active ? 'var(--accent-color)' : 'var(--text-color)',
                     }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {m.label}
+                      {m.isNew && (
+                        <span style={{
+                          fontSize: '0.55rem', fontWeight: 700, letterSpacing: '0.03em', padding: '1px 5px',
+                          borderRadius: 4, background: 'var(--accent-color)', color: '#1a1408', flexShrink: 0,
+                        }}>
+                          NEW
+                        </span>
+                      )}
+                    </span>
                     <SignalBars quality={m.quality} />
                   </button>
                 );
@@ -1320,6 +1444,13 @@ const TabGatekeeperHub = () => {
             onChange={(v) => {
               const [providerId, model] = v.split('::');
               setActive({ providerId: providerId ?? '', model: model ?? '' });
+              // 2026-07-19 (per Reza): selecting a model in the picker is
+              // the admin's acknowledgment of it — clears its NEW badge.
+              // Fire-and-forget: this is cosmetic, never worth blocking
+              // or erroring the actual provider-selection flow over.
+              if (providerId && model) {
+                void apiPost('/api/model-updates/seen', { kind, providerId, modelId: model }).catch(() => {});
+              }
             }}
           />
 
@@ -2840,10 +2971,12 @@ const TabDocumentAssistant = () => {
 // provider, with a signal-bar importance indicator and a per-model Apply
 // button that adds it straight into the selectable model dropdown.
 interface ModelUpdateAlertT {
+  kind: 'text' | 'image';
   providerId: string;
   providerLabel: string;
   newModelIds: string[];
   truncatedCount: number;
+  removedModelIds: string[];
   importance: 'high' | 'medium';
   description: string;
 }
@@ -2867,25 +3000,9 @@ function ModelUpdatesBell() {
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [applyingAll, setApplyingAll] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
-
-  const fetchAlerts = async () => {
-    try {
-      const result = await apiGet<{ alerts: ModelUpdateAlertT[] }>('/api/model-updates');
-      setAlerts(result.alerts ?? []);
-    } catch { /* non-critical */ }
-  };
-
-  useEffect(() => { void fetchAlerts(); }, []);
-
-  const toggleOpen = () => {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPanelPos({ top: rect.bottom + 6, left: rect.left });
-    }
-    setOpen((v) => !v);
-  };
 
   const checkNow = async () => {
     setChecking(true);
@@ -2895,6 +3012,31 @@ function ModelUpdatesBell() {
     } finally {
       setChecking(false);
     }
+  };
+
+  // 2026-07-19 (per Reza): "check every login" — ModelUpdatesBell only
+  // mounts once the admin is inside the dashboard (i.e. after login), so
+  // running a live refresh here (not just reading yesterday's cached
+  // alerts) covers that without touching the login route at all. Silent
+  // on failure — this must never block or error out the dashboard mount.
+  useEffect(() => { void checkNow(); }, []);
+
+  const applyAll = async () => {
+    setApplyingAll(true);
+    try {
+      const result = await apiPost<{ alerts: ModelUpdateAlertT[] }>('/api/model-updates/apply-all', {});
+      setAlerts(result.alerts ?? []);
+    } finally {
+      setApplyingAll(false);
+    }
+  };
+
+  const toggleOpen = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPanelPos({ top: rect.bottom + 6, left: rect.left });
+    }
+    setOpen((v) => !v);
   };
 
   const applyModel = async (providerId: string, modelId: string) => {
@@ -2912,7 +3054,7 @@ function ModelUpdatesBell() {
     try { await apiPost(`/api/model-updates/${providerId}/dismiss`, {}); } catch { /* local dismiss already applied */ }
   };
 
-  const totalCount = alerts.reduce((sum, a) => sum + a.newModelIds.length, 0);
+  const totalCount = alerts.reduce((sum, a) => sum + a.newModelIds.length + a.removedModelIds.length, 0);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -2964,6 +3106,19 @@ function ModelUpdatesBell() {
               <p style={{ fontSize: '0.68rem', color: 'rgba(233,228,218,0.6)', marginTop: '0.5rem' }}>Nothing new — you're up to date.</p>
             )}
 
+            {alerts.length > 0 && (
+              <button
+                onClick={() => void applyAll()}
+                disabled={applyingAll}
+                style={{
+                  width: '100%', marginTop: '0.6rem', fontSize: '0.68rem', fontWeight: 700, padding: '0.4rem 0.5rem',
+                  background: '#D4A24C', border: 'none', borderRadius: 6, color: '#1a1408', cursor: 'pointer',
+                }}
+              >
+                {applyingAll ? 'Applying…' : `Apply All Updates (${totalCount})`}
+              </button>
+            )}
+
             {alerts.map((a) => (
               <div key={a.providerId} style={{ marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2996,6 +3151,17 @@ function ModelUpdatesBell() {
                 {a.truncatedCount > 0 && (
                   <p style={{ fontSize: '0.6rem', color: 'rgba(233,228,218,0.4)', marginTop: 2 }}>+{a.truncatedCount} more not shown</p>
                 )}
+                {a.removedModelIds.map((modelId) => (
+                  <div key={modelId} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.15rem 0' }}>
+                    <span style={{
+                      fontSize: '0.55rem', fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                      background: 'rgba(220,90,90,0.18)', color: '#e69a9a', flexShrink: 0,
+                    }}>
+                      REMOVED
+                    </span>
+                    <span style={{ fontSize: '0.66rem', fontFamily: 'monospace', wordBreak: 'break-all', flex: 1, color: 'rgba(233,228,218,0.55)', textDecoration: 'line-through' }}>{modelId}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

@@ -11,7 +11,7 @@
 // Cohere have their own shapes and get small dedicated callers.
 // ============================================================
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { db } from '../db/db';
 import { apiKeys, modelOverrides } from '../db/schema';
@@ -24,6 +24,12 @@ export interface ProviderModel {
    * capability guide, not a benchmark score — helps a non-technical
    * admin pick something reasonable without knowing the models. */
   quality: 1 | 2 | 3 | 4 | 5;
+  /** 2026-07-19 (per Reza): set true for models added via the model-
+   * discovery "Apply" / "Apply All" flow — drives the NEW badge in the
+   * Gatekeeper Hub picker. Cleared (see markModelSeen) once the admin
+   * actually selects that model there. Hardcoded/original models never
+   * get this set, so they never show the badge. */
+  isNew?: boolean;
 }
 
 export interface TextProvider {
@@ -357,13 +363,59 @@ export async function getProviderApiKey(provider: TextProvider | ImageProvider):
  * restart. Persisting it to the DB needs the same encrypt/decrypt path
  * used for API keys; wire that in once encryptionService.ts's exact
  * signature is confirmed. */
-export function applyModelOverride(kind: 'text' | 'image', providerId: string, modelId: string, label: string): boolean {
+export function applyModelOverride(kind: 'text' | 'image', providerId: string, modelId: string, label: string, isNew: boolean = true): boolean {
   const list = kind === 'text' ? TEXT_PROVIDERS : IMAGE_PROVIDERS;
   const provider = list.find((p) => p.id === providerId);
   if (!provider) return false;
-  if (provider.models.some((m) => m.id === modelId)) return true; // already there
-  provider.models.push({ id: modelId, label, quality: 3 });
+  const existing = provider.models.find((m) => m.id === modelId);
+  if (existing) {
+    existing.isNew = isNew; // already there — keep isNew in sync (e.g. re-applying, or a hydrate replay)
+    return true;
+  }
+  provider.models.push({ id: modelId, label, quality: 3, isNew });
   return true;
+}
+
+/** Removes a model that's vanished from the provider's live list (2026-07-19,
+ * per Reza's "removed models should leave the list too"). For models that
+ * were originally hand-written in TEXT_PROVIDERS/IMAGE_PROVIDERS above (not
+ * added via override), this only removes it from the in-memory list for
+ * this running process — since the hardcoded array lives in source code,
+ * it comes back on the next deploy/restart until someone edits the source.
+ * Overrides are also deleted from the DB so they don't come back via
+ * hydrateModelOverrides() either. */
+export async function removeModelFromProvider(kind: 'text' | 'image', providerId: string, modelId: string): Promise<boolean> {
+  const list = kind === 'text' ? TEXT_PROVIDERS : IMAGE_PROVIDERS;
+  const provider = list.find((p) => p.id === providerId);
+  if (!provider) return false;
+  const before = provider.models.length;
+  provider.models = provider.models.filter((m) => m.id !== modelId);
+  try {
+    await db.delete(modelOverrides).where(
+      and(eq(modelOverrides.kind, kind), eq(modelOverrides.providerId, providerId), eq(modelOverrides.modelId, modelId))
+    );
+  } catch (err) {
+    console.warn(`[modelOverrides] Removed "${modelId}" from the live list but failed to delete its DB override row (harmless if it was never an override):`, err);
+  }
+  return provider.models.length < before;
+}
+
+/** Clears the NEW badge for one model — called when the admin actually
+ * selects it in the Gatekeeper Hub picker (2026-07-19, per Reza). */
+export async function markModelSeen(kind: 'text' | 'image', providerId: string, modelId: string): Promise<void> {
+  const list = kind === 'text' ? TEXT_PROVIDERS : IMAGE_PROVIDERS;
+  const provider = list.find((p) => p.id === providerId);
+  const model = provider?.models.find((m) => m.id === modelId);
+  if (model) model.isNew = false;
+  try {
+    await db.update(modelOverrides).set({ isNew: false }).where(
+      and(eq(modelOverrides.kind, kind), eq(modelOverrides.providerId, providerId), eq(modelOverrides.modelId, modelId))
+    );
+  } catch {
+    // Fine if this wasn't an override row (a hardcoded model never has a
+    // DB row to update) — the in-memory clear above is what actually
+    // drives the badge anyway.
+  }
 }
 
 /** Durable half of "Apply" (2026-07-10 fix) — writes the override to the
@@ -371,10 +423,10 @@ export function applyModelOverride(kind: 'text' | 'image', providerId: string, m
  * applyModelOverride() has already updated the in-memory registry; this
  * only persists the record for next boot's hydrateModelOverrides(). Safe
  * to call even if the row already exists (onConflictDoNothing). */
-export async function persistModelOverride(kind: 'text' | 'image', providerId: string, modelId: string, label: string): Promise<void> {
+export async function persistModelOverride(kind: 'text' | 'image', providerId: string, modelId: string, label: string, isNew: boolean = true): Promise<void> {
   await db
     .insert(modelOverrides)
-    .values({ kind, providerId, modelId, label, quality: 3 })
+    .values({ kind, providerId, modelId, label, quality: 3, isNew })
     .onConflictDoNothing();
 }
 
@@ -387,7 +439,7 @@ export async function hydrateModelOverrides(): Promise<void> {
   try {
     const rows = await db.query.modelOverrides.findMany();
     for (const row of rows) {
-      applyModelOverride(row.kind as 'text' | 'image', row.providerId, row.modelId, row.label);
+      applyModelOverride(row.kind as 'text' | 'image', row.providerId, row.modelId, row.label, row.isNew ?? false);
     }
     if (rows.length > 0) {
       // eslint-disable-next-line no-console

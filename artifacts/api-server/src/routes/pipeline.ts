@@ -8,6 +8,7 @@ import { authGuard } from '../middleware/auth';
 import { generateArtDirection, buildFramedPrompt, generateSquareCoverArt, generateWideCoverArtFromReference } from '../services/aiArtGenerator';
 import { resolveActiveTextProvider, callTextProvider, findTextProvider } from '../services/aiProviders';
 import { analyzeAudio } from '../services/audioAnalyser';
+import { analyzeVideo } from '../services/videoAnalyser';
 
 const router: Router = Router();
 
@@ -109,10 +110,14 @@ function buildNarrativeSource(audioMetadata: Record<string, unknown>): string {
 const processSchema = z.object({
   audioUrl: z.string().min(1).optional(),
   youtubeUrl: z.string().min(1).optional(),
+  // 2026-07-20 (per Reza): the second, independent upload box in Media
+  // Pipeline — a video piece flows through this exact same pipeline,
+  // just with videoUrl instead of audioUrl driving it.
+  videoUrl: z.string().min(1).optional(),
   title: z.string().nullish(),
   genre: z.string().nullish(),
-}).passthrough().refine((d) => Boolean(d.audioUrl || d.youtubeUrl), {
-  message: 'audioUrl or youtubeUrl is required',
+}).passthrough().refine((d) => Boolean(d.audioUrl || d.youtubeUrl || d.videoUrl), {
+  message: 'audioUrl, youtubeUrl, or videoUrl is required',
 });
 
 const approveSchema = z.object({
@@ -139,6 +144,7 @@ const jobToStatusPayload = (job: {
   id: string;
   status: string | null;
   progress: number | null;
+  mediaType: string | null;
   audioMetadata: unknown;
   generatedArtUrl: string | null;
   generatedArtUrlWide: string | null;
@@ -149,6 +155,7 @@ const jobToStatusPayload = (job: {
   jobId: job.id,
   status: job.status,
   progress: job.progress,
+  mediaType: job.mediaType ?? 'audio',
   audioMetadata: job.audioMetadata ?? undefined,
   generatedArtUrl: job.generatedArtUrl ?? undefined,
   generatedArtUrlWide: job.generatedArtUrlWide ?? undefined,
@@ -275,13 +282,19 @@ router.post('/process', authGuard, async (req: Request, res: Response): Promise<
       });
       return;
     }
-    const { audioUrl, title, genre } = req.body;
+    const { audioUrl, videoUrl, title, genre } = req.body;
+    // 2026-07-20 (per Reza): the two upload boxes are mutually exclusive —
+    // whichever one the admin actually used drives mediaType for
+    // everything downstream (draft track, pipeline job, review panel).
+    const mediaType: 'audio' | 'video' = videoUrl ? 'video' : 'audio';
 
     // 1. Create a draft track
     const [draftTrack] = await db.insert(tracks).values({
       title: { en: title || 'Untitled Piece', es: '', fr: '', zh: '', ja: '', ko: '' },
       narrative: { en: '', es: '', fr: '', zh: '', ja: '', ko: '' },
-      audioUrl,
+      mediaType,
+      audioUrl: mediaType === 'audio' ? audioUrl : null,
+      videoUrl: mediaType === 'video' ? videoUrl : null,
       coverUrl: null,
       genre: genre || 'cinematic',
       isLive: false,
@@ -290,31 +303,39 @@ router.post('/process', authGuard, async (req: Request, res: Response): Promise<
     // 2. Create the pipeline job
     const [job] = await db.insert(pipelineJobs).values({
       trackId: draftTrack!.id,
+      mediaType,
       status: 'uploading',
       progress: 10,
     }).returning();
 
-    // 3. Trigger asynchronous audio analysis ONLY. Cover art and caption
-    //    are never auto-started — each is a fully independent action the
-    //    admin triggers explicitly (Generate button on its own box). This
-    //    was a deliberate product decision (Reza, 2026-07-09): upload →
-    //    preview → [admin decides what to generate, one box at a time].
+    // 3. Trigger asynchronous analysis ONLY (audio listening OR video
+    //    watching, depending on mediaType — both return the exact same
+    //    AudioMetadata shape, see videoAnalyser.ts's header comment for
+    //    why that's a deliberate reuse, not a naming accident). Cover art
+    //    and caption are never auto-started — each is a fully independent
+    //    action the admin triggers explicitly (Generate button on its own
+    //    box). This was a deliberate product decision (Reza, 2026-07-09):
+    //    upload → preview → [admin decides what to generate, one box at a time].
     setTimeout((): void => {
       void (async (): Promise<void> => {
         try {
           const jobId = job!.id;
 
-          broadcastJobStatus(jobId, 'analyzing_audio', 20, { message: 'Reading file metadata and having AI listen to the track…' });
-          const audioMetadata = await analyzeAudio(audioUrl);
+          broadcastJobStatus(jobId, 'analyzing_audio', 20, {
+            message: mediaType === 'video'
+              ? 'Reading file metadata and having AI watch the video…'
+              : 'Reading file metadata and having AI listen to the track…',
+          });
+          const audioMetadata = mediaType === 'video' ? await analyzeVideo(videoUrl) : await analyzeAudio(audioUrl);
           await db.update(pipelineJobs).set({ status: 'analyzing_audio', progress: 20, audioMetadata }).where(eq(pipelineJobs.id, jobId));
 
           broadcastJobStatus(jobId, 'ready_for_review', 30, { audioMetadata, message: 'Ready — generate cover art and caption whenever you like.' });
           await db.update(pipelineJobs).set({ status: 'ready_for_review', progress: 30 }).where(eq(pipelineJobs.id, jobId));
         } catch (err: unknown) {
-          console.error('Asynchronous audio analysis failed:', err);
+          console.error(`Asynchronous ${mediaType} analysis failed:`, err);
           await db.update(pipelineJobs).set({
             status: 'error',
-            errorMessage: (err as Error).message || 'Audio analysis failed',
+            errorMessage: (err as Error).message || `${mediaType === 'video' ? 'Video' : 'Audio'} analysis failed`,
           }).where(eq(pipelineJobs.id, job!.id));
           broadcastJobStatus(job!.id, 'error', 100, { error: (err as Error).message });
         }

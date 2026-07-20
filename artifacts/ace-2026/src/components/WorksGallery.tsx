@@ -292,7 +292,6 @@ function PianoLane({
           x,
           opacity,
           width: `clamp(3rem, ${widthVW}vw, ${widthVW * 0.6}rem)`,
-          cursor: 'pointer',
           transformOrigin: 'left center',
         }}
         aria-label={`${t('Explore')} ${t(group.label)} (${count} ${count === 1 ? t('track') : t('tracks')})`}
@@ -342,7 +341,7 @@ function PianoLane({
         onMouseEnter={press}
         onMouseLeave={() => setPressed(false)}
         className="flex items-baseline gap-4 focus:outline-none text-left"
-        style={{ opacity: labelOpacity, x: labelX, marginLeft: 'clamp(1rem, 2.5vw, 2.25rem)', cursor: 'pointer' }}
+        style={{ opacity: labelOpacity, x: labelX, marginLeft: 'clamp(1rem, 2.5vw, 2.25rem)' }}
       >
         <span className="font-display font-light whitespace-nowrap"
           style={{ fontSize: 'clamp(1.1rem, 2.3vw, 1.9rem)', letterSpacing: '0.02em', lineHeight: 1, color: pressed ? 'var(--accent-color)' : 'var(--text-color)', transition: 'color 0.3s ease' }}>
@@ -452,7 +451,6 @@ function CarouselCard({
         transition: instant
           ? 'filter 0.12s linear, opacity 0.2s ease'
           : 'transform 0.9s cubic-bezier(0.22,1,0.36,1), filter 0.7s cubic-bezier(0.22,1,0.36,1), opacity 0.55s ease, box-shadow 0.6s ease',
-        cursor: 'pointer',
       }}
       aria-label={item.placeholder ? item.title : `${item.isPlaying ? 'Pause' : 'Play'} ${item.title}`}
       aria-current={isFocus || undefined}
@@ -606,7 +604,6 @@ function WorkCarousel({ items }: { items: CarouselItem[] }) {
           margin: '0 auto',
           height: 'min(62vh, 560px)',
           touchAction: 'pan-y',
-          cursor: 'grab',
         }}
         aria-label={t('Circular works carousel — scroll, drag, or use arrow keys')}
       >
@@ -727,7 +724,7 @@ function OverlayPanel({
   return (
     <motion.div
       key="concept-overlay"
-      className="fixed inset-0 flex flex-col"
+      className="works-gallery-overlay fixed inset-0 flex flex-col"
       style={{ zIndex: 9999, background: 'rgba(8,8,8,0.94)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
