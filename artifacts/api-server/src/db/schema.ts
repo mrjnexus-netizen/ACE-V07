@@ -47,6 +47,17 @@ export const tracks = pgTable(
     audioUrl: text('audio_url'),
     coverUrl: text('cover_url'),
     coverBlur: text('cover_blur'),
+    // 2026-07-19 (per Reza): a SEPARATELY generated, properly-composed
+    // landscape/banner version of the cover art — used by
+    // ComposerPresence.tsx's full-bleed rotating band. Was previously the
+    // SAME image as coverUrl (the square/card version) just stretched/
+    // cropped wide, which looked amateurish and low-quality no matter how
+    // good the source generation was. Null for any track generated before
+    // this — the frontend falls back to coverUrl for those, so nothing
+    // breaks for existing tracks; only NEW cover-art generations produce
+    // this second image.
+    coverUrlWide: text('cover_url_wide'),
+    coverBlurWide: text('cover_blur_wide'),
     dominantColors: text('dominant_colors').array().default([]),
     vibrantPalette: jsonb('vibrant_palette'),
     genre: text('genre'),
@@ -81,6 +92,11 @@ export const pipelineJobs = pgTable(
     progress: integer('progress').default(0),
     audioMetadata: jsonb('audio_metadata'),
     generatedArtUrl: text('generated_art_url'),
+    // 2026-07-19 (per Reza): square cover and wide banner are now two
+    // independent Generate buttons — the job needs to track both URLs
+    // separately so the admin panel can show live progress for whichever
+    // one is currently generating without clobbering the other.
+    generatedArtUrlWide: text('generated_art_url_wide'),
     generatedNarrative: jsonb('generated_narrative'),
     errorMessage: text('error_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

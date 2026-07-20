@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db } from '../db/db';
 import { tracks, pipelineJobs } from '../db/schema';
 import { authGuard } from '../middleware/auth';
-import { generateAIArt, generateArtDirection } from '../services/aiArtGenerator';
+import { generateArtDirection, buildFramedPrompt, generateSquareCoverArt, generateWideCoverArtFromReference } from '../services/aiArtGenerator';
 import { resolveActiveTextProvider, callTextProvider, findTextProvider } from '../services/aiProviders';
 import { analyzeAudio } from '../services/audioAnalyser';
 
@@ -119,6 +119,7 @@ const approveSchema = z.object({
   title: z.unknown().optional(),
   narrative: z.unknown().optional(),
   coverUrl: z.string().nullish(),
+  coverUrlWide: z.string().nullish(),
   genre: z.string().nullish(),
   bpm: z.union([z.string(), z.number()]).nullish(),
   mood: z.string().nullish(),
@@ -140,6 +141,7 @@ const jobToStatusPayload = (job: {
   progress: number | null;
   audioMetadata: unknown;
   generatedArtUrl: string | null;
+  generatedArtUrlWide: string | null;
   generatedNarrative: unknown;
   errorMessage: string | null;
 }) => ({
@@ -149,6 +151,7 @@ const jobToStatusPayload = (job: {
   progress: job.progress,
   audioMetadata: job.audioMetadata ?? undefined,
   generatedArtUrl: job.generatedArtUrl ?? undefined,
+  generatedArtUrlWide: job.generatedArtUrlWide ?? undefined,
   generatedNarrative: job.generatedNarrative ?? undefined,
   errorMessage: job.errorMessage ?? undefined,
 });
@@ -352,7 +355,7 @@ router.post('/approve/:jobId', authGuard, async (req: Request, res: Response): P
       });
       return;
     }
-    const { title, narrative, coverUrl, genre, bpm, mood, keySignature } = req.body;
+    const { title, narrative, coverUrl, coverUrlWide, genre, bpm, mood, keySignature } = req.body;
 
     const job = await db.query.pipelineJobs.findFirst({
       where: eq(pipelineJobs.id, jobId!),
@@ -387,6 +390,12 @@ router.post('/approve/:jobId', authGuard, async (req: Request, res: Response): P
       narrative: narrative || generatedNarrative || { en: '', es: '', fr: '', zh: '', ja: '', ko: '' },
       // Manual thumbnail upload takes priority over the AI-generated one.
       coverUrl: coverUrl || job.generatedArtUrl,
+      // Same pattern for the wide banner (2026-07-19) — a manual upload
+      // for the wide frame wins; otherwise keep whatever the wide
+      // Generate button already produced (that path writes coverUrlWide
+      // to the track directly at generate-time, so this is only really
+      // exercised by a manual wide upload/replace).
+      coverUrlWide: coverUrlWide || job.generatedArtUrlWide,
       genre: genre || 'cinematic',
       bpm: bpm ? parseInt(bpm) : (audioMetadata?.bpm as number) || 110,
       mood: mood || (audioMetadata?.mood as string) || 'Cinematic',
@@ -464,11 +473,17 @@ router.post('/regenerate/:jobId', authGuard, async (req: Request, res: Response)
     const audioMetadata = (job.audioMetadata as Record<string, unknown> | null) ?? {};
 
     if (field === 'art') {
+      // 2026-07-19 (per Reza): square cover and wide banner are now two
+      // fully independent Generate buttons in the admin UI, fired one at
+      // a time — this branch only ever touches the square (card) slot.
+      // coverUrlWide is deliberately left untouched here so an earlier
+      // wide generation isn't silently wiped out by a square-only
+      // regenerate.
       broadcastJobStatus(jobId!, 'ready_for_review', job.progress ?? 30, {
         message: 'Generating cover art with AI — this can take up to a minute…',
       });
-      const art = await generateAIArt(job.trackId, audioMetadata as Parameters<typeof generateAIArt>[1], 'Cinematic Warmth');
-      if (!art) {
+      const square = await generateSquareCoverArt(job.trackId, audioMetadata as Parameters<typeof generateSquareCoverArt>[1], 'Cinematic Warmth');
+      if (!square) {
         broadcastJobStatus(jobId!, 'ready_for_review', job.progress ?? 30, {
           message: 'Cover art generation failed — check the active image provider in Gatekeeper Hub.',
         });
@@ -482,15 +497,60 @@ router.post('/regenerate/:jobId', authGuard, async (req: Request, res: Response)
         return;
       }
       await db.update(tracks).set({
-        coverUrl: art.url,
-        coverBlur: art.blurhash,
-        dominantColors: art.dominantColors,
-        vibrantPalette: art.vibrantPalette,
+        coverUrl: square.url,
+        coverBlur: square.blurhash,
+        dominantColors: square.dominantColors,
+        vibrantPalette: square.vibrantPalette,
       }).where(eq(tracks.id, job.trackId));
-      await db.update(pipelineJobs).set({ generatedArtUrl: art.url }).where(eq(pipelineJobs.id, jobId!));
+      await db.update(pipelineJobs).set({ generatedArtUrl: square.url }).where(eq(pipelineJobs.id, jobId!));
       broadcastJobStatus(jobId!, 'ready_for_review', job.progress ?? 30, {
-        generatedArtUrl: art.url,
+        generatedArtUrl: square.url,
         message: 'Cover art ready.',
+      });
+    } else if (field === 'art-wide') {
+      // Composed FROM the square cover (image-to-image recompose), not a
+      // fresh independent generation — see generateWideCoverArtFromReference.
+      const referenceUrl = job.generatedArtUrl;
+      if (!referenceUrl) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: 'Generate the square cover first — the wide banner is composed from it.',
+          code: 'VALIDATION_ERROR',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+      broadcastJobStatus(jobId!, 'ready_for_review', job.progress ?? 30, {
+        message: 'Recomposing the cover into a wide banner — this can take up to a minute…',
+      });
+      const wide = await generateWideCoverArtFromReference(
+        job.trackId,
+        referenceUrl,
+        audioMetadata as Parameters<typeof generateWideCoverArtFromReference>[2],
+        'Cinematic Warmth'
+      );
+      if (!wide) {
+        broadcastJobStatus(jobId!, 'ready_for_review', job.progress ?? 30, {
+          message: 'Wide banner generation failed after several retries — this is usually a temporary rate limit on the image provider. Wait a minute and click Regenerate again.',
+        });
+        res.status(502).json({
+          success: false,
+          data: null,
+          error: 'Wide banner generation failed after several retries — this is usually a temporary rate limit on the image provider. Wait a minute and click Regenerate again.',
+          code: 'AI_PROVIDER_ERROR',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+      await db.update(tracks).set({
+        coverUrlWide: wide.url,
+        coverBlurWide: wide.blurhash,
+      }).where(eq(tracks.id, job.trackId));
+      await db.update(pipelineJobs).set({ generatedArtUrlWide: wide.url }).where(eq(pipelineJobs.id, jobId!));
+      broadcastJobStatus(jobId!, 'ready_for_review', job.progress ?? 30, {
+        generatedArtUrlWide: wide.url,
+        message: 'Wide banner ready.',
       });
     } else {
       broadcastJobStatus(jobId!, 'ready_for_review', job.progress ?? 30, {
@@ -540,10 +600,27 @@ router.get('/sample-prompt/:jobId', authGuard, async (req: Request, res: Respons
       return;
     }
     const audioMetadata = (job.audioMetadata as Record<string, unknown> | null) ?? {};
-    const prompt = field === 'narrative'
-      ? buildNarrativeSource(audioMetadata)
-      : await generateArtDirection(audioMetadata as Parameters<typeof generateArtDirection>[0]);
-    res.status(200).json({ success: true, data: { prompt, field }, error: null, code: null, timestamp: new Date().toISOString() });
+    if (field === 'narrative') {
+      const prompt = buildNarrativeSource(audioMetadata);
+      res.status(200).json({ success: true, data: { prompt, field }, error: null, code: null, timestamp: new Date().toISOString() });
+      return;
+    }
+    // 2026-07-19 (per Reza): art generation now produces two
+    // separately-composed images (square card + wide banner) from one
+    // shared concept — both actual prompts are returned here so a manual
+    // ChatGPT/Midjourney fallback can reproduce either.
+    const concept = await generateArtDirection(audioMetadata as Parameters<typeof generateArtDirection>[0]);
+    res.status(200).json({
+      success: true,
+      data: {
+        prompt: buildFramedPrompt(concept, 'square'),
+        promptWide: buildFramedPrompt(concept, 'wide'),
+        field,
+      },
+      error: null,
+      code: null,
+      timestamp: new Date().toISOString(),
+    });
   } catch (err: unknown) {
     res.status(500).json({
       success: false,

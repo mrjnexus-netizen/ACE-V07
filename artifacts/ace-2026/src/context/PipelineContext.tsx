@@ -6,6 +6,7 @@ export interface ApprovalOverrides {
   title?: MultiLingual;
   narrative?: MultiLingual;
   coverUrl?: string;
+  coverUrlWide?: string;
 }
 
 // A file that has finished uploading and is sitting in preview — no
@@ -27,7 +28,7 @@ interface PipelineContextType {
   clearStagedAudio: () => void;
   startPipeline: (input?: { youtubeUrl?: string }) => Promise<void>;
   approvePipeline: (jobId: string, overrides?: ApprovalOverrides) => Promise<void>;
-  regeneratePipeline: (jobId: string, field: 'art' | 'narrative') => Promise<void>;
+  regeneratePipeline: (jobId: string, field: 'art' | 'art-wide' | 'narrative') => Promise<void>;
   cancelJob: () => void;
   resetJob: () => void;
 }
@@ -103,6 +104,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         progress: 10,
         audioMetadata: null,
         generatedArtUrl: null,
+        generatedArtUrlWide: null,
         generatedNarrative: null,
         errorMessage: null,
       });
@@ -137,6 +139,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
             progress: (data.progress as number) ?? prev.progress,
             audioMetadata: (data.audioMetadata as PipelineJob['audioMetadata']) ?? prev.audioMetadata,
             generatedArtUrl: (data.generatedArtUrl as string) ?? prev.generatedArtUrl,
+            generatedArtUrlWide: (data.generatedArtUrlWide as string) ?? prev.generatedArtUrlWide,
             generatedNarrative: (data.generatedNarrative as PipelineJob['generatedNarrative']) ?? prev.generatedNarrative,
             errorMessage: (data.errorMessage as string) ?? null,
           };
@@ -171,6 +174,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
         progress: 100,
         audioMetadata: null,
         generatedArtUrl: null,
+        generatedArtUrlWide: null,
         generatedNarrative: null,
         errorMessage: error.message || 'Failed to start pipeline process.',
       });
@@ -193,8 +197,12 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
   // polling loop started in startPipeline (still running at this point —
   // it only stops on 'complete'/'error'), so this just needs to fire the
   // request; the next 2s poll tick reflects the change automatically.
-  const regeneratePipeline = useCallback(async (jobId: string, field: 'art' | 'narrative') => {
-    setLoadingMessage(field === 'art' ? 'Starting cover art generation…' : 'Starting caption generation…');
+  const regeneratePipeline = useCallback(async (jobId: string, field: 'art' | 'art-wide' | 'narrative') => {
+    setLoadingMessage(
+      field === 'art' ? 'Starting cover art generation…' :
+      field === 'art-wide' ? 'Starting wide banner generation…' :
+      'Starting caption generation…'
+    );
     try {
       await apiPost(`/api/pipeline/regenerate/${jobId}`, { field });
     } catch (err: unknown) {

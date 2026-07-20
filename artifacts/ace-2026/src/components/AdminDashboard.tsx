@@ -262,6 +262,17 @@ const TabMediaPipeline = () => {
   const [busyCoverUpload, setBusyCoverUpload] = useState(false);
   const [busyApprove, setBusyApprove] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  // 2026-07-19 (per Reza): the wide banner frame is a fully independent
+  // second box, mirroring the square one's own state — its own Generate
+  // button, its own manual-upload override, its own busy flag. The wide
+  // Generate button doesn't roll a fresh random image though — it
+  // recomposes the already-generated square cover (see
+  // generateWideCoverArtFromReference on the backend).
+  const [manualCoverUrlWide, setManualCoverUrlWide] = useState<string | null>(null);
+  const [coverDismissedWide, setCoverDismissedWide] = useState(false);
+  const [busyArtWide, setBusyArtWide] = useState(false);
+  const [busyCoverUploadWide, setBusyCoverUploadWide] = useState(false);
+  const coverInputWideRef = useRef<HTMLInputElement>(null);
   // "Select from Library" (2026-07-09, per Reza): browse Poster Studio's
   // generated-posters gallery and pick one directly as this track's cover.
   const [showLibrary, setShowLibrary] = useState(false);
@@ -288,10 +299,13 @@ const TabMediaPipeline = () => {
     setNarrativeTouched(false);
     setManualCoverUrl(null);
     setCoverDismissed(false);
+    setManualCoverUrlWide(null);
+    setCoverDismissedWide(false);
     setSamplePrompt(null);
   };
 
   const effectiveCoverUrl = manualCoverUrl || (coverDismissed ? null : currentJob?.generatedArtUrl) || null;
+  const effectiveCoverUrlWide = manualCoverUrlWide || (coverDismissedWide ? null : currentJob?.generatedArtUrlWide) || null;
 
   const handleGenerateArt = async () => {
     if (!currentJob) return;
@@ -299,6 +313,40 @@ const TabMediaPipeline = () => {
     setManualCoverUrl(null); // a fresh AI generation should be what's shown next, not a stale manual upload
     setCoverDismissed(false);
     try { await regeneratePipeline(currentJob.id, 'art'); } finally { setBusyArt(false); }
+  };
+
+  // Recomposes the square cover into a wide banner — requires the square
+  // to exist first (the backend enforces this too and returns a clear
+  // error if it's missing).
+  const handleGenerateArtWide = async () => {
+    if (!currentJob) return;
+    if (!effectiveCoverUrl) return; // button is disabled in this case too, this is just a safety net
+    setBusyArtWide(true);
+    setManualCoverUrlWide(null);
+    setCoverDismissedWide(false);
+    try { await regeneratePipeline(currentJob.id, 'art-wide'); } finally { setBusyArtWide(false); }
+  };
+
+  const handleDeleteCoverWide = () => {
+    setManualCoverUrlWide(null);
+    setCoverDismissedWide(true);
+  };
+
+  const handleManualCoverUploadWide = async (f: File) => {
+    if (!currentJob) return;
+    setBusyCoverUploadWide(true);
+    try {
+      const form = new FormData();
+      form.append('media', f);
+      form.append('entity_type', 'track-cover-wide');
+      form.append('entity_id', currentJob.id);
+      const uploaded = await apiPost<{ url: string }>('/api/media/upload', form);
+      if (uploaded?.url) { setManualCoverUrlWide(uploaded.url); setCoverDismissedWide(false); }
+    } catch (err) {
+      console.error('Manual wide cover upload failed:', err);
+    } finally {
+      setBusyCoverUploadWide(false);
+    }
   };
 
   const handleGenerateNarrative = async () => {
@@ -390,6 +438,7 @@ const TabMediaPipeline = () => {
         title: manualTitle ? { en: manualTitle, es: '', fr: '', zh: '', ja: '', ko: '' } : undefined,
         narrative: manualNarrative ? { en: manualNarrative, es: '', fr: '', zh: '', ja: '', ko: '' } : undefined,
         coverUrl: effectiveCoverUrl || undefined,
+        coverUrlWide: effectiveCoverUrlWide || undefined,
       });
     } finally {
       setBusyApprove(false);
@@ -541,9 +590,9 @@ const TabMediaPipeline = () => {
                 />
               </div>
 
-              {/* ---- Box 1: Cover art — fully independent ---- */}
+              {/* ---- Box 1: Cover art (square/card) — fully independent ---- */}
               <div className="adm-panel" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                <label className="adm-label">Cover Art</label>
+                <label className="adm-label">Cover Art (Square — for cards)</label>
                 <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
                   <div style={{ width: 148, height: 84, borderRadius: 8, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', flexShrink: 0, border: '1px solid var(--adm-border)' }}>
                     {effectiveCoverUrl ? (
@@ -606,6 +655,67 @@ const TabMediaPipeline = () => {
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ---- Box 1b: Banner (wide) — 2026-07-19 per Reza: a second,
+                   independent frame right next to the square one. Its own
+                   Generate button doesn't roll a fresh random image — it
+                   RECOMPOSES the square cover above into a 16:9 banner
+                   (same subject/identity, reframed), so Generate here is
+                   disabled until the square cover exists. ---- */}
+              <div className="adm-panel" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                <label className="adm-label">Banner (Wide — for the homepage hero)</label>
+                <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start' }}>
+                  <div style={{ width: 148, height: 84, borderRadius: 8, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', flexShrink: 0, border: '1px solid var(--adm-border)' }}>
+                    {effectiveCoverUrlWide ? (
+                      <img src={effectiveCoverUrlWide} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div className="adm-notice" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', textAlign: 'center', padding: '0 6px' }}>
+                        {busyArtWide ? '' : 'No banner yet'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2" style={{ flex: 1 }}>
+                    {busyArtWide && (
+                      <p className="adm-notice" style={{ color: 'var(--accent-color)' }}>
+                        {loadingMessage || 'Recomposing into a wide banner…'}
+                      </p>
+                    )}
+                    <div className="adm-row" style={{ flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => void handleGenerateArtWide()}
+                        disabled={busyArtWide || !effectiveCoverUrl}
+                        className="adm-btn adm-btn--ghost adm-btn--sm"
+                      >
+                        {busyArtWide ? 'Working…' : effectiveCoverUrlWide ? 'Regenerate' : 'Generate from cover'}
+                      </button>
+                      <button onClick={() => coverInputWideRef.current?.click()} disabled={busyArtWide || busyCoverUploadWide} className="adm-btn adm-btn--ghost adm-btn--sm">
+                        {busyCoverUploadWide ? 'Uploading…' : effectiveCoverUrlWide ? 'Replace' : 'Upload your own'}
+                      </button>
+                      {effectiveCoverUrlWide && (
+                        <button onClick={handleDeleteCoverWide} disabled={busyArtWide || busyCoverUploadWide} className="adm-btn adm-btn--ghost adm-btn--sm">
+                          Delete
+                        </button>
+                      )}
+                      <input
+                        ref={coverInputWideRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleManualCoverUploadWide(f); e.target.value = ''; }}
+                      />
+                    </div>
+                    {manualCoverUrlWide && <p className="adm-notice">Your uploaded photo — takes priority over the AI one.</p>}
+                    {!effectiveCoverUrl && (
+                      <p className="adm-notice" style={{ opacity: 0.7 }}>
+                        Generate the square cover above first — the banner is composed from it.
+                      </p>
+                    )}
+                    <p className="adm-notice" style={{ opacity: 0.7 }}>
+                      Cropping/resizing tools aren't built yet — for now, upload an image already sized how you want it.
+                    </p>
                   </div>
                 </div>
               </div>

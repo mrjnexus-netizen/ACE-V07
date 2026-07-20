@@ -32,7 +32,12 @@ interface GenreGroup {
 }
 
 function coverOf(t: AudioTrack): string {
-  return t.coverArt?.url || (t as unknown as { coverUrl?: string }).coverUrl || '';
+  // 2026-07-19 (per Reza): prefer the separately-composed wide/banner
+  // version for this full-bleed band — falls back to the square (card)
+  // version for any track generated before coverUrlWide existed, so
+  // nothing breaks for already-published tracks; it just won't look as
+  // good as a freshly (re)generated one until the admin regenerates it.
+  return t.coverUrlWide || t.coverArt?.url || (t as unknown as { coverUrl?: string }).coverUrl || '';
 }
 
 const ROTATE_MS = 3000;

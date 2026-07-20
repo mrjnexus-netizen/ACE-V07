@@ -43,7 +43,7 @@ export interface TextProvider {
 export interface ImageProvider {
   id: string;
   label: string;
-  compatMode: 'openai-image' | 'stability' | 'replicate' | 'gemini-image' | 'huggingface' | 'pollinations' | 'deepai' | 'clipdrop' | 'ideogram' | 'leonardo';
+  compatMode: 'openai-image' | 'stability' | 'replicate' | 'gemini-image' | 'gemini-native-image' | 'huggingface' | 'pollinations' | 'deepai' | 'clipdrop' | 'ideogram' | 'leonardo';
   baseUrl: string;
   models: ProviderModel[];
   keyName: string;
@@ -233,14 +233,24 @@ export const IMAGE_PROVIDERS: ImageProvider[] = [
     tier: 'paid',
   },
   {
+    // 2026-07-19: migrated off the Imagen 4 family (imagen-4.0-*) per
+    // Google's own deprecation notice — the entire Imagen line is being
+    // shut down (full family retirement by 2026-08-17; some preview
+    // variants were already shut down 2026-02-17). Google's official
+    // migration path is its Gemini-native image models ("Nano Banana"),
+    // which use the standard :generateContent endpoint (inlineData in
+    // the response) instead of Imagen's :predict/instances shape — see
+    // the new 'gemini-native-image' compatMode below. Kept the same
+    // provider id + keyName so Reza's existing stored API key in
+    // Gatekeeper Hub keeps working with zero reconfiguration.
     id: 'gemini-image',
-    label: 'Google Gemini (Imagen)',
-    compatMode: 'gemini-image',
+    label: 'Google Gemini (Nano Banana)',
+    compatMode: 'gemini-native-image',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
     models: [
-      { id: 'imagen-4.0-fast-generate-001', label: 'Imagen 4 Fast (cheapest, fastest)', quality: 3 },
-      { id: 'imagen-4.0-generate-001', label: 'Imagen 4 (standard)', quality: 4 },
-      { id: 'imagen-4.0-ultra-generate-001', label: 'Imagen 4 Ultra (highest quality)', quality: 5 },
+      { id: 'gemini-2.5-flash-image', label: 'Nano Banana (cheapest, fastest)', quality: 3 },
+      { id: 'gemini-3.1-flash-image-preview', label: 'Nano Banana 2 (fast, higher quality)', quality: 4 },
+      { id: 'gemini-3-pro-image-preview', label: 'Nano Banana Pro (highest quality)', quality: 5 },
     ],
     keyName: 'AI_PROVIDER_KEY_GEMINI_IMAGE',
     docsUrl: 'https://aistudio.google.com/app/apikey',
@@ -625,6 +635,11 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     return Buffer.from(await img.arrayBuffer());
   }
 
+  // Legacy Imagen (:predict / instances-and-predictions shape). Kept only
+  // so this doesn't hard-crash if a stale model override in the DB still
+  // points at an old imagen-4.0-* id; the Imagen family itself is being
+  // shut down by Google (full retirement 2026-08-17) so this path should
+  // no longer be reachable via the provider registry above.
   if (provider.compatMode === 'gemini-image') {
     const url = `${provider.baseUrl}/${model}:predict?key=${apiKey}`;
     const res = await fetchWithTimeout(url, {
@@ -635,6 +650,32 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
     if (!res.ok) throw new Error(await friendlyProviderError(provider.label, res.status, res));
     const data = await res.json();
     const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+    if (!b64) throw new Error(`${provider.label} returned no image.`);
+    return Buffer.from(b64, 'base64');
+  }
+
+  // Current Gemini image models ("Nano Banana" family: gemini-2.5-flash-image,
+  // gemini-3.1-flash-image-preview, gemini-3-pro-image-preview) — these speak
+  // the standard :generateContent endpoint (same shape as Gemini text calls),
+  // NOT Imagen's :predict/instances shape. The generated image comes back as
+  // inline_data (base64) inside one of the response's content parts, mixed in
+  // with any text parts the model may also return, so we scan for it.
+  if (provider.compatMode === 'gemini-native-image') {
+    const url = `${provider.baseUrl}/${model}:generateContent?key=${apiKey}`;
+    const res = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    });
+    if (!res.ok) throw new Error(await friendlyProviderError(provider.label, res.status, res));
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts as
+      | Array<{ inlineData?: { data?: string }; inline_data?: { data?: string } }>
+      | undefined;
+    const imagePart = parts?.find(p => p.inlineData?.data || p.inline_data?.data);
+    const b64 = imagePart?.inlineData?.data ?? imagePart?.inline_data?.data;
     if (!b64) throw new Error(`${provider.label} returned no image.`);
     return Buffer.from(b64, 'base64');
   }
@@ -736,4 +777,56 @@ export async function callImageProvider(provider: ImageProvider, model: string, 
   }
 
   throw new Error(`Unsupported image provider compatMode: ${provider.compatMode}`);
+}
+
+// 2026-07-19 (per Reza): "Cover Art" and "Banner" now have fully
+// independent Generate buttons in the admin UI — the banner's button
+// doesn't roll a brand-new random image, it RECOMPOSES the already-
+// generated square cover into a wide banner, so the two stay visually
+// identical (same subject/lighting/palette), just reframed. This needs
+// an image-input-capable provider, which today only means the configured
+// Gemini "Nano Banana" provider (gemini-native-image compatMode) — its
+// :generateContent endpoint accepts an inlineData image part alongside
+// the text instruction. No other provider registered here supports
+// image-conditioned generation, so this throws a clear, specific error
+// for anything else; aiArtGenerator.ts's caller catches that and falls
+// back to a fresh TEXT-ONLY wide generation via Pollinations instead.
+export async function callImageProviderWithReference(
+  provider: ImageProvider,
+  model: string,
+  apiKey: string,
+  prompt: string,
+  referenceImageBase64: string,
+  referenceMimeType: string
+): Promise<Buffer> {
+  if (provider.compatMode === 'gemini-native-image') {
+    const url = `${provider.baseUrl}/${model}:generateContent?key=${apiKey}`;
+    const res = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inlineData: { mimeType: referenceMimeType, data: referenceImageBase64 } },
+            { text: prompt },
+          ],
+        }],
+      }),
+    });
+    if (!res.ok) throw new Error(await friendlyProviderError(provider.label, res.status, res));
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts as
+      | Array<{ inlineData?: { data?: string }; inline_data?: { data?: string } }>
+      | undefined;
+    const imagePart = parts?.find(p => p.inlineData?.data || p.inline_data?.data);
+    const b64 = imagePart?.inlineData?.data ?? imagePart?.inline_data?.data;
+    if (!b64) throw new Error(`${provider.label} returned no image.`);
+    return Buffer.from(b64, 'base64');
+  }
+
+  throw new Error(
+    `${provider.label} does not support image-reference (image-to-image) generation — ` +
+    `only the Gemini Nano Banana provider does. Pick that as the active image provider ` +
+    `in Gatekeeper Hub to use "recompose from square" for the wide banner.`
+  );
 }

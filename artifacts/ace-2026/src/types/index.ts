@@ -104,6 +104,11 @@ export interface AudioTrack {
   // what the API/UI use in practice (2026-07-10). coverArt above stays
   // for now in case something else still relies on the richer shape.
   coverUrl: string | null;
+  // 2026-07-19 (per Reza): separately-generated landscape/banner version
+  // of the cover art, matching tracks.cover_url_wide. Used by
+  // ComposerPresence.tsx's full-bleed rotating band; falls back to
+  // coverUrl for tracks generated before this existed.
+  coverUrlWide: string | null;
   genre: 'cinematic' | 'gaming' | 'animation' | 'ambient';
   bpm: number | null;
   mood: string | null;
@@ -169,6 +174,10 @@ export interface PipelineJob {
   progress: number;
   audioMetadata: AudioMetadata | null;
   generatedArtUrl: string | null;
+  // 2026-07-19 (per Reza): square cover and wide banner are now two
+  // independent Generate buttons — tracked separately so each has its
+  // own live progress/result in the admin panel.
+  generatedArtUrlWide: string | null;
   generatedNarrative: MultiLingual | null;
   errorMessage: string | null;
 }
