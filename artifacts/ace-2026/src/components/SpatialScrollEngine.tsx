@@ -288,6 +288,11 @@ export default function SpatialScrollEngine() {
     return () => window.removeEventListener('resize', c);
   }, []);
   const isMobile = dims.w < 768;
+  // 2026-07-20 (per Reza): tablet-only stagger for the two side panels —
+  // left text down a touch, right text up a touch, purely a tablet
+  // aesthetic tweak, no effect on desktop or the separate mobile branch.
+  const isTablet = dims.w >= 768 && dims.w < 1200;
+  const tabletPanelOffset = isTablet ? 18 : 0; // px
 
   // ----- DATA PLUMBING (unchanged) -----
   const cards = useMemo<ConceptCard[]>(() => {
@@ -431,7 +436,20 @@ export default function SpatialScrollEngine() {
   }, [isMobile]);
 
   // Ring geometry — evenly spaced, clamped to always fit the viewport.
-  const radius = Math.min(360, Math.round(dims.h * 0.4), Math.round(dims.w * 0.26));
+  // 2026-07-20 (per Reza): on tablet-portrait widths, width was the
+  // binding constraint here while the pinned section's height (tied to
+  // dims.h, which is tall on a portrait tablet) stayed large — the ring
+  // rendered small and left a lot of unused empty space above/below it.
+  // Raising the width factor only actually changes anything when width
+  // IS the tighter constraint (narrower/taller viewports like tablets);
+  // wide desktop windows are still governed by the same 360px cap as
+  // before, so this doesn't touch the already-tuned desktop look.
+  // 2026-07-20 round 2: 0.32 fixed that but amplified a SEPARATE effect —
+  // the helix's vertical swing (frontY below, proportional to radius)
+  // pushes the whole ring further from center at scroll-start, widening
+  // the empty gap above it where the title sits. 0.29 is the balance
+  // point between "ring too small" and "ring swings too far off-center".
+  const radius = Math.min(360, Math.round(dims.h * 0.4), Math.round(dims.w * 0.29));
   const radiusRef = useRef(radius);
   radiusRef.current = radius;
   const cardW = Math.round(radius * 0.5);
@@ -491,7 +509,7 @@ export default function SpatialScrollEngine() {
 
   // ----- DESKTOP: the orbital ring around the luminous core. -----
   return (
-    <section ref={sectionRef} id="selected-works-orbit" className="relative" style={{ height: `${N * 90}vh`, marginTop: '16vh' }}>
+    <section ref={sectionRef} id="selected-works-orbit" className="relative" style={{ height: `${N * 90}vh`, marginTop: 'clamp(6rem, 16vh, 10rem)' }}>
       <style>{SSE_STYLES}</style>
       <div ref={stageRef} className="absolute left-0 right-0 top-0 h-screen overflow-hidden" style={{ willChange: 'transform' }}>
         <div className="absolute left-0 right-0 top-0 pointer-events-none" style={{ height: 140, background: 'linear-gradient(to bottom, var(--surface-color), transparent)', zIndex: 30 }} />
@@ -506,8 +524,19 @@ export default function SpatialScrollEngine() {
         </div>
 
         {/* Editorial panel — always the true front card (exactly one, by construction). */}
-        <div className="absolute z-20" style={{ top: '50%', left: '5%', transform: 'translateY(-50%)', width: 'min(21vw, 310px)' }}>
-          <motion.div key={frontIndex} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
+        <div className="absolute z-20" style={{ top: '50%', left: '5%', transform: `translateY(calc(-50% + ${tabletPanelOffset}px))`, width: 'min(21vw, 310px)' }}>
+          <motion.div
+            key={frontIndex}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              maxHeight: 'clamp(200px, 32vh, 340px)',
+              overflow: 'hidden',
+              maskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
+            }}
+          >
             <div className="flex items-baseline gap-3 mb-3">
               <span className="text-[0.66rem] uppercase tracking-[0.22em] text-[var(--accent-color)] font-mono">{t(activeCard.concept)}</span>
               {activeYear ? <span className="text-[0.66rem] text-[var(--text-muted-color)] font-mono">{activeYear}</span> : null}
@@ -537,8 +566,19 @@ export default function SpatialScrollEngine() {
               itself never moves; only the text inside re-balances.
             - marginLeft:'auto' keeps the (possibly narrower) balanced text
               flush against the box's own right edge, next to the border. */}
-        <div className="absolute z-20 text-right" style={{ top: '50%', right: '5%', transform: 'translateY(-50%)', width: 'min(21vw, 310px)', borderRight: '1px solid rgba(var(--accent-rgb),0.4)', paddingRight: 13 }}>
-          <motion.div key={`line-${frontIndex}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}>
+        <div className="absolute z-20 text-right" style={{ top: '50%', right: '5%', transform: `translateY(calc(-50% - ${tabletPanelOffset}px))`, width: 'min(21vw, 310px)', borderRight: '1px solid rgba(var(--accent-rgb),0.4)', paddingRight: 13 }}>
+          <motion.div
+            key={`line-${frontIndex}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+            style={{
+              maxHeight: 'clamp(200px, 32vh, 340px)',
+              overflow: 'hidden',
+              maskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
+            }}
+          >
             <p ref={lineRef} className="font-display italic" style={{ fontSize: 'clamp(0.95rem, 1.2vw, 1.1rem)', lineHeight: 1.5, color: 'rgba(var(--accent-rgb),0.92)', marginLeft: 'auto' }}>
               <EditableText contentKey={`works.quote.${frontIndex}`} defaultValue={t(activeLine)} as="span" />
             </p>

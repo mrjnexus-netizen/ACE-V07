@@ -556,8 +556,8 @@ html.lenis body { height: auto; }
   transition: transform var(--btn-slow) var(--btn-ease), box-shadow var(--btn-slow) var(--btn-ease);
 }
 .btn--media.btn--media-sm {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
 }
 .btn--media .ring {
   position: absolute;
@@ -566,6 +566,13 @@ html.lenis body { height: auto; }
   border: 1px solid rgba(var(--accent-rgb), 0.5);
   animation: btnRing 3.2s ease-in-out infinite;
   pointer-events: none;
+}
+/* 2026-07-20 round 2 (per Reza — still felt too big/sticking out at
+   -4px): tightened further. The 56px-tall mobile bar only has ~48px of
+   usable height after its own padding, so this ring needs real
+   clearance, not just "less than before". */
+.btn--media.btn--media-sm .ring {
+  inset: -2px;
 }
 .btn--media:hover {
   transform: scale(1.04);
@@ -3537,5 +3544,67 @@ p, blockquote, figcaption, .text-wrap-pretty {
   .works-gallery-overlay *::before,
   .works-gallery-overlay *::after {
     cursor: none !important;
+  }
+}
+
+/* 2026-07-20 (per Reza): the video drawer (AudioContext.tsx) needs its
+   own mechanism on small screens — the desktop version (a centered,
+   rounded, max-960px box) reads as a cramped floating rectangle on a
+   phone/tablet. Mobile/tablet gets a full-width, square-cornered,
+   taller panel instead — basically a proper takeover of the space
+   above the (also full-width, on mobile) persistent bar, not a shrunk
+   copy of the desktop layout. */
+.ace-video-drawer-inner {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 1rem;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  position: relative;
+}
+/* 2026-07-20 round 2 (per Reza — "isn't this a bit ugly?", correctly):
+   object-fit was left at its browser default (no cover/contain), which
+   letterboxed almost any real-world video with visible flat black bars
+   top/bottom or side/side — reads as broken, not premium. cover fills
+   the frame completely (cropping slightly rather than padding with
+   black), which is what every polished video surface on this site
+   already does elsewhere. A soft gradient fade at the very top blends
+   the drawer into whatever's behind it instead of a hard black edge, so
+   it reads as sliding elegantly into place rather than a box slapped on
+   top of the page. */
+.ace-video-drawer-inner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));
+  pointer-events: none;
+  z-index: 1;
+}
+.ace-video-drawer-video {
+  width: 100%;
+  height: 62vh;
+  max-height: 62vh;
+  display: block;
+  background: #000;
+  object-fit: cover;
+}
+@media (max-width: 767px) {
+  .ace-video-drawer-inner {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .ace-video-drawer-video {
+    height: 52vh;
+    max-height: 52vh;
   }
 }

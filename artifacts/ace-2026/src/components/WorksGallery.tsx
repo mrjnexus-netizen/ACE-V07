@@ -743,6 +743,7 @@ function OverlayPanel({
         data-cursor="text"
         className="btn btn--icon absolute"
         style={{
+          position: 'absolute',
           zIndex: 2,
           top: 'clamp(1.25rem, 3vw, 2.25rem)',
           right: 'clamp(1.25rem, 4vw, 3rem)',

@@ -117,7 +117,7 @@ export default function PersistentAudioPlayer() {
         </div>
       </div>
       <div className="flex md:hidden flex-col h-full" style={{ color: 'var(--text-color)' }}>
-        <div className="flex items-center px-3 py-1 gap-3">
+        <div className="flex items-center px-3 py-1 gap-3" style={{ transform: 'translateY(2px)' }}>
           <div className="flex items-center gap-3 flex-1 min-w-0" onClick={handleMobileExpand}>
             <div className="w-[36px] h-[36px] rounded overflow-hidden bg-[var(--surface3-color)] flex-shrink-0">
               {coverUrl && <img src={coverUrl} alt={title} className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} onLoad={() => setImageLoaded(true)} />}

@@ -52,12 +52,17 @@ function localText(
 
 // 2026-07-17 (site-wide responsive audit, per Reza): same reasoning as the
 // identical helper in LinguisticPortal.tsx — a plain width check routed
-// portrait tablets (768-1023px wide, taller than wide) into the DESKTOP
+// portrait tablets (768-1024px wide, taller than wide) into the DESKTOP
 // 1600x900 landscape composition, scaled down small with dead space
 // top/bottom, instead of the vertically-built MOB_W x MOB_H one actually
 // designed for that shape.
+// 2026-07-20 (per Reza): iPad Pro's exact width (1024px) was falling just
+// OUTSIDE the "< 1024" check below — off-by-one on a real, common device
+// size — so it fell straight through to the 100vh desktop layout with a
+// huge unused gap under the portrait, exactly what this comment already
+// describes as the bug being guarded against. <= 1024 actually catches it.
 function isMobileLayoutWidth(width: number, height: number): boolean {
-  return width < 768 || (width < 1024 && height > width);
+  return width < 768 || (width <= 1024 && height > width);
 }
 
 function useIsMobile(): boolean {

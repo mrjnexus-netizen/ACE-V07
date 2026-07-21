@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
 /**
@@ -117,6 +117,18 @@ export default function CreatorMark() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // 2026-07-20 (per Reza): on tablet only, the modal should sit directly
+  // above the Mr.J seal with no gap, instead of dead-center on screen.
+  // Computed live from the seal's actual on-screen position at the
+  // moment it's opened (not a guessed fixed offset) — the seal sits in
+  // the footer, so its exact position depends on scroll position.
+  const [tabletAnchorStyle, setTabletAnchorStyle] = useState<CSSProperties | null>(null);
+  // 2026-07-20 (per Reza — closes itself ~1s after opening, mobile/tablet
+  // only): extra safety on top of switching the backdrop from onMouseDown
+  // to onClick below — ignores any close-trigger in the first 400ms after
+  // opening, in case a touch device's delayed synthetic click event still
+  // gets through by some other path.
+  const openedAtRef = useRef(0);
 
   // 2026-07-18 (per Reza, final polish pass): opening had a CSS entrance
   // animation, but closing had none at all — clicking Close just
@@ -127,11 +139,39 @@ export default function CreatorMark() {
   // framer-motion's AnimatePresence.
   const CLOSE_MS = 320;
   const handleClose = () => {
+    if (Date.now() - openedAtRef.current < 400) return; // guard — see note above
     setClosing(true);
     window.setTimeout(() => {
       setOpen(false);
       setClosing(false);
+      setTabletAnchorStyle(null);
     }, CLOSE_MS);
+  };
+  const handleOpen = () => {
+    openedAtRef.current = Date.now();
+    const isTablet = window.innerWidth >= 768 && window.innerWidth < 1200;
+    const btn = buttonRef.current;
+    if (isTablet && btn) {
+      const r = btn.getBoundingClientRect();
+      const boxWidth = Math.min(window.innerWidth * 0.88, 380);
+      // Right above the seal, horizontally centered on it, no gap —
+      // clamped so it never runs off the left/right/top edge of the
+      // viewport if the seal happens to sit near a corner.
+      const left = Math.min(
+        Math.max(8, r.left + r.width / 2 - boxWidth / 2),
+        window.innerWidth - boxWidth - 8
+      );
+      setTabletAnchorStyle({
+        position: 'fixed',
+        left,
+        bottom: Math.max(8, window.innerHeight - r.top),
+        top: 'auto',
+        margin: 0,
+      });
+    } else {
+      setTabletAnchorStyle(null);
+    }
+    setOpen(true);
   };
 
   // Belt-and-suspenders click handling, kept from earlier rounds even
@@ -140,7 +180,7 @@ export default function CreatorMark() {
   useEffect(() => {
     const el = buttonRef.current;
     if (!el) return;
-    const onNativeClick = () => setOpen(true);
+    const onNativeClick = () => handleOpen();
     el.addEventListener('click', onNativeClick);
     return () => el.removeEventListener('click', onNativeClick);
   }, []);
@@ -158,8 +198,8 @@ export default function CreatorMark() {
         ref={buttonRef}
         type="button"
         className="crm-seal"
-        onClick={() => setOpen(true)}
-        onPointerUp={() => setOpen(true)}
+        onClick={() => handleOpen()}
+        onPointerUp={() => handleOpen()}
         aria-label="A small seal — click for the full credit"
       >
         <div className="crm-seal-plaque">
@@ -180,8 +220,8 @@ export default function CreatorMark() {
       {open &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className={`crm-fs-backdrop ${closing ? 'crm-fs-closing' : ''}`} onMouseDown={handleClose}>
-            <div className={`crm-fs-box ${closing ? 'crm-fs-closing' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
+          <div className={`crm-fs-backdrop ${closing ? 'crm-fs-closing' : ''}`} onClick={handleClose}>
+            <div className={`crm-fs-box ${closing ? 'crm-fs-closing' : ''}`} onClick={(e) => e.stopPropagation()} style={tabletAnchorStyle ?? undefined}>
               <div className="crm-fs-frame">
                 <video
                   className="crm-fs-video"
