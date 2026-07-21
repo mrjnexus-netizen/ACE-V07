@@ -273,6 +273,13 @@ export default function SpatialScrollEngine() {
     h: typeof window !== 'undefined' ? window.innerHeight : 900,
   }));
   const [frontIndex, setFrontIndex] = useState(0);
+  // 2026-07-21 (per Reza): the caption text is clamped to 2 lines with a
+  // "See more" button instead of the previous fade-out — this tracks
+  // whether the CURRENT card's caption is expanded, and resets to
+  // collapsed the moment the front card changes (nobody wants the NEXT
+  // card's caption to silently start pre-expanded).
+  const [descExpanded, setDescExpanded] = useState(false);
+  useEffect(() => { setDescExpanded(false); }, [frontIndex]);
   const [started, setStarted] = useState(false);
 
   // Rotation is driven by SCROLL ONLY now — hovering never rotates the
@@ -523,19 +530,18 @@ export default function SpatialScrollEngine() {
           <div style={{ marginTop: 12, width: 60, height: 1, background: 'linear-gradient(to right, rgba(var(--accent-rgb),0.75), transparent)' }} />
         </div>
 
-        {/* Editorial panel — always the true front card (exactly one, by construction). */}
-        <div className="absolute z-20" style={{ top: '50%', left: '5%', transform: `translateY(calc(-50% + ${tabletPanelOffset}px))`, width: 'min(21vw, 310px)' }}>
+        {/* Editorial panel — always the true front card (exactly one, by
+            construction). 2026-07-21 (per Reza): top-aligned now, not
+            vertically centered — the top edge is a fixed, stable point
+            (matching the mirror panel's top exactly), text grows downward
+            from there instead of the whole block re-centering as content
+            length changes. */}
+        <div className="absolute z-20" style={{ top: '46%', left: '5%', marginTop: tabletPanelOffset, width: 'min(21vw, 310px)' }}>
           <motion.div
             key={frontIndex}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              maxHeight: 'clamp(200px, 32vh, 340px)',
-              overflow: 'hidden',
-              maskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
-            }}
           >
             <div className="flex items-baseline gap-3 mb-3">
               <span className="text-[0.66rem] uppercase tracking-[0.22em] text-[var(--accent-color)] font-mono">{t(activeCard.concept)}</span>
@@ -545,9 +551,42 @@ export default function SpatialScrollEngine() {
               {activeTitle}
             </h3>
             {activeDesc && (
-              <p ref={descRef} className="text-[var(--text-muted-color)]" style={{ fontSize: 15, lineHeight: 1.7, marginBottom: 16 }}>
-                {activeDesc}
-              </p>
+              <>
+                {/* 2026-07-21 (per Reza): was an unbounded height with a
+                    fade-out past a certain point — meant well (keeps the
+                    card from growing into the ring) but silently hides
+                    part of the actual caption with no way to read the
+                    rest. A real 2-line clamp + explicit "See more" toggle
+                    is honest about what's hidden and lets anyone who
+                    wants the full text actually get it. */}
+                <p
+                  ref={descRef}
+                  className="text-[var(--text-muted-color)]"
+                  style={
+                    descExpanded
+                      ? { fontSize: 15, lineHeight: 1.7, marginBottom: 8 }
+                      : {
+                          fontSize: 15,
+                          lineHeight: 1.7,
+                          marginBottom: 8,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }
+                  }
+                >
+                  {activeDesc}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setDescExpanded((v) => !v)}
+                  className="font-mono uppercase hover:text-[var(--accent-color)]"
+                  style={{ fontSize: '0.62rem', letterSpacing: '0.18em', color: 'var(--text-dim-color)', marginBottom: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                >
+                  {descExpanded ? t('Show less') : t('See more')}
+                </button>
+              </>
             )}
             {!activeCard.track && (
               <p className="text-[0.64rem] uppercase tracking-[0.26em] text-[var(--text-dim-color)] font-mono mt-4">{t('In composition')}</p>
@@ -566,7 +605,7 @@ export default function SpatialScrollEngine() {
               itself never moves; only the text inside re-balances.
             - marginLeft:'auto' keeps the (possibly narrower) balanced text
               flush against the box's own right edge, next to the border. */}
-        <div className="absolute z-20 text-right" style={{ top: '50%', right: '5%', transform: `translateY(calc(-50% - ${tabletPanelOffset}px))`, width: 'min(21vw, 310px)', borderRight: '1px solid rgba(var(--accent-rgb),0.4)', paddingRight: 13 }}>
+        <div className="absolute z-20 text-right" style={{ top: '46%', right: '5%', marginTop: -tabletPanelOffset, width: 'min(21vw, 310px)', borderRight: '1px solid rgba(var(--accent-rgb),0.4)', paddingRight: 13 }}>
           <motion.div
             key={`line-${frontIndex}`}
             initial={{ opacity: 0, y: 12 }}
