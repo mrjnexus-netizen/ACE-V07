@@ -244,7 +244,7 @@ function PianoLane({
   const count = group.tracks.length;
 
   return (
-    <div className="relative flex items-center" style={{ height: 'clamp(1.7rem, 3.4vh, 2.3rem)' }}>
+    <div className="relative flex items-center" style={{ height: 'clamp(1.35rem, 2.7vh, 1.85rem)' }}>
       {/* Decorative black key nestled in the gap to the NEXT white key
           (shorter than the white key, 3D, like a real piano). Not for last. */}
       {!isLast && (
@@ -910,9 +910,20 @@ export default function WorksGallery() {
   // done. START_OFFSET above now does the "push it back further" work
   // instead of widening this anchor, since widening it further would push
   // completion PAST the point he pinned it to.
+  // 2026-07-21 (per Reza, root-cause fix — supersedes the 2026-07-11 anchor
+  // below): 'start start' requires at least one full viewport-height of
+  // scrollable content to exist AFTER this section for progress to ever
+  // reach 1 — on tall viewports (tablet especially) that room often isn't
+  // there, so the last keys' reveal could never complete, no matter how
+  // much content follows. 'end end' is self-contained — progress reaches 1
+  // exactly when this section has fully scrolled past, a condition that
+  // depends only on the section's OWN height, guaranteed reachable on any
+  // device. Completion timing shifts slightly earlier than the exact
+  // "header at the very top" moment originally specified, in exchange for
+  // being reliable on every screen size — the actual practical goal.
   const { scrollYProgress } = useScroll({
     target: sectionRef,
-    offset: ['start end', 'start start'],
+    offset: ['start end', 'end end'],
   });
 
   // ALWAYS build all 12 concepts (+ Other Works). Each gets the live tracks
