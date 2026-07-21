@@ -36,7 +36,7 @@ export default function SoundToggle() {
       whileHover={{ scale: 1.06 }}
       className="fixed flex items-center justify-center"
       style={{
-        top: '1.1rem',
+        top: 0,
         left: '1.1rem',
         zIndex: 250,
         width: 48,
