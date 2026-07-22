@@ -148,17 +148,51 @@ function playNote(freq: number) {
 // One track card's caption, balanced independently (each card needs its own
 // hook instance — cannot call useBalancedText conditionally inside a .map).
 function TrackCaption({ text }: { text: string }) {
-  const ref = useBalancedText<HTMLParagraphElement>('center');
-  // marginLeft/Right auto centers this block within its parent, but that
-  // alone does NOT center the text lines inside it — without
-  // textAlign:'center' too, multi-line text still wraps ragged-left
-  // starting from the (now-centered) block's own left edge, which is
-  // exactly what read as the caption "bunching to one side" under the
-  // carousel's centered focus card (2026-07-14, per Reza).
+  const ref = useBalancedText<HTMLParagraphElement>('justify');
+  const { t } = useT();
+  // 2026-07-22 (per Reza): long captions could run on indefinitely under
+  // the focused card — clamped to 2 lines with an explicit "See more" /
+  // "Show less" toggle instead, same pattern as the ring-card captions in
+  // SpatialScrollEngine.tsx. Resets to collapsed whenever the caption
+  // text itself changes (i.e. a different track becomes focused) so the
+  // next card never silently starts pre-expanded.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { setExpanded(false); }, [text]);
+  // Note: text-align is controlled entirely by useBalancedText's own
+  // `align` param above (it writes el.style.textAlign imperatively on
+  // every render, which would silently overwrite any textAlign set here
+  // via React's style prop) — do NOT set textAlign in this component's
+  // own inline styles below, it would have no visible effect.
   return (
-    <p ref={ref} className="font-display font-light mt-2" style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)', marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' }}>
-      {text}
-    </p>
+    <div style={{ marginTop: '0.5rem', marginLeft: 'auto', marginRight: 'auto' }}>
+      <p
+        ref={ref}
+        className="font-display font-light"
+        style={
+          expanded
+            ? { fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text-dim-color)' }
+            : {
+                fontSize: '0.9rem',
+                lineHeight: 1.55,
+                color: 'var(--text-dim-color)',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }
+        }
+      >
+        {text}
+      </p>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="mt-1 text-xs underline"
+        style={{ color: 'var(--accent-color)', pointerEvents: 'auto' }}
+      >
+        {expanded ? t('Show less') : t('See more')}
+      </button>
+    </div>
   );
 }
 
