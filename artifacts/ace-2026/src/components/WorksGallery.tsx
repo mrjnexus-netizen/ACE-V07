@@ -288,7 +288,7 @@ function PianoLane({
           style={{
             left: 0,
             bottom: 'calc(-1 * clamp(0.15rem, 0.35vh, 0.25rem) - 0.5px)',
-            width: `clamp(2rem, ${widthVW * 0.6}vw, ${widthVW * 0.4}rem)`,
+            width: `clamp(1rem, ${widthVW * 0.6}vw, ${widthVW * 0.4}rem)`,
             height: 'clamp(1.36rem, 2.72vh, 1.84rem)',
             transform: 'translateY(50%)',
             opacity,
@@ -325,7 +325,7 @@ function PianoLane({
         style={{
           x,
           opacity,
-          width: `clamp(3rem, ${widthVW}vw, ${widthVW * 0.6}rem)`,
+          width: `clamp(1.5rem, ${widthVW}vw, ${widthVW * 0.6}rem)`,
           transformOrigin: 'left center',
         }}
         aria-label={`${t('Explore')} ${t(group.label)} (${count} ${count === 1 ? t('track') : t('tracks')})`}

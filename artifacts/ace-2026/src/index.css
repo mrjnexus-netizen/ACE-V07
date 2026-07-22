@@ -3854,3 +3854,37 @@ p, blockquote, figcaption, .text-wrap-pretty {
   font-size: 9px;
   letter-spacing: 0.08em;
 }
+
+/* ============================================================
+   2026-07-22 (per Reza -- Mr.J modal + Studio Bot chat panel too
+   big on mobile). Both boxes size themselves as a percentage of
+   viewport width, which reads fine on tablet/desktop but eats most
+   of a narrow phone screen. Mobile-only overrides, scaled down
+   proportionally -- desktop/tablet completely untouched.
+   ============================================================ */
+@media (max-width: 767px) {
+  .crm-fs-box {
+    width: min(68vw, 250px);
+    padding: 1rem 0.9rem 1.15rem;
+    gap: 0.55rem;
+  }
+  .crm-fs-frame {
+    width: min(24vh, 150px);
+  }
+  .csb-panel {
+    width: min(66vw, 215px) !important;
+  }
+}
+
+/* 2026-07-22 (per Reza -- chat panel's right edge/input cut off on
+   mobile after the narrower width was applied): flex children (the
+   <input>) default to min-width:auto, which keeps them at their
+   intrinsic content width and prevents shrinking to fit a narrower
+   flex row -- the classic flexbox overflow gotcha. min-width:0 lets
+   it actually shrink to fit the now-narrower panel. */
+.csb-input {
+  min-width: 0;
+}
+.csb-panel form {
+  min-width: 0;
+}
