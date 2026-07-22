@@ -625,6 +625,7 @@ html.lenis body { height: auto; }
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   height: 30px;
   border-radius: 999px;
   padding: 0 8px;
