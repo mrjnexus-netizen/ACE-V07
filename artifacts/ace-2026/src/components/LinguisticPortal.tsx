@@ -320,7 +320,7 @@ const StarfieldCanvas = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRe
   return (
     <Canvas
       key={canvasKey}
-      style={{ position: 'fixed', inset: 0, zIndex: -1 }}
+      style={{ position: 'fixed', inset: 0, zIndex: -1, willChange: 'transform' }}
       camera={{ fov: 75, near: 0.1, far: 100 }}
       onCreated={(state) => {
         onRecoveryCreated(state);

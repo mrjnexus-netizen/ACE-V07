@@ -313,7 +313,7 @@ export default function ExecutiveStudioBot() {
                               }
                         }
                       >
-                        <p>{msg.role === 'bot' ? t(msg.text) : msg.text}</p>
+                        <p className="csb-message-text">{msg.role === 'bot' ? t(msg.text) : msg.text}</p>
                         {msg.trackId && (
                           <button
                             onClick={() => {
@@ -326,7 +326,7 @@ export default function ExecutiveStudioBot() {
                             {'\u25B6 ' + t('Play Track')}
                           </button>
                         )}
-                        <span className="block text-[9px] mt-1 opacity-50">
+                        <span className="block mt-1 csb-timestamp">
                           {new Date(msg.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
@@ -356,15 +356,14 @@ export default function ExecutiveStudioBot() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={t('Type a message...')}
-                    className="flex-1 px-2.5 py-1.5 rounded-lg text-[12.5px] outline-none"
+                    className="flex-1 px-2.5 py-1.5 rounded-lg text-[12.5px] outline-none csb-input"
                     style={{ backgroundColor: 'var(--surface3-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)' }}
                     disabled={isLoading}
                   />
                   <button
                     type="submit"
                     disabled={isLoading || !input.trim()}
-                    className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-40 csb-send"
-                    style={{ background: 'linear-gradient(135deg, var(--accent-color), var(--accent2-color))', color: 'var(--surface-color)' }}
+                    className="px-3 py-1.5 rounded-lg transition-all disabled:opacity-40 csb-send"
                   >
                     {t('Send')}
                   </button>

@@ -3625,3 +3625,232 @@ p, blockquote, figcaption, .text-wrap-pretty {
     cursor: none !important;
   }
 }
+
+/* ============================================================
+   2026-07-21 (per Reza -- "cheap, not luxury") ExecutiveStudioBot
+   round 2: typography, bubble shape, timestamp, and Send button
+   brought in line with the site's established cinematic-luxury
+   language (serif display/body faces, mono for archival details,
+   thin gold hairlines, restrained gradients) instead of generic
+   Tailwind rounded-lg + flat gradient defaults. Additive only.
+   ============================================================ */
+.csb-panel {
+  border-radius: 16px;
+  position: relative;
+}
+/* Same top-sheen device already used on the video drawer -- a soft
+   light catching the panel's upper edge instead of a hard cut. */
+.csb-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, rgba(var(--accent-rgb), 0.08), transparent);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 16px 16px 0 0;
+}
+.csb-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.14em;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.csb-message-text {
+  font-family: var(--font-body);
+  line-height: 1.55;
+}
+/* Asymmetric corner -- the one corner nearest the sender reads as a
+   quiet point of origin, without a literal speech-bubble tail. */
+.csb-bubble {
+  border-radius: 12px;
+}
+.justify-end .csb-bubble {
+  border-radius: 12px 12px 3px 12px;
+}
+.justify-start .csb-bubble {
+  border-radius: 12px 12px 12px 3px;
+}
+.csb-timestamp {
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  font-size: 8.5px;
+  opacity: 0.45;
+}
+.csb-input {
+  font-family: var(--font-body);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.csb-input:focus {
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+/* Send: an outlined gold plaque, small-caps and letter-spaced, that
+   fills solid on hover -- replaces the flat filled gradient pill,
+   which read as a generic "CTA button" rather than a considered detail. */
+.csb-send {
+  font-family: var(--font-display);
+  letter-spacing: 0.12em;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: transparent !important;
+  color: var(--accent-color) !important;
+  border: 1px solid var(--accent-color);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.csb-send:not(:disabled):hover {
+  background: linear-gradient(135deg, var(--accent-color), var(--accent2-color)) !important;
+  color: var(--surface-color) !important;
+  box-shadow: 0 2px 14px rgba(var(--accent-rgb), 0.35);
+}
+
+/* ============================================================
+   2026-07-21 round 2 (per Reza -- "still blunt, not luminous/sexy"):
+   the round-1 pass was too timid to actually read as transformed.
+   This pass leans in: an ambient glow inside the panel, a gradient
+   gold-edge frame instead of a flat 1px line, glassy dimensional
+   bubbles instead of flat boxes, generous breathing room, and a
+   soft halo on the header icon and Send button for continuity with
+   the launcher's existing "breathing" glow language. Additive only.
+   ============================================================ */
+.csb-panel {
+  border: none !important;
+  background-clip: padding-box;
+}
+/* Gradient gold-edge frame, replacing the flat 1px --border-accent-color
+   line -- reads as a jeweled edge catching light rather than a ruled box. */
+.csb-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(160deg,
+    rgba(var(--accent-rgb), 0.65),
+    rgba(var(--accent-rgb), 0.1) 35%,
+    rgba(var(--accent-rgb), 0.05) 65%,
+    rgba(var(--accent-rgb), 0.5));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+}
+/* Ambient glow breathing inside the glass, centred behind the header --
+   this is the "luminous" quality: light seems to come from the widget
+   itself, not just sit on a flat dark surface. */
+.csb-panel::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 10%;
+  right: 10%;
+  height: 60%;
+  background: radial-gradient(ellipse at top, rgba(var(--accent-rgb), 0.16), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(4px);
+}
+.csb-panel > * {
+  position: relative;
+  z-index: 1;
+}
+.csb-panel {
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(var(--accent-rgb), 0.08) !important;
+}
+/* Header icon: a soft halo instead of a flat accent-colored glyph. */
+.csb-panel svg {
+  filter: drop-shadow(0 0 6px rgba(var(--accent-rgb), 0.55));
+}
+.csb-title {
+  font-size: 0.78rem;
+}
+/* More breathing room throughout -- the cramped padding was part of
+   what read as "cheap"; premium surfaces give content room to sit. */
+.csb-bubble {
+  padding: 0.7rem 0.85rem !important;
+}
+/* Glassy, dimensional bot bubble: soft translucent surface with a
+   gentle inner top highlight (like light grazing a beveled edge) and
+   its own faint outward glow, instead of a flat solid-colour box. */
+.justify-start .csb-bubble {
+  background: linear-gradient(165deg, rgba(var(--surface-rgb), 0.9), rgba(var(--surface-rgb), 0.6)) !important;
+  border: 1px solid rgba(var(--accent-rgb), 0.18) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 4px 18px rgba(0, 0, 0, 0.35),
+    0 0 20px rgba(var(--accent-rgb), 0.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.justify-end .csb-bubble {
+  box-shadow:
+    0 4px 20px rgba(var(--accent-rgb), 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.csb-message-text {
+  font-size: 12.75px;
+}
+/* Input: a soft idle glow (not just on focus) so the whole capsule
+   reads as lit rather than a plain dark rectangle waiting to be used. */
+.csb-input {
+  border-color: rgba(var(--accent-rgb), 0.22) !important;
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.05) inset;
+  padding: 0.55rem 0.8rem !important;
+}
+.csb-input:focus {
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16), 0 0 16px rgba(var(--accent-rgb), 0.2);
+}
+/* Send: pill-shaped, with its own quiet breathing halo at rest (same
+   keyframe language as the launcher button) so it visibly invites a
+   click rather than sitting inert until hovered. */
+.csb-send {
+  border-radius: 9999px;
+  padding: 0.5rem 1.1rem;
+  position: relative;
+  box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.3);
+  animation: csb-send-breathe 3.4s ease-in-out infinite;
+}
+@keyframes csb-send-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.22); }
+  50%      { box-shadow: 0 0 10px 2px rgba(var(--accent-rgb), 0.28); }
+}
+.csb-send:disabled {
+  animation: none;
+}
+.csb-launcher {
+  box-shadow: 0 6px 24px rgba(var(--accent-rgb), 0.25), 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+   2026-07-21 round 3 (per Reza -- buttons too big, touching the
+   frame edges, text too coarse). Scaling everything down and adding
+   real breathing room from the gold border frame. Additive only.
+   ============================================================ */
+.csb-panel > div:first-child {
+  padding: 0.85rem 1.1rem !important;
+}
+.csb-icon-btn {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+.csb-panel > div:first-child > span:last-child {
+  gap: 2px;
+}
+.csb-panel .flex-1.overflow-y-auto {
+  padding: 0.85rem 1.1rem !important;
+}
+.csb-panel form {
+  padding: 0.75rem 1.1rem !important;
+}
+.csb-send {
+  padding: 0.4rem 0.85rem;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
