@@ -209,6 +209,8 @@ export default function MusicTime({ pinnedActive, pinned }: MusicTimeProps = {})
 
   useEffect(() => {
     let raf = 0;
+    let cachedAccent = '212,175,55';
+    let accentFrameCounter = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
       if (!inViewRef.current) return;
@@ -222,7 +224,19 @@ export default function MusicTime({ pinnedActive, pinned }: MusicTimeProps = {})
       ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx2d.clearRect(0, 0, w, h);
 
-      const accent = getComputedStyle(canvas).getPropertyValue('--accent-rgb').trim() || '212,175,55';
+      // 2026-07-21 (per Reza — site-wide jank, root cause confirmed via
+      // Performance-trace analysis): getComputedStyle() forces a style
+      // recalc and was previously called on EVERY frame here (60/sec) to
+      // read a value that only actually changes on a language/theme
+      // switch. Now cached and refreshed only every 20 frames (~3x/sec,
+      // imperceptibly delayed for a color that changes on a big UI
+      // transition anyway) — this alone was ~2ms/frame in the trace.
+      accentFrameCounter++;
+      if (accentFrameCounter >= 20 || accentFrameCounter === 1) {
+        accentFrameCounter = 0;
+        cachedAccent = getComputedStyle(canvas).getPropertyValue('--accent-rgb').trim() || '212,175,55';
+      }
+      const accent = cachedAccent;
       const pointer = pointerRef.current;
 
       for (const s of stringsRef.current) {

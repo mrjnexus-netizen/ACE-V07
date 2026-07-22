@@ -174,16 +174,17 @@ export default function CreatorMark() {
     setOpen(true);
   };
 
-  // Belt-and-suspenders click handling, kept from earlier rounds even
-  // though the real bug turned out to be downstream of this (see file
-  // comment) — doesn't hurt to keep three independent trigger paths.
-  useEffect(() => {
-    const el = buttonRef.current;
-    if (!el) return;
-    const onNativeClick = () => handleOpen();
-    el.addEventListener('click', onNativeClick);
-    return () => el.removeEventListener('click', onNativeClick);
-  }, []);
+  // 2026-07-21 (per Reza — jank/freeze on open, root cause confirmed via
+  // PerformanceObserver longtask trace): this component previously had
+  // THREE independent triggers calling handleOpen() for a single click —
+  // this native listener, plus onClick AND onPointerUp on the button below.
+  // Each call re-ran getBoundingClientRect() + a setState (tabletAnchorStyle),
+  // forcing a reflow + re-render, so one physical click fired 3 reflow/
+  // render cycles back-to-back — measured as a burst of 50-80ms long tasks
+  // right at open. Removed; a single onClick is sufficient and was already
+  // proven to open reliably (the earlier "closes itself after ~1s" bug was
+  // fixed downstream, in the backdrop's mousedown->onClick switch — unrelated
+  // to which open-trigger is used).
 
   useEffect(() => {
     if (!open) return;
@@ -199,7 +200,6 @@ export default function CreatorMark() {
         type="button"
         className="crm-seal"
         onClick={() => handleOpen()}
-        onPointerUp={() => handleOpen()}
         aria-label="A small seal — click for the full credit"
       >
         <div className="crm-seal-plaque">
@@ -220,7 +220,7 @@ export default function CreatorMark() {
       {open &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className={`crm-fs-backdrop ${closing ? 'crm-fs-closing' : ''}`} onClick={handleClose}>
+          <div className={`crm-fs-backdrop creator-mark-overlay ${closing ? 'crm-fs-closing' : ''}`} onClick={handleClose}>
             <div className={`crm-fs-box ${closing ? 'crm-fs-closing' : ''}`} onClick={(e) => e.stopPropagation()} style={tabletAnchorStyle ?? undefined}>
               <div className="crm-fs-frame">
                 <video

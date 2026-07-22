@@ -3608,3 +3608,20 @@ p, blockquote, figcaption, .text-wrap-pretty {
     max-height: 52vh;
   }
 }
+
+@media (pointer: fine) {
+  .creator-mark-overlay,
+  .creator-mark-overlay *,
+  .creator-mark-overlay *::before,
+  .creator-mark-overlay *::after,
+  .csb-launcher,
+  .csb-launcher *,
+  .csb-launcher *::before,
+  .csb-launcher *::after,
+  .csb-panel,
+  .csb-panel *,
+  .csb-panel *::before,
+  .csb-panel *::after {
+    cursor: none !important;
+  }
+}

@@ -275,6 +275,17 @@ export default function SpatialScrollEngine() {
     h: typeof window !== 'undefined' ? window.innerHeight : 900,
   }));
   const [frontIndex, setFrontIndex] = useState(0);
+  // 2026-07-21 (per Reza — site-wide mouse/animation jank, root cause
+  // confirmed via Performance-trace analysis): setFrontIndex/setStarted
+  // were called unconditionally on EVERY animation frame (60/sec) inside
+  // the scroll-driven rAF loop below, even on the ~97% of frames where
+  // the value hadn't actually changed. Each call still enters React's
+  // scheduler/reconciler before bailing out, and that per-frame overhead
+  // was the single largest main-thread cost in the trace (bigger than
+  // React's own internal work). These refs let the loop check "did this
+  // actually change" itself and skip the setState call entirely when not.
+  const lastFrontIdxRef = useRef(0);
+  const startedRef = useRef(false);
   // 2026-07-21 (per Reza): the caption text is clamped to 2 lines with a
   // "See more" button instead of the previous fade-out — this tracks
   // whether the CURRENT card's caption is expanded, and resets to
@@ -459,8 +470,14 @@ export default function SpatialScrollEngine() {
         rotationRef.current += (near - rotationRef.current) * EASE;
         sph.style.transform = `rotateX(8deg) rotateY(${rotationRef.current}deg)`;
 
-        setFrontIndex((f) => (f === targetIdx ? f : targetIdx));
-        if (p > 0.02) setStarted((s) => s || true);
+        if (targetIdx !== lastFrontIdxRef.current) {
+          lastFrontIdxRef.current = targetIdx;
+          setFrontIndex(targetIdx);
+        }
+        if (p > 0.02 && !startedRef.current) {
+          startedRef.current = true;
+          setStarted(true);
+        }
 
         // Keep the front slot locked at screen (0,0): the helix climbs a
         // fixed step per card, so counter-shift the WHOLE assembly (core +

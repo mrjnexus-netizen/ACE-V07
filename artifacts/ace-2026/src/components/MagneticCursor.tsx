@@ -116,18 +116,25 @@ const MagneticCursor = () => {
     setVisible(true);
 
     let seed = 0;
+    const mouseRef = { x: -100, y: -100 };
+    let rafId = 0;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      posX.set(e.clientX - TIP_X);
-      posY.set(e.clientY - TIP_Y);
-
+    // The expensive part (querySelectorAll + getBoundingClientRect, which
+    // forces a synchronous layout reflow) now runs at most once per
+    // animation frame, regardless of how many raw 'mousemove' events the
+    // browser fires per frame (high-poll-rate mice can fire hundreds/sec).
+    // Previously this ran once per RAW EVENT inside handleMouseMove itself,
+    // which repeatedly blocked the main thread with layout thrashing on
+    // every pixel of mouse movement — the root cause of the site-wide
+    // cursor jank/stutter/freeze reported across all pages and tabs.
+    const updateMagnetics = () => {
       const magnetics = document.querySelectorAll('[data-magnetic]');
       magnetics.forEach((el) => {
         const rect = el.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
-        const dx = e.clientX - cx;
-        const dy = e.clientY - cy;
+        const dx = mouseRef.x - cx;
+        const dy = mouseRef.y - cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const h = el as HTMLElement;
         if (dist < 80) {
@@ -138,6 +145,15 @@ const MagneticCursor = () => {
           h.style.transition = 'transform 0.3s ease-out';
         }
       });
+      rafId = requestAnimationFrame(updateMagnetics);
+    };
+    rafId = requestAnimationFrame(updateMagnetics);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      posX.set(e.clientX - TIP_X);
+      posY.set(e.clientY - TIP_Y);
+      mouseRef.x = e.clientX;
+      mouseRef.y = e.clientY;
     };
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -165,6 +181,7 @@ const MagneticCursor = () => {
     window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);

@@ -116,6 +116,48 @@ export const LiquidImage = ({ src, alt = '', className = '' }: LiquidImageProps)
     frameRef.current = requestAnimationFrame(animate);
   }, [hoverState]);
 
+  const handleContextLost = useCallback((e: Event) => {
+    // Without preventDefault(), the browser treats this as a PERMANENT
+    // loss and never fires 'webglcontextrestored' — the canvas just goes
+    // blank forever. This is the same root cause documented in
+    // useWebGLRecovery.ts and already fixed in VoronoiPortraitFilter.tsx;
+    // this component uses a raw WebGL context (not react-three-fiber's
+    // <Canvas>) so it needs its own handlers rather than that hook.
+    e.preventDefault();
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+    }
+  }, []);
+
+  const handleContextRestored = useCallback(() => {
+    // Rebuild the whole pipeline (shaders/program/buffers/texture) against
+    // the freshly-restored context, then re-upload the already-loaded
+    // image and resume the render loop.
+    initWebGL();
+    const gl = glRef.current;
+    const texture = textureRef.current;
+    const img = imageRef.current;
+    if (gl && texture && img) {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    }
+    if (containerRef.current && !frameRef.current) {
+      frameRef.current = requestAnimationFrame(animate);
+    }
+  }, [initWebGL, animate]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.addEventListener('webglcontextlost', handleContextLost, false);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', handleContextLost, false);
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored, false);
+    };
+  }, [handleContextLost, handleContextRestored]);
+
   useEffect(() => {
     if (!src) return;
     const img = new Image();

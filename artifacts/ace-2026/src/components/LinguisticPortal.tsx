@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useWebGLRecovery } from '../three/core/useWebGLRecovery';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useChromatic } from '../context/ChromaticContext';
@@ -315,11 +316,15 @@ const Starfield = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRef: Rea
 };
 
 const StarfieldCanvas = ({ colorRef, hoverRef, audioRef, pointerRef }: { colorRef: React.MutableRefObject<string>; hoverRef: React.MutableRefObject<number>; audioRef: React.MutableRefObject<number>; pointerRef: React.MutableRefObject<{ x: number; y: number }> }) => {
+  const { canvasKey, onCreated: onRecoveryCreated } = useWebGLRecovery();
   return (
     <Canvas
+      key={canvasKey}
       style={{ position: 'fixed', inset: 0, zIndex: -1 }}
       camera={{ fov: 75, near: 0.1, far: 100 }}
-      onCreated={({ gl, scene }) => {
+      onCreated={(state) => {
+        onRecoveryCreated(state);
+        const { gl, scene } = state;
         // 2026-07-13 (per Reza — minimal/cyber theme support): this used
         // to hardcode '#000000', which is correct for onyx/cyber (both
         // near-black) but wrong for minimal (ivory, #F9F9F7) — the canvas
