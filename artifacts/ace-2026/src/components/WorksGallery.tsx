@@ -164,7 +164,7 @@ function TrackCaption({ text }: { text: string }) {
   // via React's style prop) — do NOT set textAlign in this component's
   // own inline styles below, it would have no visible effect.
   return (
-    <div style={{ marginTop: '0.5rem', marginLeft: 'auto', marginRight: 'auto' }}>
+    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <p
         ref={ref}
         className="font-display font-light"
