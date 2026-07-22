@@ -1,5 +1,5 @@
 import Lenis from '@studio-freight/lenis';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 interface SmoothScrollOptions {
   duration: number;
@@ -12,7 +12,7 @@ interface SmoothScrollOptions {
 // (or prefers-reduced-motion is set) the page still scrolls normally.
 const useSmoothScroll = () => {
   const lenisRef = useRef<Lenis | null>(null);
-  const [scrollPosition, setScrollPosition] = useState(0);
+  const scrollPositionRef = useRef(0);
   const scrollSubscribers = useRef<Set<(scroll: number) => void>>(new Set());
 
   const subscribeToScroll = useCallback((callback: (scroll: number) => void) => {
@@ -44,7 +44,7 @@ const useSmoothScroll = () => {
       (window as unknown as { __lenis?: Lenis | null }).__lenis = lenis;
 
       const onScroll = ({ scroll }: { scroll: number }) => {
-        setScrollPosition(scroll);
+        scrollPositionRef.current = scroll;
         subs.forEach((callback) => callback(scroll));
       };
       lenis.on('scroll', onScroll);
@@ -67,7 +67,7 @@ const useSmoothScroll = () => {
     };
   }, []);
 
-  return { lenis: lenisRef.current, scrollPosition, subscribeToScroll };
+  return { lenis: lenisRef.current, scrollPosition: scrollPositionRef.current, subscribeToScroll };
 };
 
 const useScrollPosition = (callback: (scroll: number) => void) => {
