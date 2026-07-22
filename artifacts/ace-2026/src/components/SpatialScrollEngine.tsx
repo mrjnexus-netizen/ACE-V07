@@ -529,7 +529,7 @@ export default function SpatialScrollEngine() {
   const activeLine = POETIC_LINES[frontIndex % POETIC_LINES.length]!;
   const activeYear = activeCard.track ? new Date(activeCard.track.createdAt).getFullYear() : null;
 
-  const descRef = useBalancedText<HTMLParagraphElement>();
+  const descRef = useRef<HTMLParagraphElement>(null);
   const lineRef = useBalancedText<HTMLParagraphElement>();
 
   // ----- MOBILE: reliable vertical reveal. -----
@@ -596,7 +596,7 @@ export default function SpatialScrollEngine() {
             (matching the mirror panel's top exactly), text grows downward
             from there instead of the whole block re-centering as content
             length changes. */}
-        <div className="absolute z-20" style={{ top: '46%', left: '5%', marginTop: tabletPanelOffset, width: 'min(21vw, 310px)' }}>
+        <div className="absolute z-20" style={{ top: '46%', left: '5%', marginTop: tabletPanelOffset, width: 'min(21vw, 310px)', minHeight: 'clamp(210px, 24vh, 260px)' }}>
           <motion.div
             key={frontIndex}
             initial={{ opacity: 0, y: 12 }}
@@ -624,11 +624,13 @@ export default function SpatialScrollEngine() {
                   className="text-[var(--text-muted-color)]"
                   style={
                     descExpanded
-                      ? { fontSize: 15, lineHeight: 1.7, marginBottom: 8 }
+                      ? { fontSize: 15, lineHeight: 1.7, marginBottom: 8, textAlign: 'justify', width: '100%' }
                       : {
                           fontSize: 15,
                           lineHeight: 1.7,
                           marginBottom: 8,
+                          textAlign: 'justify',
+                          width: '100%',
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',
