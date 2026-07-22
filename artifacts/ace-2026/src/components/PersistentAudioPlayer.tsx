@@ -116,8 +116,8 @@ export default function PersistentAudioPlayer() {
           <button onClick={stopTrack} className="hover:text-[var(--accent-color)] ml-1" aria-label={t('Close player')}><Icon d={CLOSE} size={16} stroke /></button>
         </div>
       </div>
-      <div className="flex md:hidden flex-col h-full" style={{ color: 'var(--text-color)' }}>
-        <div className="flex items-center px-3 py-1 gap-3" style={{ transform: 'translateY(2px)' }}>
+      <div className="flex md:hidden flex-col justify-center h-full" style={{ color: 'var(--text-color)' }}>
+        <div className="flex items-center px-3.5 py-1.5 gap-3.5">
           <div className="flex items-center gap-3 flex-1 min-w-0" onClick={handleMobileExpand}>
             <div className="w-[36px] h-[36px] rounded overflow-hidden bg-[var(--surface3-color)] flex-shrink-0">
               {coverUrl && <img src={coverUrl} alt={title} className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`} onLoad={() => setImageLoaded(true)} />}
@@ -126,7 +126,7 @@ export default function PersistentAudioPlayer() {
             <div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: 'var(--text-color)' }}>{title}</p><p className="text-[10px] truncate" style={{ color: 'var(--text-muted-color)' }}>{genre}</p></div>
           </div>
           <button onClick={handlePlayPause} className="btn btn--media btn--media-sm flex-shrink-0" aria-label={isPlaying ? t('Pause') : t('Play')}><span className="ring" aria-hidden="true" /><span className="bloom" aria-hidden="true" /><Icon d={isPlaying ? PAUSE : PLAY} size={16} /></button>
-          <button onClick={stopTrack} className="flex-shrink-0 hover:text-[var(--accent-color)]" aria-label={t('Close player')}><Icon d={CLOSE} size={14} stroke /></button>
+          <button onClick={stopTrack} className="flex-shrink-0 hover:text-[var(--accent-color)] ml-1" aria-label={t('Close player')}><Icon d={CLOSE} size={14} stroke /></button>
         </div>
         {mobileExpanded && (
           <div className="flex flex-col px-3 pb-2 gap-2">
