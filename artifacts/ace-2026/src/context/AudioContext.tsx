@@ -576,17 +576,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
             transition: 'opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)',
           }}
         >
-          <div style={{
-            width: '100%',
-            maxWidth: 960,
-            margin: '0 1rem',
-            borderRadius: '14px 14px 0 0',
-            overflow: 'hidden',
-            background: '#000',
-            boxShadow: '0 -12px 48px rgba(0,0,0,0.55)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderBottom: 'none',
-          }}>
+        <div className="ace-video-drawer-inner">
             <video
               ref={videoElRef}
               onTimeUpdate={handleTimeUpdate}
@@ -595,11 +585,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
               muted={audioState.isMuted}
               playsInline
               preload="metadata"
-              style={{ width: '100%', maxHeight: '62vh', display: 'block', background: '#000' }}
+              className="ace-video-drawer-video"
             />
-          </div>
-        </div>,
-        document.body
+        </div>
+      </div>,
+      document.body
       )}
 
       {children}
