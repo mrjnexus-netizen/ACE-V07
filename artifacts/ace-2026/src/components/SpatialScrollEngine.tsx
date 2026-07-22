@@ -1,5 +1,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
+import { motion, useScroll, useTransform, useMotionValue, animate, useReducedMotion } from 'framer-motion';
+import MirrorShatterPortrait from './MirrorShatterPortrait';
+import EditableImage from './EditableImage';
 import { useIdentity } from '../context/IdentityContext';
 import { useAudio } from '../context/AudioContext';
 import { useT } from '../context/TranslationContext';
@@ -264,7 +266,7 @@ export default function SpatialScrollEngine() {
   // page-absolute top, measured ONCE on mount and re-measured only on
   // resize/content-size changes — never every frame.
   const metricsRef = useRef({ top: 0, height: 0 });
-  const { tracks, locale } = useIdentity();
+  const { tracks, locale, composerIdentity } = useIdentity();
   const safeLocale = (locale ?? 'en') as Locale;
   const { audioState, playTrack, pauseTrack, setPlaylist } = useAudio();
   const { t } = useT();
@@ -280,6 +282,17 @@ export default function SpatialScrollEngine() {
   // card's caption to silently start pre-expanded).
   const [descExpanded, setDescExpanded] = useState(false);
   useEffect(() => { setDescExpanded(false); }, [frontIndex]);
+  // 2026-07-21 (per Reza, tablet-only last-card portrait, time-based
+  // reveal): fires once, the first time the last card (index N-1) becomes
+  // front — never re-fires on subsequent visits (scrolling back up past
+  // it and returning doesn't replay the assembly animation, matching
+  // "stays on screen" — it's a one-time arrival, not a repeatable toggle).
+  useEffect(() => {
+    if (frontIndex === N - 1 && !portraitTriggeredRef.current) {
+      portraitTriggeredRef.current = true;
+      animate(portraitProgress, 1, { duration: 2.5, ease: [0.22, 1, 0.36, 1] });
+    }
+  }, [frontIndex]);
   const [started, setStarted] = useState(false);
 
   // Rotation is driven by SCROLL ONLY now — hovering never rotates the
@@ -287,6 +300,35 @@ export default function SpatialScrollEngine() {
   // spins). Hover can only ever "activate" (colour + highlight) whichever
   // card scroll has already brought to the front.
   const rotationRef = useRef(0); // the single eased rotation value (degrees)
+  // 2026-07-21 (per Reza, tablet-only last-card portrait): a framer-motion
+  // MotionValue mirroring this section's own scroll progress (p, below),
+  // so MirrorShatterPortrait — which expects a MotionValue, same as it
+  // gets from WorksGallery.tsx's useScroll — can drive its shatter+voronoi
+  // reveal off THIS section's own progress. Deliberately NOT wired to the
+  // piano keys' separate progress in WorksGallery.tsx: coordinating two
+  // independently-pinned sections' scroll state is a much bigger, riskier
+  // job than keeping this entirely self-contained within this section.
+  const portraitProgress = useMotionValue(0);
+  // 2026-07-21 round 2 (per Reza — the scroll-linked version jumped/broke
+  // at the shard→voronoi crossfade): MirrorShatterPortrait's internal
+  // pacing (including that crossfade) was tuned for WorksGallery.tsx's
+  // generous windowSpan (0.78 of a very long scroll). This section only
+  // has ~0.08-0.12 of scroll progress left after the last card settles —
+  // nowhere near enough room for the same multi-stage animation to read
+  // as anything but an abrupt jump, no matter how the numbers are tuned
+  // within that budget. A one-shot, TIME-based reveal (not tied to scroll
+  // distance at all) sidesteps the constraint entirely: once triggered,
+  // it always gets the same comfortable ~2.5s regardless of how much
+  // scroll room is actually left. Runs once, holds at 1 — no fade-out,
+  // per Reza's explicit "just stays on screen" ask.
+  const portraitTriggeredRef = useRef(false);
+  // 2026-07-21 round 3 (per Reza): scroll should ALSO control fade
+  // in/out of the portrait — separate from portraitProgress (the
+  // one-shot shatter-assembly animation, kept time-based on purpose so
+  // that internal crossfade never jumps). This one just tracks raw
+  // scroll p directly, purely for the outer wrapper's opacity.
+  const portraitScrollFade = useMotionValue(0);
+  const portraitOpacity = useTransform(portraitScrollFade, [0.90, 0.94], [0, 1]);
   const [hoveredFront, setHoveredFront] = useState(false);
 
   useEffect(() => {
@@ -401,6 +443,7 @@ export default function SpatialScrollEngine() {
         stage.style.transform = `translate3d(0, ${y}px, 0)`;
 
         const p = y / total;
+        portraitScrollFade.set(p);
 
         // SNAP-STOP ROTATION: scroll is divided into exactly 12 bands, one
         // per card. Within a band the target angle is CONSTANT, so the
@@ -626,6 +669,49 @@ export default function SpatialScrollEngine() {
             </span>
           </motion.div>
         </div>
+
+        {/* 2026-07-21 round 2 (per Reza) — TABLET ONLY (hidden md:block
+            xl:hidden): the exact same shatter+voronoi-tile portrait
+            effect used for the real composer photo elsewhere on the site
+            (see MirrorShatterPortrait.tsx's own header comment). Driven
+            by portraitProgress, which is now a one-shot TIME-based
+            animation (see the useEffect above) — not tied to this
+            section's scroll distance at all, which is what was causing
+            the shard→voronoi crossfade to jump/break (nowhere near enough
+            scroll room left after the last card settles for that
+            multi-stage animation to read as smooth). windowStart=0,
+            windowSpan=1 here because portraitProgress is purpose-built to
+            run 0→1 over its own fixed 2.5s, not shared page-scroll space.
+            No fade-out — stays on screen once it arrives, per Reza's
+            explicit ask. */}
+        {composerIdentity?.portrait?.url && (
+          <motion.div
+            className="hidden md:block xl:hidden absolute pointer-events-none"
+            style={{
+              left: '50%',
+              top: '78%',
+              transform: 'translate(-50%, -50%)',
+              width: 'min(38vw, 400px)',
+              height: 'min(46vh, 420px)',
+              zIndex: 12,
+              opacity: portraitOpacity,
+            }}
+          >
+            <EditableImage contentKey="worksSection.mirrorPortrait" defaultUrl={composerIdentity.portrait.url}>
+              {(url) => (
+                <MirrorShatterPortrait
+                  src={url}
+                  locale={(locale ?? 'en') as Locale}
+                  progress={portraitProgress}
+                  windowStart={0}
+                  windowSpan={1}
+                  showVoronoi={false}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              )}
+            </EditableImage>
+          </motion.div>
+        )}
 
         {/* 3D scene — core + ring share one preserve-3d context so depth is real. */}
         <div ref={sceneRef} className="absolute inset-0 flex items-center justify-center" style={{ perspective: '1500px', opacity: 0, willChange: 'opacity', transition: 'opacity 0.4s ease-out' }}>

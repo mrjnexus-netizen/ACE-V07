@@ -188,6 +188,7 @@ export default function MirrorShatterPortrait({
   progress,
   windowStart = 0.14,
   windowSpan = 0.78,
+  showVoronoi = true,
   className,
   style,
 }: {
@@ -206,6 +207,16 @@ export default function MirrorShatterPortrait({
    * keys' own completion point (WorksGallery.tsx's START_OFFSET +
    * REVEAL_SPAN) so both finish at the same scroll position. */
   windowSpan?: number;
+  /** 2026-07-21 (per Reza): VoronoiPortraitFilter creates its OWN
+   * separate THREE.WebGLRenderer. WorksGallery.tsx's usage (default true)
+   * is fine — nothing else nearby needs WebGL. But SpatialScrollEngine.tsx
+   * ALSO runs its own Three.js scene for the card ring, and having two
+   * concurrent WebGL contexts in view at once was hitting the browser's
+   * context limit, silently losing one (rendering as a garbled solid-
+   * color mess, not the intended photo/filter). Passing false here skips
+   * ever creating that second WebGL context — the shard mosaic simply
+   * stays as the final, permanent state instead of crossfading into it. */
+  showVoronoi?: boolean;
   className?: string;
   style?: CSSProperties;
 }) {
@@ -237,7 +248,12 @@ export default function MirrorShatterPortrait({
   // in both directions).
   const midPoint = windowStart + windowSpan * 0.5;
   const crossfadeSpan = windowSpan * 0.16;
-  const mosaicOpacity = useTransform(progress, [midPoint - crossfadeSpan / 2, midPoint + crossfadeSpan / 2], [1, 0], { ease: [EASE] });
+  const mosaicOpacity = useTransform(
+    progress,
+    showVoronoi ? [midPoint - crossfadeSpan / 2, midPoint + crossfadeSpan / 2] : [0, 1],
+    showVoronoi ? [1, 0] : [1, 1],
+    { ease: [EASE, EASE] }
+  );
   const voronoiOpacity = useTransform(progress, [midPoint - crossfadeSpan / 2, midPoint + crossfadeSpan / 2], [0, 1], { ease: [EASE] });
 
   return (
@@ -265,9 +281,11 @@ export default function MirrorShatterPortrait({
           ))}
         </motion.div>
 
-        <motion.div className="absolute inset-0" style={{ opacity: voronoiOpacity }}>
-          <VoronoiPortraitFilter src={src} locale={locale} />
-        </motion.div>
+        {showVoronoi && (
+          <motion.div className="absolute inset-0" style={{ opacity: voronoiOpacity }}>
+            <VoronoiPortraitFilter src={src} locale={locale} />
+          </motion.div>
+        )}
       </div>
 
       {/* Cinematic vignette — matches the Hero portrait's treatment. */}
