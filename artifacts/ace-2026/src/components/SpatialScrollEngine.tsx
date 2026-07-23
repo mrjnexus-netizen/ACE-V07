@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
-import { motion, useScroll, useTransform, useMotionValue, animate, useReducedMotion } from 'framer-motion';
+import { motion, useTransform, useMotionValue, animate } from 'framer-motion';
 import MirrorShatterPortrait from './MirrorShatterPortrait';
 import EditableImage from './EditableImage';
 import { useIdentity } from '../context/IdentityContext';
@@ -147,95 +147,339 @@ function AnimatedFace({ seed, active }: { seed: number; active: boolean }) {
 }
 
 // ----------------------------------------------------------------------
-// 2026-07-17 (per Reza) — MOBILE-ONLY scroll-driven card fade.
+// 2026-07-22 round 7 (per Reza -- back to the round-5 cube, not the
+// round-6 drum; that was a misread of "kart ha nesheste sare jash").
+// Same 6-face cube + image-recycling technique as round 5 (a cube only
+// has 6 faces, so the rotation keeps going past 360 degrees and swaps
+// the next image onto whichever face is about to come back around --
+// that's how 6 faces cover all 12 categories). Refined per Reza's
+// notes on round 5: softer rounded corners (not sharp), and each face
+// now uses the SAME VinylCardFace component the desktop ring uses
+// (cover art + its own built-in play/pause treatment) instead of a
+// plain background-image div, with NO separate Play button -- tapping
+// a face calls the same onCardClick the desktop ring cards use, which
+// drives the existing bottom persistent player. Because a face's
+// identity (which of the 12 cards is currently on it) changes as the
+// recycling window slides, that assignment is tracked in React state
+// (faceCardIdx) rather than raw DOM writes, updated only when the
+// window actually shifts (the setter bails out via reference equality
+// otherwise, so this stays cheap even though it's evaluated every
+// frame). The continuous cube rotation itself remains a direct
+// style write in the rAF loop for performance, same as before.
 //
-// Reza's explicit scope: touch NOTHING about the cards themselves (their
-// design, features, internal animations — VinylCardFace, the play state,
-// the text block below) — ONLY change how they move/reveal as the person
-// scrolls. Reference behaviour (codepen.io/JavaScriptJunkie/pen/BGNELL):
-// each card fades and scales up as it approaches the center of the
-// viewport while scrolling, then fades back down as it moves past —
-// a continuous, reversible "focus" effect, not the one-time
-// whileInView-and-done reveal this had before (which also never played
-// again if you scrolled back up).
-//
-// Framer-motion's useScroll needs a real per-instance target ref, which
-// means a real per-instance component (can't call hooks inside the
-// .map() callback below — that would call hooks a variable number of
-// times per render, which breaks React's rules of hooks). Everything
-// inside the returned JSX — the button, VinylCardFace, the text block —
-// is copied verbatim from the previous version; only the outer
-// motion.article's animation source changed.
-function MobileWorkCard({
-  concept,
-  title,
-  desc,
-  cover,
-  track,
-  isCurrent,
-  isPlaying,
-  seed,
-  currentTime,
-  duration,
-  onActivate,
+// Scroll-driving mechanism unchanged: watches scroll via
+// IntersectionObserver + rAF-polled getBoundingClientRect, never calls
+// preventDefault or scrollTo, so it cannot fight Lenis.
+type CubeStop = { rx: number; ry: number };
+
+function buildCubeStops(n: number): CubeStop[] {
+  const base: CubeStop[] = [
+    { rx: 90, ry: 0 },
+    { rx: 0, ry: 0 },
+    { rx: 0, ry: -90 },
+    { rx: 0, ry: -180 },
+    { rx: 0, ry: -270 },
+    { rx: -90, ry: -360 },
+  ];
+  const out = base.slice(0, Math.min(n, 6));
+  for (let i = 6; i < n; i++) {
+    out.push({ rx: 0, ry: -360 - (i - 6) * 90 });
+  }
+  return out;
+}
+
+function faceAtStop(i: number): number {
+  if (i < 6) return i;
+  return 1 + ((i - 2) % 4);
+}
+
+const cubeEase = (t: number) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
+
+const CUBE_FACES: { face: string; transform: string }[] = [
+  { face: 'top', transform: 'rotateX(-90deg) translateZ(130px)' },
+  { face: 'front', transform: 'translateZ(130px)' },
+  { face: 'right', transform: 'rotateY(90deg) translateZ(130px)' },
+  { face: 'back', transform: 'rotateY(180deg) translateZ(130px)' },
+  { face: 'left', transform: 'rotateY(-90deg) translateZ(130px)' },
+  { face: 'bottom', transform: 'rotateX(90deg) translateZ(130px)' },
+];
+
+function MobileCubeGallery({
+  cards,
+  localized,
+  audioState,
+  onCardClick,
   t,
 }: {
-  concept: string;
-  title: string;
-  desc: string;
-  cover: string;
-  track: AudioTrack | null;
-  isCurrent: boolean;
-  isPlaying: boolean;
-  seed: number;
-  currentTime: number;
-  duration: number;
-  onActivate: (track: AudioTrack | null) => void;
+  cards: ConceptCard[];
+  localized: (m: { en?: string } | Record<string, string> | null | undefined) => string;
+  audioState: ReturnType<typeof useAudio>['audioState'];
+  onCardClick: (track: AudioTrack | null) => void;
   t: (s: string) => string;
 }) {
-  const reduce = useReducedMotion() ?? false;
-  const cardRef = useRef<HTMLElement>(null);
+  const N = cards.length;
+  const STOPS = useMemo(() => buildCubeStops(N), [N]);
 
-  // Progress 0 -> the card's top edge is at the viewport's bottom edge
-  // (just about to enter, from below). Progress 1 -> the card's bottom
-  // edge is at the viewport's top edge (just about to leave, off the
-  // top). 0.5 lands close to the card passing through the viewport's
-  // center for typical card/viewport proportions — exactly the "focus"
-  // point the fade should peak at.
-  const { scrollYProgress } = useScroll({ target: cardRef, offset: ['start end', 'end start'] });
+  const sectionRef = useRef<HTMLElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const cubeRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { setExpanded(false); }, [active]);
 
-  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], reduce ? [1, 1, 1] : [0.15, 1, 0.15]);
-  const scale = useTransform(scrollYProgress, [0, 0.5, 1], reduce ? [1, 1, 1] : [0.88, 1, 0.88]);
+  const [faceCardIdx, setFaceCardIdx] = useState<number[]>(() =>
+    Array.from({ length: 6 }, (_, i) => (i < N ? i : -1))
+  );
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    const stage = stageRef.current;
+    const cube = cubeRef.current;
+    if (!section || !stage || !cube || N < 2) return;
+
+    let inView = false;
+    let displayS = 0;
+    let lastRawP = -1;
+    let restP = 0; // last position the cube was fully settled/resting at
+    let idleFrames = 0;
+    let lastDirection = 0; // +1 forward, -1 backward -- remembered through idle
+    let raf = 0;
+    const DEAD_ZONE = 0.03; // wider -- ignores more than just tiny jitter, so
+    // ordinary small scroll nudges don't read as panicked twitching
+
+    const io = new IntersectionObserver(
+      ([entry]) => { inView = !!entry?.isIntersecting; },
+      { threshold: 0 }
+    );
+    io.observe(section);
+
+    const measureProgress = () => {
+      const rect = section.getBoundingClientRect();
+      const scrollRange = rect.height - window.innerHeight;
+      if (scrollRange <= 0) return { p: 0, scrollRange: 0 };
+      return { p: Math.max(0, Math.min(1, -rect.top / scrollRange)), scrollRange };
+    };
+
+    const assignFaces = (stopIdx: number) => {
+      setFaceCardIdx((prev) => {
+        let next: number[] | null = null;
+        for (let offset = -3; offset <= 3; offset++) {
+          const si = stopIdx + offset;
+          if (si < 0 || si >= N) continue;
+          const faceIdx = faceAtStop(si);
+          if (prev[faceIdx] !== si) {
+            if (!next) next = [...prev];
+            next[faceIdx] = si;
+          }
+        }
+        return next ?? prev;
+      });
+    };
+
+    const applyTransform = (s: number) => {
+      const tt = s * (N - 1);
+      const i = Math.min(Math.floor(tt), N - 2);
+      const f = cubeEase(tt - i);
+      const a = STOPS[i]!;
+      const b = STOPS[i + 1]!;
+      const rx = a.rx + (b.rx - a.rx) * f;
+      const ry = a.ry + (b.ry - a.ry) * f;
+      cube.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+
+      const stopIdx = Math.min(N - 1, Math.floor(s * (N - 1) + 0.5));
+      setActive((prev) => (prev === stopIdx ? prev : stopIdx));
+      assignFaces(stopIdx);
+    };
+
+    const tick = () => {
+      if (inView) {
+        const { p, scrollRange } = measureProgress();
+        // Pin: always exactly cancels the actual scroll delta, every
+        // frame, with zero smoothing lag -- this is what makes it hold
+        // perfectly still (no "tick") for the section's whole duration.
+        stage.style.transform = `translate3d(0, ${p * scrollRange}px, 0)`;
+
+        if (Math.abs(p - lastRawP) > 0.0004) {
+          idleFrames = 0;
+          if (p > lastRawP) lastDirection = 1;
+          else if (p < lastRawP) lastDirection = -1;
+        } else {
+          idleFrames += 1;
+        }
+        const isSettled = idleFrames > 10;
+
+        const stepSize = 1 / (N - 1);
+        const stopFloat = p / stepSize;
+        const base = Math.max(0, Math.min(N - 2, Math.floor(stopFloat)));
+        const frac = stopFloat - base;
+        // Commit forward at ~30% of the way there when the last motion
+        // was forward, or hold back until ~70% when it was backward --
+        // this is the fix: a moderate scroll now reliably finishes the
+        // move to the next/previous card instead of springing back to
+        // wherever it started just because it didn't cross the exact
+        // midpoint.
+        const settleStop = lastDirection >= 0
+          ? (frac > 0.3 ? base + 1 : base)
+          : (frac < 0.7 ? base : base + 1);
+        const nearest = settleStop / (N - 1);
+
+        const beyondDeadZone = Math.abs(p - restP) > DEAD_ZONE;
+        const target = isSettled ? nearest : (beyondDeadZone ? p : restP);
+        displayS += (target - displayS) * (isSettled ? 0.045 : 0.065);
+        if (isSettled) restP = target;
+        lastRawP = p;
+        applyTransform(displayS);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [N, STOPS]);
+
+  const activeCard = cards[active] ?? cards[0]!;
+  const activeTitle = activeCard.track ? (localized(activeCard.track.title) || t('Untitled')) : t(activeCard.concept);
+  const activeDesc = activeCard.track ? localized(activeCard.track.narrative) : t(activeCard.blurb);
 
   return (
-    <motion.article ref={cardRef} style={{ opacity, scale }}>
-      <button
-        type="button"
-        data-cursor={track ? 'play' : undefined}
-        onClick={() => onActivate(track)}
-        className="block w-full text-left focus:outline-none"
-        style={{ cursor: track ? 'pointer' : 'default' }}
-        aria-label={track ? `${isPlaying ? t('Pause') : t('Play')} ${title}` : `${t(concept)} — ${t('coming soon')}`}
-      >
-        <div className="relative overflow-hidden rounded-3xl" style={{ aspectRatio: '16 / 10' }}>
-          <VinylCardFace
-            cover={cover}
-            fallback={<AnimatedFace seed={seed} active={false} />}
-            title={title}
-            isPlaying={isPlaying}
-            isCurrent={isCurrent}
-            currentTime={currentTime}
-            duration={duration}
-            dim={false}
-          />
+    <section
+      ref={sectionRef}
+      id="selected-works-orbit"
+      className="relative overflow-hidden"
+      style={{ minHeight: `${N * 95}vh` }}
+    >
+      <style>{SSE_STYLES}</style>
+      <div ref={stageRef} className="absolute top-0 left-0 right-0 flex flex-col items-center justify-center py-16" style={{ minHeight: '100vh' }}>
+        <header className="text-center" style={{ marginBottom: '3.5rem' }}>
+          <span className="text-xs uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">
+            {t('The Score')}
+          </span>
+          <h2 className="text-3xl font-display text-[var(--text-color)] mt-2">{t('Selected Works')}</h2>
+        </header>
+
+        <div className="flex items-center justify-center" style={{ perspective: 1100 }}>
+          <div
+            ref={cubeRef}
+            style={{
+              width: 260,
+              height: 260,
+              position: 'relative',
+              transformStyle: 'preserve-3d',
+              transform: 'rotateX(90deg) rotateY(0deg)',
+              willChange: 'transform',
+            }}
+          >
+            {CUBE_FACES.map((f, faceIdx) => {
+              const cardIdx = faceCardIdx[faceIdx] ?? -1;
+              const card = cardIdx >= 0 && cardIdx < N ? cards[cardIdx] : null;
+              if (!card) {
+                return (
+                  <div
+                    key={f.face}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: 22,
+                      overflow: 'hidden',
+                      backfaceVisibility: 'hidden',
+                      background: '#14100d',
+                      border: '1px solid rgba(212, 168, 75, 0.2)',
+                      transform: f.transform,
+                    }}
+                  />
+                );
+              }
+              const track = card.track;
+              const title = track ? (localized(track.title) || t('Untitled')) : t(card.concept);
+              const cover = track ? trackCover(track) : '';
+              const isCurrent = !!track && audioState.currentTrack?.id === track.id;
+              const isPlaying = isCurrent && audioState.isPlaying;
+              return (
+                <button
+                  key={f.face}
+                  type="button"
+                  onClick={() => onCardClick(track)}
+                  aria-label={track ? `${isPlaying ? t('Pause') : t('Play')} ${title}` : `${t(card.concept)} -- ${t('coming soon')}`}
+                  className="block focus:outline-none"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: 22,
+                    overflow: 'hidden',
+                    backfaceVisibility: 'hidden',
+                    border: '1px solid rgba(212, 168, 75, 0.25)',
+                    transform: f.transform,
+                  }}
+                >
+                  <VinylCardFace
+                    cover={cover}
+                    fallback={<AnimatedFace seed={cardIdx} active={false} />}
+                    title={title}
+                    isPlaying={isPlaying}
+                    isCurrent={isCurrent}
+                    currentTime={audioState.currentTime}
+                    duration={audioState.duration}
+                    dim={false}
+                  />
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="mt-4">
-          <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">{t(concept)}</span>
-          <h3 className="text-2xl font-display text-[var(--text-color)] leading-tight mt-1 mb-1">{title}</h3>
-          {desc && <p className="text-sm text-[var(--text-muted-color)]">{desc}</p>}
+
+        <div className="px-8" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginTop: '3.5rem' }}>
+          <span className="text-[0.7rem] uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">
+            {t(activeCard.concept)}
+          </span>
+          <h3 className="text-2xl font-display text-[var(--text-color)] mt-2 mb-3">{activeTitle}</h3>
+          {activeDesc && (
+            <div style={{ width: '100%', maxWidth: '34ch', margin: '0 auto' }}>
+              <p
+                className="text-sm text-[var(--text-muted-color)]"
+                style={
+                  expanded
+                    ? { lineHeight: 1.85, textAlign: 'justify' }
+                    : {
+                        lineHeight: 1.85,
+                        textAlign: 'justify',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }
+                }
+              >
+                {activeDesc}
+              </p>
+              <button
+                type="button"
+                onClick={() => setExpanded((e) => !e)}
+                className="mt-2 tracking-wide underline"
+                style={{ color: 'var(--accent-color)', display: 'block', width: '100%', textAlign: 'center', fontSize: '0.65rem', letterSpacing: '0.04em', opacity: 0.85 }}
+              >
+                {expanded ? t('Show less') : t('See more')}
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap justify-center gap-1.5 mt-6 px-4">
+            {cards.map((c, i) => (
+              <span
+                key={c.concept}
+                className="rounded-full transition-all duration-500"
+                style={{
+                  width: i === active ? 16 : 6,
+                  height: 6,
+                  background: i === active ? 'var(--accent-color)' : 'rgba(var(--accent-rgb), 0.3)',
+                }}
+              />
+            ))}
+          </div>
         </div>
-      </button>
-    </motion.article>
+      </div>
+    </section>
   );
 }
 
@@ -532,45 +776,16 @@ export default function SpatialScrollEngine() {
   const descRef = useRef<HTMLParagraphElement>(null);
   const lineRef = useBalancedText<HTMLParagraphElement>();
 
-  // ----- MOBILE: reliable vertical reveal. -----
+  // ----- MOBILE: rotating cube gallery, scroll-watched (not scroll-jacked), pinned. -----
   if (isMobile) {
     return (
-      <section id="selected-works-orbit" className="relative py-16 px-4">
-        <style>{SSE_STYLES}</style>
-        <header className="text-center mb-10">
-          <span className="text-xs uppercase tracking-[0.2em] text-[var(--accent-color)] font-mono">
-            {t('The Score')}
-          </span>
-          <h2 className="text-3xl font-display text-[var(--text-color)] mt-2">{t('Selected Works')}</h2>
-        </header>
-        <div className="flex flex-col gap-14">
-          {cards.map((card, ci) => {
-            const { concept, blurb, track } = card;
-            const title = track ? (localized(track.title) || t('Untitled')) : t(concept);
-            const desc = track ? localized(track.narrative) : t(blurb);
-            const cover = track ? trackCover(track) : '';
-            const isCurrent = !!track && audioState.currentTrack?.id === track.id;
-            const isPlaying = isCurrent && audioState.isPlaying;
-            return (
-              <MobileWorkCard
-                key={concept}
-                concept={concept}
-                title={title}
-                desc={desc}
-                cover={cover}
-                track={track}
-                isCurrent={isCurrent}
-                isPlaying={isPlaying}
-                seed={ci}
-                currentTime={audioState.currentTime}
-                duration={audioState.duration}
-                onActivate={onCardClick}
-                t={t}
-              />
-            );
-          })}
-        </div>
-      </section>
+      <MobileCubeGallery
+        cards={cards}
+        localized={localized}
+        audioState={audioState}
+        onCardClick={onCardClick}
+        t={t}
+      />
     );
   }
 
