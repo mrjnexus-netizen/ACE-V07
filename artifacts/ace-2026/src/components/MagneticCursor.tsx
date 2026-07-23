@@ -94,7 +94,17 @@ const MagneticCursor = () => {
   const posX = useMotionValue(-100);
   const posY = useMotionValue(-100);
 
-  const springConfig = { damping: 22, stiffness: 380, mass: 0.5 };
+  // 2026-07-23 (per Reza, "kroor dir be moghe'iyate vaghei mires" — constant
+  // perceptible lag behind the real cursor position): the previous config
+  // (damping:22, stiffness:380, mass:0.5) had a damping ratio of ~0.8 and a
+  // natural frequency of ~27.6 rad/s — soft enough that fast mouse movement
+  // visibly outran the spring. Since this cursor IS the user's only visual
+  // pointer (the real OS cursor is hidden), any lag here is directly felt as
+  // "the cursor is slow." Retuned for a damping ratio of ~0.85 (still just
+  // enough give to feel soft/elastic, not robotic/instant-snap) at a much
+  // higher natural frequency (~51.6 rad/s) so it tracks essentially without
+  // perceptible catch-up lag, with no added overshoot/wobble.
+  const springConfig = { damping: 26, stiffness: 800, mass: 0.3 };
   const cursorX = useSpring(posX, springConfig);
   const cursorY = useSpring(posY, springConfig);
 
@@ -127,24 +137,41 @@ const MagneticCursor = () => {
     // which repeatedly blocked the main thread with layout thrashing on
     // every pixel of mouse movement — the root cause of the site-wide
     // cursor jank/stutter/freeze reported across all pages and tabs.
+    //
+    // 2026-07-23 (per Reza, "sorat va hange mouse" perceived lag): this
+    // loop was still running the reflow-forcing querySelectorAll +
+    // getBoundingClientRect pass on EVERY animation frame unconditionally,
+    // forever, even while the mouse was completely stationary — a
+    // continuous, needless reflow that competes with everything else on
+    // the main thread and reads as general sluggishness. Fixed by only
+    // doing the expensive pass when the mouse has actually moved since the
+    // last frame (compared against the last-processed coordinates); when
+    // stationary, the rAF loop still runs (so magnetic elements resume
+    // instantly on the next real movement) but skips all DOM reads/writes.
+    let lastProcessedX = -100;
+    let lastProcessedY = -100;
     const updateMagnetics = () => {
-      const magnetics = document.querySelectorAll('[data-magnetic]');
-      magnetics.forEach((el) => {
-        const rect = el.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const dx = mouseRef.x - cx;
-        const dy = mouseRef.y - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const h = el as HTMLElement;
-        if (dist < 80) {
-          h.style.transform = `translate3d(${dx * 0.35}px, ${dy * 0.35}px, 0)`;
-          h.style.transition = 'transform 0.1s ease-out';
-        } else if (h.style.transform) {
-          h.style.transform = '';
-          h.style.transition = 'transform 0.3s ease-out';
-        }
-      });
+      if (mouseRef.x !== lastProcessedX || mouseRef.y !== lastProcessedY) {
+        lastProcessedX = mouseRef.x;
+        lastProcessedY = mouseRef.y;
+        const magnetics = document.querySelectorAll('[data-magnetic]');
+        magnetics.forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dx = mouseRef.x - cx;
+          const dy = mouseRef.y - cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const h = el as HTMLElement;
+          if (dist < 80) {
+            h.style.transform = `translate3d(${dx * 0.35}px, ${dy * 0.35}px, 0)`;
+            h.style.transition = 'transform 0.1s ease-out';
+          } else if (h.style.transform) {
+            h.style.transform = '';
+            h.style.transition = 'transform 0.3s ease-out';
+          }
+        });
+      }
       rafId = requestAnimationFrame(updateMagnetics);
     };
     rafId = requestAnimationFrame(updateMagnetics);
@@ -203,7 +230,17 @@ const MagneticCursor = () => {
           top: cursorY,
           pointerEvents: 'none',
           position: 'fixed',
-          zIndex: 99999,
+          // Must always paint above every other body-portaled UI element.
+          // PersistentAudioPlayer's .pap-shell and AudioContext's video
+          // drawer are both portaled straight to document.body with
+          // zIndex: 2147483000 (an intentionally huge "unbeatable" value
+          // for THEIR purposes). Since the cursor is ALSO a document.body
+          // portal now, it shares that same top-level stacking context —
+          // whichever has the higher number wins, and 99999 lost to
+          // 2147483000, which is why the cursor visually sank beneath the
+          // bottom bar. 2147483647 is the maximum valid CSS z-index
+          // (2^31-1), guaranteeing this can never lose to anything else.
+          zIndex: 2147483647,
         }}
       >
         {/* Rotation/press-scale live on this INNER element only. The outer
@@ -232,7 +269,7 @@ const MagneticCursor = () => {
               top: s.y - s.size / 2,
               pointerEvents: 'none',
               position: 'fixed',
-              zIndex: 99998,
+              zIndex: 2147483646,
               borderRadius: '50%',
               width: s.size,
               height: s.size,

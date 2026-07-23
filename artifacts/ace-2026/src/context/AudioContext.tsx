@@ -562,6 +562,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       {typeof document !== 'undefined' && createPortal(
         <div
           aria-hidden={audioState.currentTrack?.mediaType !== 'video'}
+          className="ace-video-drawer-overlay"
           style={{
             position: 'fixed',
             left: 0,

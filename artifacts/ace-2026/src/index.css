@@ -3548,6 +3548,52 @@ p, blockquote, figcaption, .text-wrap-pretty {
   }
 }
 
+/* 2026-07-23 (per Reza): the video drawer overlay (AudioContext.tsx,
+   shown when selecting a video in the gallery) is ALSO rendered via
+   createPortal straight to document.body — same root cause as
+   .works-gallery-overlay above, just never given its own scoped rule
+   when the portal was introduced. Same fix, same reasoning. */
+@media (pointer: fine) {
+  .ace-video-drawer-overlay,
+  .ace-video-drawer-overlay *,
+  .ace-video-drawer-overlay *::before,
+  .ace-video-drawer-overlay *::after {
+    cursor: none !important;
+  }
+}
+
+/* 2026-07-23 round 2 (per Reza): the persistent audio/video player bar
+   itself (PersistentAudioPlayer.tsx, .pap-shell — play/pause, seek,
+   volume, the whole bottom bar) is ALSO createPortal'd straight to
+   document.body, same as the drawer above it. Only .pap-volume (the
+   slider) had ever been individually patched (2026-07-19 fix above) —
+   the shell around it, including the play/pause/prev/next/mute
+   buttons, was never covered, which is why the native OS cursor kept
+   showing specifically on that bottom bar. Scoping the whole shell
+   here supersedes the need for the narrower .pap-volume-only fix, but
+   that rule is left in place untouched (harmless overlap, not worth
+   the risk of removing a working, previously-hard-won fix).
+   FIX ROUND 2 (still 2026-07-23, per live getComputedStyle diagnostic
+   showing 'auto' instead of 'none' even after this rule was installed):
+   this rule was first written unlayered (plain CSS, no @layer), same
+   mistake already discovered and fixed once before for .pap-volume on
+   2026-07-19 — CSS Cascade Layers REVERSES priority for `!important`
+   declarations: a layered !important rule (Tailwind's cursor-pointer
+   utility, emitted inside @layer utilities) beats an unlayered
+   !important rule, even though unlayered normally wins for everything
+   ELSE. Wrapping this in `@layer components` (exactly like the working
+   .pap-volume fix already does) is the actual, evidence-confirmed fix. */
+@layer components {
+  @media (pointer: fine) {
+    .pap-shell,
+    .pap-shell *,
+    .pap-shell *::before,
+    .pap-shell *::after {
+      cursor: none !important;
+    }
+  }
+}
+
 /* 2026-07-20 (per Reza): the video drawer (AudioContext.tsx) needs its
    own mechanism on small screens — the desktop version (a centered,
    rounded, max-960px box) reads as a cramped floating rectangle on a
