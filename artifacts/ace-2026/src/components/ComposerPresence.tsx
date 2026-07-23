@@ -5,29 +5,11 @@ import { useIdentity } from '../context/IdentityContext';
 import { useT } from '../context/TranslationContext';
 import EditableText from './EditableText';
 import type { AudioTrack } from '../types';
-import { useBalancedText } from '../hooks/useBalancedText';
 
-// Short, editable blurbs per genre (lowercased key).
-const GENRE_BLURBS: Record<string, string> = {
-  orchestral: 'Sweeping strings and brass — the grammar of the symphony, rebuilt for the modern screen.',
-  cinematic: 'Themes written to live beneath the image, shaping what the eye believes it feels.',
-  gaming: 'Adaptive, interactive scores that respond and evolve with the player in real time.',
-  animation: 'Bright, characterful music that gives motion its heartbeat and worlds their wonder.',
-  ambient: 'Slow, weightless texture — sound designed to surround rather than to lead.',
-  electronic: 'Synthesised pulse and grain, where circuitry learns to breathe.',
-  'electronic-orchestral': 'Where live orchestra and electronics meet — organic and synthetic in one breath.',
-  synthwave: 'Neon-lit nostalgia: analog warmth wrapped around a driving retro pulse.',
-  choral: 'The human voice, massed and luminous — the oldest instrument, reimagined.',
-  other: 'Work that resists category — experiments and one-of-a-kind scores.',
-};
-
-function blurbFor(genre: string): string {
-  return GENRE_BLURBS[genre.toLowerCase()] || GENRE_BLURBS.other!;
-}
-
-interface GenreGroup {
-  genre: string;
+interface ConceptGroup {
+  concept: string;
   tracks: AudioTrack[];
+  featured: AudioTrack;
   cover: string;
 }
 
@@ -40,7 +22,14 @@ function coverOf(t: AudioTrack): string {
   return t.coverUrlWide || t.coverArt?.url || (t as unknown as { coverUrl?: string }).coverUrl || '';
 }
 
-const ROTATE_MS = 3000;
+// Resolves a multilingual {en,es,fr,zh,ja,ko} field for the current locale,
+// falling back to English then to an empty string — same fallback order
+// already used for composerName below.
+function resolveML(field: unknown, locale: string | null | undefined): string {
+  const map = field as Record<string, string> | null | undefined;
+  if (!map) return '';
+  return map[locale ?? 'en'] || map.en || '';
+}
 
 // Reza (2026-07-11): the band no longer plays a track directly. Clicking it
 // now starts a slow, guided scroll journey down to that genre's STARRED
@@ -198,22 +187,30 @@ export default function ComposerPresence() {
     };
   }, [reduce]);
 
-  // Group tracks by genre automatically.
-  const groups = useMemo<GenreGroup[]>(() => {
+  // 2026-07-23 (per Reza): this used to group by `genre`, which is an
+  // uncontrolled, incidental field -- the slide count was whatever number
+  // of distinct genres happened to exist, and the cover shown was just
+  // whichever track happened to be first in the array for that genre,
+  // completely ignoring the admin's actual starred/isFeatured choice. This
+  // is the same 12-concept curation system used everywhere else on the
+  // site (WorkSphere, WorkCarousel) -- one slide per concept, showing
+  // whichever track the admin has starred for it.
+  const groups = useMemo<ConceptGroup[]>(() => {
     const map = new Map<string, AudioTrack[]>();
     (tracks ?? []).forEach((t) => {
-      const g = (t.genre || 'other').trim();
-      if (!map.has(g)) map.set(g, []);
-      map.get(g)!.push(t);
+      const c = (t.concept || 'other').trim();
+      if (!map.has(c)) map.set(c, []);
+      map.get(c)!.push(t);
     });
-    return Array.from(map.entries()).map(([genre, list]) => ({
-      genre,
-      tracks: list,
-      cover: coverOf(list[0]!),
-    }));
+    return Array.from(map.entries()).map(([concept, list]) => {
+      const featured = list.find((t) => t.isFeatured) ?? list[0]!;
+      return { concept, tracks: list, featured, cover: coverOf(featured) };
+    });
   }, [tracks]);
 
-  // Auto-advance every ROTATE_MS while the section is in view and not paused.
+  const ROTATE_MS = 3000;
+
+
   useEffect(() => {
     if (!inView || paused || reduce || groups.length <= 1) return;
     const id = setInterval(() => {
@@ -236,11 +233,6 @@ export default function ComposerPresence() {
   }
 
   const current = groups[active]!;
-
-  // G5: force even wrap + no widow last-word on the rotating genre blurb,
-  // cross-browser. Re-balance whenever the active genre (and its text)
-  // changes.
-  const blurbRef = useBalancedText<HTMLParagraphElement>();
 
   return (
     <section
@@ -307,7 +299,7 @@ export default function ComposerPresence() {
 
         <AnimatePresence mode="popLayout">
           <motion.button
-            key={current.genre}
+            key={current.concept}
             type="button"
             onClick={() => startJourneyToSection()}
             initial={reduce ? { opacity: 0 } : { opacity: 0, x: '60%', rotateY: -28, filter: 'blur(8px)' }}
@@ -339,20 +331,57 @@ export default function ComposerPresence() {
             </div>
 
             {/* content */}
-            <div className="relative z-10 w-full flex items-center justify-between" style={{ padding: '0 clamp(2rem, 9vw, 10rem)' }}>
-              <div className="max-w-2xl text-left">
+            <div className="relative z-10 w-full h-full flex items-center justify-between" style={{ padding: '0 clamp(2rem, 9vw, 10rem)' }}>
+              <div
+                className="max-w-xl text-left"
+                style={{
+                  paddingRight: 'clamp(1rem, 2vw, 2.5rem)',
+                  // 2026-07-23 round 2 (per Reza): the reserved-height math
+                  // for the title (2 lines) + caption (3 lines) was based
+                  // on assumed font sizes, but never actually checked
+                  // against the band's REAL live height (clamp(160px,
+                  // 28vh, 300px) — much smaller on short viewports), so
+                  // the stack could still spill past the band's own
+                  // bottom edge. This hard-clips the whole column to
+                  // whatever height it's actually been given by its
+                  // flex parent, guaranteeing nothing can ever visually
+                  // escape the banner regardless of any math above.
+                  maxHeight: '100%',
+                  overflow: 'hidden',
+                }}
+              >
                 <span className="font-mono uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: 'var(--accent-color)' }}>
                   {String(active + 1).padStart(2, '0')} / {String(groups.length).padStart(2, '0')}
                 </span>
                 <h3
                   className="font-display font-light mt-3 text-white capitalize"
-                  style={{ fontSize: 'clamp(2rem, 5.5vw, 4.5rem)', lineHeight: 1 }}
+                  style={{
+                    fontSize: 'clamp(1.8rem, 4.8vw, 4rem)',
+                    lineHeight: 1.05,
+                    // 2026-07-23 (per Reza): real per-track titles vary in
+                    // length (unlike the old fixed genre name), so without
+                    // a reserved height each slide's block sat at a
+                    // different vertical position/size depending on
+                    // whether the title wrapped to 1 or 2 lines. Reserving
+                    // exactly 2 lines' worth of space — and hard-clamping
+                    // anything longer — keeps every slide visually
+                    // identical in proportions.
+                    minHeight: '2.1em',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
                 >
-                  {t(current.genre)}
+                  {resolveML(current.featured.title, locale) || t(current.concept)}
                 </h3>
-                <p ref={blurbRef} className="font-light mt-4 text-white/75" style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1.05rem)', lineHeight: 1.55, maxWidth: '46ch' }}>
-                  {t(blurbFor(current.genre))}
-                </p>
+                {/* 2026-07-23 round 3 (per Reza): caption removed from
+                    this banner entirely — title only. He preferred the
+                    look of it disappearing (which happened incidentally
+                    on short slides due to the overflow-safety clip above)
+                    over showing captions at all, so this is now the
+                    permanent, deliberate behavior rather than a
+                    height-dependent accident. */}
               </div>
 
               {/* Right-side zone: spray canvas + headphone glyph share one
@@ -403,7 +432,7 @@ export default function ComposerPresence() {
             that), so this needs a real z-index to win against it, not just
             DOM order. */}
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 6 }}>
-          <HeadphoneSpray active={spraySectionInView && !reduce} originRef={iconBoxRef} remeasureKey={current.genre} />
+          <HeadphoneSpray active={spraySectionInView && !reduce} originRef={iconBoxRef} remeasureKey={current.concept} />
         </div>
       </div>
 
@@ -411,9 +440,9 @@ export default function ComposerPresence() {
       <div className="flex items-center justify-center gap-2.5" style={{ marginTop: 'clamp(0.5rem, 1.5vh, 1rem)' }}>
         {groups.map((g, i) => (
           <button
-            key={g.genre}
+            key={g.concept}
             type="button"
-            aria-label={`${t('Show')} ${g.genre}`}
+            aria-label={`${t('Show')} ${g.concept}`}
             onClick={() => setActive(i)}
             className="rounded-full transition-all duration-500"
             style={{

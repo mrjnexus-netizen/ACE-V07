@@ -46,12 +46,19 @@ function trackCover(t: AudioTrack): string {
   return t.coverArt?.url || (t as unknown as { coverUrl?: string }).coverUrl || '';
 }
 
-function trackTitle(t: AudioTrack): string {
-  return t.title?.en || 'Untitled';
+// 2026-07-23 (per Reza): these were hardcoded to `.en` regardless of the
+// site's active locale -- the gallery lightbox kept showing English
+// title/caption even after the track's other 5 languages were correctly
+// translated and populated. Same fallback order as ComposerPresence.tsx's
+// resolveML: current locale, then English, then a safe default.
+function trackTitle(t: AudioTrack, locale: string): string {
+  const map = t.title as unknown as Record<string, string> | null | undefined;
+  return map?.[locale] || map?.en || 'Untitled';
 }
 
-function trackCaption(t: AudioTrack): string {
-  return t.narrative?.en || '';
+function trackCaption(t: AudioTrack, locale: string): string {
+  const map = t.narrative as unknown as Record<string, string> | null | undefined;
+  return map?.[locale] || map?.en || '';
 }
 
 interface ConceptGroup {
@@ -712,6 +719,7 @@ function OverlayPanel({
 }) {
   const { audioState, playTrack, pauseTrack, setPlaylist } = useAudio();
   const { t } = useT();
+  const { locale } = useIdentity();
 
   // Lock scroll + ESC while mounted. Lenis (smooth scroll) ignores plain body
   // overflow:hidden, so we stop the instance directly via window.__lenis and
@@ -859,8 +867,8 @@ function OverlayPanel({
                         return {
                           key: tk.id,
                           cover: trackCover(tk),
-                          title: trackTitle(tk),
-                          caption: trackCaption(tk),
+                          title: trackTitle(tk, locale ?? 'en'),
+                          caption: trackCaption(tk, locale ?? 'en'),
                           concept: group.label,
                           isCurrent,
                           isPlaying: isCurrent && audioState.isPlaying,

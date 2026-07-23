@@ -7,6 +7,7 @@ import { tracks, pipelineJobs } from '../db/schema';
 import { authGuard } from '../middleware/auth';
 import { generateArtDirection, buildFramedPrompt, generateSquareCoverArt, generateWideCoverArtFromReference } from '../services/aiArtGenerator';
 import { resolveActiveTextProvider, callTextProvider, findTextProvider } from '../services/aiProviders';
+import { translateToAllLocales } from '../services/localeCascadeTranslator';
 import { analyzeAudio } from '../services/audioAnalyser';
 import { analyzeVideo } from '../services/videoAnalyser';
 
@@ -400,15 +401,34 @@ router.post('/approve/:jobId', authGuard, async (req: Request, res: Response): P
     const generatedNarrative = job.generatedNarrative as Record<string, unknown> | null;
     const audioMetadata = job.audioMetadata as Record<string, unknown> | null;
 
+    // 2026-07-23 (per Reza): title was NEVER translated anywhere in the
+    // system -- both the manual-override path (AdminDashboard builds
+    // {en: manualTitle, es:'', fr:'', zh:'', ja:'', ko:''}) and this
+    // fallback path stored genuinely empty strings for the other 5
+    // languages, which is why the English title kept showing up on every
+    // non-English page. Cascade-translate it in both cases.
+    const titleEn =
+      title && typeof title === 'object' && typeof (title as Record<string, unknown>).en === 'string'
+        ? ((title as Record<string, unknown>).en as string)
+        : (audioMetadata?.title as string) || 'Untitled Composition';
+    const finalTitle = await translateToAllLocales(titleEn);
+
+    // Manual override takes priority (per Reza's spec) but — same bug as
+    // title above — was previously stored as {en, es:'', fr:'', ...},
+    // never actually translated. The AI-generated default path already IS
+    // a full cascaded object (from generateNarrative()), so only the
+    // manual-override branch needs a fresh translate call here.
+    const narrativeEn =
+      narrative && typeof narrative === 'object' && typeof (narrative as Record<string, unknown>).en === 'string'
+        ? ((narrative as Record<string, unknown>).en as string)
+        : '';
+    const finalNarrative = narrativeEn.trim()
+      ? await translateToAllLocales(narrativeEn)
+      : generatedNarrative || { en: '', es: '', fr: '', zh: '', ja: '', ko: '' };
+
     await db.update(tracks).set({
-      title: title || (audioMetadata?.title
-        ? { en: audioMetadata.title as string, es: '', fr: '', zh: '', ja: '', ko: '' }
-        : { en: 'Untitled Composition', es: '', fr: '', zh: '', ja: '', ko: '' }),
-      // Manual override takes priority (per Reza's spec); otherwise the
-      // FULL generated object — was previously falling back to just the
-      // English STRING, storing malformed data in a column typed for the
-      // {en,es,fr,zh,ja,ko} shape.
-      narrative: narrative || generatedNarrative || { en: '', es: '', fr: '', zh: '', ja: '', ko: '' },
+      title: finalTitle,
+      narrative: finalNarrative,
       // Manual thumbnail upload takes priority over the AI-generated one.
       coverUrl: coverUrl || job.generatedArtUrl,
       // Same pattern for the wide banner (2026-07-19) — a manual upload

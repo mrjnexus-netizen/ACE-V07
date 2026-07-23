@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { db } from '../db/db';
 import { tracks } from '../db/schema';
 import { authGuard } from '../middleware/auth';
+import { cascadeLocaleFieldIfChanged } from '../services/localeCascadeTranslator';
 
 const router: Router = Router();
 
@@ -78,9 +79,15 @@ router.post('/', authGuard, async (req: Request, res: Response) => {
       });
     }
     const data = req.body;
+    // 2026-07-23 (per Reza): title/caption produced by the admin must be
+    // auto-translated into all 5 other languages immediately, whether
+    // AI-generated or hand-typed. A brand-new track has no prior English
+    // value to compare against, so any provided title/narrative cascades.
+    const cascadedTitle = await cascadeLocaleFieldIfChanged(data.title, undefined);
+    const cascadedNarrative = await cascadeLocaleFieldIfChanged(data.narrative, undefined);
     const [newTrack] = await db.insert(tracks).values({
-      title: data.title,
-      narrative: data.narrative,
+      title: cascadedTitle ?? data.title,
+      narrative: cascadedNarrative ?? data.narrative,
       audioUrl: data.audioUrl,
       coverUrl: data.coverUrl,
       coverBlur: data.coverBlur,
@@ -164,9 +171,28 @@ router.put('/:id', authGuard, async (req: Request, res: Response) => {
       });
     }
     const data = req.body;
+
+    // 2026-07-23 (per Reza): editing a published track's English title or
+    // caption never re-triggered translation into the other 5 languages --
+    // the old value stayed frozen (or, if it was already blank from the
+    // approve-time bug fixed alongside this, blank forever). Fetch the
+    // currently-stored English text so we only pay for a fresh translate
+    // call when it actually changed, then cascade if so.
+    const existingTrack = await db.query.tracks.findFirst({ where: eq(tracks.id, id!) });
+    const previousTitleEn =
+      existingTrack && typeof existingTrack.title === 'object' && existingTrack.title
+        ? ((existingTrack.title as Record<string, unknown>).en as string | undefined)
+        : undefined;
+    const previousNarrativeEn =
+      existingTrack && typeof existingTrack.narrative === 'object' && existingTrack.narrative
+        ? ((existingTrack.narrative as Record<string, unknown>).en as string | undefined)
+        : undefined;
+    const cascadedTitle = await cascadeLocaleFieldIfChanged(data.title, previousTitleEn);
+    const cascadedNarrative = await cascadeLocaleFieldIfChanged(data.narrative, previousNarrativeEn);
+
     const updatePayload: Record<string, unknown> = {
-      title: data.title,
-      narrative: data.narrative,
+      title: cascadedTitle ?? data.title,
+      narrative: cascadedNarrative ?? data.narrative,
       audioUrl: data.audioUrl,
       coverUrl: data.coverUrl,
       coverBlur: data.coverBlur,
