@@ -8,6 +8,7 @@ import { db } from '../db/db';
 import { composerIdentity, projects as projectsTable, apiKeys } from '../db/schema';
 import { authGuard } from '../middleware/auth';
 import { decrypt } from '../services/encryptionService';
+import { cascadeLocaleFieldIfChanged } from '../services/localeCascadeTranslator';
 
 
 const router: Router = Router();
@@ -172,13 +173,26 @@ router.put('/', authGuard, async (req: Request, res: Response<ApiResponse<string
       }).returning();
       identity = newIdentity;
     } else {
+      // 2026-07-23 (per Reza, exhaustive audit): tagline/biography are
+      // real prose, same as track titles/narratives -- they need the
+      // same cascade-translate-on-change treatment, not a raw pass-
+      // through of whatever the admin's edit form sent.
+      const cascadedTagline = await cascadeLocaleFieldIfChanged(
+        updateData.tagline,
+        (identity.tagline as Record<string, unknown> | null)?.en as string | undefined
+      );
+      const cascadedBiography = await cascadeLocaleFieldIfChanged(
+        updateData.biography,
+        (identity.biography as Record<string, unknown> | null)?.en as string | undefined
+      );
+
       // Update existing identity
       await db
         .update(composerIdentity)
         .set({
           name: updateData.name !== undefined ? updateData.name : identity.name,
-          tagline: updateData.tagline !== undefined ? updateData.tagline : identity.tagline,
-          biography: updateData.biography !== undefined ? updateData.biography : identity.biography,
+          tagline: cascadedTagline ?? identity.tagline,
+          biography: cascadedBiography ?? identity.biography,
           awards: updateData.awards !== undefined ? updateData.awards as unknown[] : identity.awards as unknown[],
           studioAddress: updateData.studioAddress !== undefined ? updateData.studioAddress : identity.studioAddress,
           portraitUrl: updateData.portraitUrl !== undefined ? updateData.portraitUrl : identity.portraitUrl,
@@ -193,16 +207,39 @@ router.put('/', authGuard, async (req: Request, res: Response<ApiResponse<string
 
     // Handle projects list sync
     if (identity && updateData.projects && Array.isArray(updateData.projects)) {
-      // For simplicity, delete all projects and insert new ones
+      // 2026-07-23 (per Reza, exhaustive audit): this used to store
+      // proj.title/proj.description exactly as sent by the admin's edit
+      // form, with no cascade-translate step at all -- the identical
+      // stale/blank-translation bug already found and fixed in
+      // tracks.ts's PUT /:id. Since this whole block deletes ALL
+      // projects and reinserts the full list on every save, look up
+      // each project's PREVIOUS English text (by id) before deleting,
+      // so an edit to one project doesn't trigger pointless retranslation
+      // of the other eleven.
+      const previousProjects = await db.query.projects.findMany({
+        where: eq(projectsTable.composerId, identity.id),
+      });
+      const previousById = new Map(previousProjects.map((p) => [p.id, p]));
+
       await db.delete(projectsTable).where(eq(projectsTable.composerId, identity.id));
 
       for (const proj of updateData.projects) {
+        const previous = proj.id ? previousById.get(proj.id) : undefined;
+        const cascadedTitle = await cascadeLocaleFieldIfChanged(
+          proj.title,
+          (previous?.title as Record<string, unknown> | null)?.en as string | undefined
+        );
+        const cascadedDescription = await cascadeLocaleFieldIfChanged(
+          proj.description,
+          (previous?.description as Record<string, unknown> | null)?.en as string | undefined
+        );
+
         await db.insert(projectsTable).values({
           composerId: identity.id,
-          title: proj.title,
+          title: cascadedTitle ?? proj.title,
           type: proj.type,
           year: proj.year || 0,
-          description: proj.description,
+          description: cascadedDescription ?? proj.description,
           coverUrl: proj.coverImage?.url || null,
           coverBlur: proj.coverImage?.blurHash || null,
         });
