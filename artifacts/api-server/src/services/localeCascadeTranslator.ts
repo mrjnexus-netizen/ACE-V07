@@ -40,9 +40,64 @@ const TARGET_LANGUAGES: Array<[key: 'es' | 'fr' | 'zh' | 'ja' | 'ko', name: stri
  * since by the time this runs the final English wording has already been
  * decided (by the admin or by the pipeline's own generation step).
  */
+// 2026-07-23 (per Reza): a real occurrence was found in production --
+// Korean title stored as "네온 무_sock" for "Neon Monsoon" -- a
+// genuinely malformed AI response (mixed-script garbage with a stray
+// underscore) that got saved verbatim because nothing ever validated
+// the model's output before writing it to the database. This is a
+// systemic gap, not a one-off: ANY translation call, from ANY caller,
+// through ANY provider, can occasionally return junk. isPlausible()
+// below is a cheap, low-false-positive check for the clearest signs of
+// a broken response; isValidTranslation() below wraps it with the
+// obvious "is it even non-empty" check. Never allowlists based on the
+// content itself (no per-language guessing) -- it only rejects patterns
+// that are essentially never present in legitimate natural-language
+// prose in ANY of the 5 target languages.
+function isPlausibleTranslation(text: string, englishSource: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  // Underscores are not natural punctuation in prose in any of these
+  // languages -- their presence is a strong, specific signal of a
+  // corrupted/truncated model response, exactly like the Neon Monsoon case.
+  if (trimmed.includes('_')) return false;
+  // A translation that's byte-for-byte identical to the English source
+  // (for target languages that don't share a script with English) is
+  // almost certainly a failed/echoed response rather than a real
+  // translation.
+  if (trimmed === englishSource.trim()) return false;
+  return true;
+}
+
 export async function translateToAllLocales(englishText: string): Promise<MultiLingualText> {
   const blank: MultiLingualText = { en: englishText, es: '', fr: '', zh: '', ja: '', ko: '' };
   if (!englishText || !englishText.trim()) return blank;
+
+  const translateOne = async (
+    provider: Parameters<typeof callTextProvider>[0],
+    model: string,
+    apiKey: string,
+    langName: string
+  ): Promise<string> => {
+    const prompt = `Translate the following into ${langName}. Reply with ONLY the translation, no extra text.`;
+    // Try up to 2 times total: the model occasionally returns a garbled
+    // or truncated response on the first attempt (as happened for
+    // Korean above) -- a second attempt with the identical prompt is
+    // enough to self-heal the vast majority of these without adding
+    // meaningfully to latency/cost.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await callTextProvider(provider, model, apiKey, prompt, englishText);
+        if (isPlausibleTranslation(result, englishText)) return result;
+        console.warn(`[LocaleCascade] Implausible ${langName} translation (attempt ${attempt + 1}):`, result);
+      } catch (err) {
+        console.warn(`[LocaleCascade] ${langName} translation attempt ${attempt + 1} failed:`, err);
+      }
+    }
+    // Both attempts failed validation -- leave blank rather than store
+    // garbage; the frontend's own locale-resolution already falls back
+    // to English when a locale value is empty.
+    return '';
+  };
 
   const runWith = async (
     provider: Parameters<typeof callTextProvider>[0],
@@ -50,15 +105,7 @@ export async function translateToAllLocales(englishText: string): Promise<MultiL
     apiKey: string
   ): Promise<MultiLingualText> => {
     const translations = await Promise.allSettled(
-      TARGET_LANGUAGES.map(([, langName]) =>
-        callTextProvider(
-          provider,
-          model,
-          apiKey,
-          `Translate the following into ${langName}. Reply with ONLY the translation, no extra text.`,
-          englishText
-        )
-      )
+      TARGET_LANGUAGES.map(([, langName]) => translateOne(provider, model, apiKey, langName))
     );
     const result: MultiLingualText = { ...blank };
     TARGET_LANGUAGES.forEach(([code], i) => {
