@@ -4,6 +4,7 @@ import pino from "pino";
 
 import { db } from "./db";
 import { composerIdentity, projects, tracks } from "./schema";
+import { translateToAllLocales } from "../services/localeCascadeTranslator";
 
 const logger = pino({
   transport: {
@@ -16,7 +17,10 @@ const logger = pino({
 
 type Localized = Record<string, string>;
 
-// Same text across all six supported locales (placeholder until real translations).
+// Same text across all six locales -- ONLY for things that must never be
+// translated (a person's own name, a physical address). Do not use this
+// for any actual prose (titles, narratives, descriptions, taglines,
+// biography) -- use translated() below instead.
 const all = (text: string): Localized => ({
   en: text,
   es: text,
@@ -26,14 +30,29 @@ const all = (text: string): Localized => ({
   ko: text,
 });
 
+// 2026-07-23 (per Reza): every piece of real prose seeded into the DB
+// must be genuinely translated into all 6 locales, the same as content
+// produced anywhere else in the system (Media Pipeline, admin edits) --
+// not left as an English placeholder duplicated across locale fields.
+// Root cause this fixes: `all()` was ALWAYS meant to be temporary ("Same
+// text across all six supported locales (placeholder until real
+// translations)" per the original comment) but nothing ever replaced it,
+// so 6 sample tracks and 12 sample projects sat with duplicated-English
+// "translations" indefinitely -- invisible to the backfill script too,
+// since those fields were non-empty (just wrong), not blank.
+async function translated(text: string): Promise<Localized> {
+  const result = await translateToAllLocales(text);
+  return result as unknown as Localized;
+}
+
 const seedContent = async (): Promise<void> => {
   logger.info("Seeding sample content...");
 
   // 1) Composer identity: fill the empty handoff defaults with real sample content.
   const identityValues = {
     name: all("Amir Moslehi"),
-    tagline: all("Composer of cinematic worlds"),
-    biography: all(
+    tagline: await translated("Composer of cinematic worlds"),
+    biography: await translated(
       "Amir Moslehi is an international composer crafting orchestral and electronic scores for film, games, and immersive media. His work fuses classical depth with modern texture, building emotional arcs that move between intimate stillness and full-spectrum intensity."
     ),
     awards: [
@@ -68,12 +87,11 @@ const seedContent = async (): Promise<void> => {
       `Tracks already exist (${existingTracks.length}), skipping track seed.`
     );
   } else {
-    const sampleTracks = [
+    const trackSpecs = [
       {
-        title: all("Aurora Borealis"),
-        narrative: all(
-          "A slow bloom of strings beneath a shifting electronic sky - light folding over light."
-        ),
+        titleEn: "Aurora Borealis",
+        narrativeEn:
+          "A slow bloom of strings beneath a shifting electronic sky - light folding over light.",
         genre: "Orchestral",
         mood: "Ethereal",
         bpm: 72,
@@ -84,10 +102,9 @@ const seedContent = async (): Promise<void> => {
         dominantColors: ["#D4AF37", "#0F0F0F", "#888880"],
       },
       {
-        title: all("Crimson Tide"),
-        narrative: all(
-          "Low brass and pulsing percussion drive a relentless current toward an inevitable horizon."
-        ),
+        titleEn: "Crimson Tide",
+        narrativeEn:
+          "Low brass and pulsing percussion drive a relentless current toward an inevitable horizon.",
         genre: "Cinematic",
         mood: "Tense",
         bpm: 120,
@@ -98,10 +115,9 @@ const seedContent = async (): Promise<void> => {
         dominantColors: ["#B8960C", "#1A1A1A", "#F5F5F0"],
       },
       {
-        title: all("Silent Cartography"),
-        narrative: all(
-          "Sparse piano maps an empty landscape; every note is a coordinate in the quiet."
-        ),
+        titleEn: "Silent Cartography",
+        narrativeEn:
+          "Sparse piano maps an empty landscape; every note is a coordinate in the quiet.",
         genre: "Ambient",
         mood: "Contemplative",
         bpm: 60,
@@ -112,10 +128,9 @@ const seedContent = async (): Promise<void> => {
         dominantColors: ["#242424", "#D4AF37", "#444440"],
       },
       {
-        title: all("The Last Algorithm"),
-        narrative: all(
-          "Orchestra and synthesis collide - a machine learning how to feel, one phrase at a time."
-        ),
+        titleEn: "The Last Algorithm",
+        narrativeEn:
+          "Orchestra and synthesis collide - a machine learning how to feel, one phrase at a time.",
         genre: "Electronic-Orchestral",
         mood: "Driving",
         bpm: 134,
@@ -126,10 +141,9 @@ const seedContent = async (): Promise<void> => {
         dominantColors: ["#D4AF37", "#080808", "#B8960C"],
       },
       {
-        title: all("Lacrimosa Reborn"),
-        narrative: all(
-          "A choir rises from silence, reshaping an old lament into something luminous and new."
-        ),
+        titleEn: "Lacrimosa Reborn",
+        narrativeEn:
+          "A choir rises from silence, reshaping an old lament into something luminous and new.",
         genre: "Choral",
         mood: "Sorrowful",
         bpm: 66,
@@ -140,10 +154,9 @@ const seedContent = async (): Promise<void> => {
         dominantColors: ["#F5F5F0", "#2A2A2A", "#D4AF37"],
       },
       {
-        title: all("Neon Monsoon"),
-        narrative: all(
-          "Warm analog synths fall like rain over a city that only exists after midnight."
-        ),
+        titleEn: "Neon Monsoon",
+        narrativeEn:
+          "Warm analog synths fall like rain over a city that only exists after midnight.",
         genre: "Synthwave",
         mood: "Nostalgic",
         bpm: 100,
@@ -154,6 +167,16 @@ const seedContent = async (): Promise<void> => {
         dominantColors: ["#B8960C", "#0F0F0F", "#888880"],
       },
     ];
+
+    const sampleTracks = [];
+    for (const spec of trackSpecs) {
+      const { titleEn, narrativeEn, ...rest } = spec;
+      sampleTracks.push({
+        ...rest,
+        title: await translated(titleEn),
+        narrative: await translated(narrativeEn),
+      });
+    }
 
     await db.insert(tracks).values(sampleTracks);
     logger.info(`Seeded ${sampleTracks.length} sample tracks.`);
@@ -172,116 +195,103 @@ const seedContent = async (): Promise<void> => {
         `Projects already exist (${existingProjects.length}), skipping project seed.`
       );
     } else {
-      const sampleProjects = [
+      const projectSpecs = [
         {
-          composerId: identityRow.id,
-          title: all("Echoes of Tomorrow"),
           type: "film",
           year: 2024,
-          description: all(
-            "An original orchestral score for a near-future science-fiction feature exploring memory and machine consciousness."
-          ),
+          titleEn: "Echoes of Tomorrow",
+          descriptionEn:
+            "An original orchestral score for a near-future science-fiction feature exploring memory and machine consciousness.",
         },
         {
-          composerId: identityRow.id,
-          title: all("The Hollow Crown"),
           type: "tv",
           year: 2024,
-          description: all(
-            "Recurring themes and season-long motifs for a prestige historical drama series."
-          ),
+          titleEn: "The Hollow Crown",
+          descriptionEn:
+            "Recurring themes and season-long motifs for a prestige historical drama series.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Vanguard Protocol"),
           type: "game",
           year: 2023,
-          description: all(
-            "Adaptive electronic-orchestral music for a tactical AAA game, scaling in real time with on-screen intensity."
-          ),
+          titleEn: "Vanguard Protocol",
+          descriptionEn:
+            "Adaptive electronic-orchestral music for a tactical AAA game, scaling in real time with on-screen intensity.",
         },
         {
-          composerId: identityRow.id,
-          title: all("The Cartographer's Daughter"),
           type: "animation",
           year: 2023,
-          description: all(
-            "A delicate, folk-tinged score for an award-winning animated short about a girl who maps imaginary worlds."
-          ),
+          titleEn: "The Cartographer's Daughter",
+          descriptionEn:
+            "A delicate, folk-tinged score for an award-winning animated short about a girl who maps imaginary worlds.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Northern Silence"),
           type: "documentary",
           year: 2022,
-          description: all(
-            "Ambient textures and field-recording-inspired soundscapes for a documentary on the vanishing Arctic."
-          ),
+          titleEn: "Northern Silence",
+          descriptionEn:
+            "Ambient textures and field-recording-inspired soundscapes for a documentary on the vanishing Arctic.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Aurora — Brand Anthem"),
           type: "advertising",
           year: 2024,
-          description: all(
-            "A precise, memorable sonic identity composed for a global brand's flagship campaign."
-          ),
+          titleEn: "Aurora — Brand Anthem",
+          descriptionEn:
+            "A precise, memorable sonic identity composed for a global brand's flagship campaign.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Dominion — Main Trailer"),
           type: "trailer",
           year: 2024,
-          description: all(
-            "High-impact hybrid cues engineered to drive a blockbuster theatrical trailer."
-          ),
+          titleEn: "Dominion — Main Trailer",
+          descriptionEn:
+            "High-impact hybrid cues engineered to drive a blockbuster theatrical trailer.",
         },
         {
-          composerId: identityRow.id,
-          title: all("The Glass Garden"),
           type: "theatre",
           year: 2023,
-          description: all(
-            "A live chamber score for the stage, written to breathe with the performers each night."
-          ),
+          titleEn: "The Glass Garden",
+          descriptionEn:
+            "A live chamber score for the stage, written to breathe with the performers each night.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Murmuration"),
           type: "dance",
           year: 2023,
-          description: all(
-            "A rhythm-led score for a contemporary ballet, tempo shaped as choreography."
-          ),
+          titleEn: "Murmuration",
+          descriptionEn:
+            "A rhythm-led score for a contemporary ballet, tempo shaped as choreography.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Symphony No. 1 — Tidewater"),
           type: "concert",
           year: 2022,
-          description: all(
-            "A full-scale concert work for orchestra, premiered in the season's opening night."
-          ),
+          titleEn: "Symphony No. 1 — Tidewater",
+          descriptionEn:
+            "A full-scale concert work for orchestra, premiered in the season's opening night.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Liminal Spaces"),
           type: "vr",
           year: 2024,
-          description: all(
-            "Spatial, fully immersive audio composed for a room-scale VR art installation."
-          ),
+          titleEn: "Liminal Spaces",
+          descriptionEn:
+            "Spatial, fully immersive audio composed for a room-scale VR art installation.",
         },
         {
-          composerId: identityRow.id,
-          title: all("Nightfall Sessions"),
           type: "album",
           year: 2023,
-          description: all(
-            "A long-form artist album released under the composer's own name — intimate and exploratory."
-          ),
+          titleEn: "Nightfall Sessions",
+          descriptionEn:
+            "A long-form artist album released under the composer's own name — intimate and exploratory.",
         },
       ];
+
+      const sampleProjects = [];
+      for (const spec of projectSpecs) {
+        const { titleEn, descriptionEn, ...rest } = spec;
+        sampleProjects.push({
+          composerId: identityRow.id,
+          ...rest,
+          title: await translated(titleEn),
+          description: await translated(descriptionEn),
+        });
+      }
 
       await db.insert(projects).values(sampleProjects);
       logger.info(`Seeded ${sampleProjects.length} sample projects.`);
